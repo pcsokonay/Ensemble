@@ -23,17 +23,22 @@ class AuthService {
         scheme: uri.scheme,
         host: uri.host,
         port: uri.hasPort ? uri.port : null,
-        path: '/api/verify',
+        path: '/api/firstfactor',
       );
 
       _logger.log('Auth URL: $authUrl');
 
-      // Try basic authentication first
-      final response = await http.get(
+      // Use Authelia's firstfactor endpoint with POST
+      final response = await http.post(
         authUrl,
         headers: {
-          'Authorization': 'Basic ${base64Encode(utf8.encode('$username:$password'))}',
+          'Content-Type': 'application/json',
         },
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+          'keepMeLoggedIn': true,
+        }),
       ).timeout(const Duration(seconds: 10));
 
       _logger.log('Auth response status: ${response.statusCode}');
@@ -52,9 +57,10 @@ class AuthService {
         }
       }
 
-      // If no cookie, check if authentication was successful
+      // Check response status
       if (response.statusCode == 200) {
-        _logger.log('✓ Authentication successful (no cookie needed)');
+        _logger.log('✓ Authentication successful');
+        // If 200 but no cookie, might not need auth
         return 'authenticated';
       }
 
