@@ -3,9 +3,13 @@ import '../models/media_item.dart';
 import '../models/player.dart';
 import '../services/music_assistant_api.dart';
 import '../services/settings_service.dart';
+import '../services/builtin_player_service.dart';
+import '../services/audio_player_service.dart';
 
 class MusicAssistantProvider with ChangeNotifier {
   MusicAssistantAPI? _api;
+  BuiltinPlayerService? _builtinPlayer;
+  final AudioPlayerService _audioPlayer = AudioPlayerService();
   MAConnectionState _connectionState = MAConnectionState.disconnected;
   String? _serverUrl;
 
@@ -52,8 +56,16 @@ class MusicAssistantProvider with ChangeNotifier {
         notifyListeners();
 
         if (state == MAConnectionState.connected) {
+          // Start built-in player service
+          _builtinPlayer = BuiltinPlayerService(_api!, _audioPlayer);
+          _builtinPlayer!.start();
+
           // Auto-load library when connected
           loadLibrary();
+        } else if (state == MAConnectionState.disconnected) {
+          // Stop built-in player service
+          _builtinPlayer?.stop();
+          _builtinPlayer = null;
         }
       });
 
@@ -68,6 +80,8 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _builtinPlayer?.stop();
+    _builtinPlayer = null;
     await _api?.disconnect();
     _connectionState = MAConnectionState.disconnected;
     _artists = [];
@@ -75,6 +89,9 @@ class MusicAssistantProvider with ChangeNotifier {
     _tracks = [];
     notifyListeners();
   }
+
+  /// Get the built-in player ID (the ID of this mobile app as a player)
+  String? get builtinPlayerId => _api?.builtinPlayerId;
 
   Future<void> loadLibrary() async {
     if (!isConnected) return;
@@ -238,6 +255,8 @@ class MusicAssistantProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _builtinPlayer?.dispose();
+    _audioPlayer.dispose();
     _api?.dispose();
     super.dispose();
   }

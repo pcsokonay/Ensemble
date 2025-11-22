@@ -7,6 +7,7 @@ class SettingsService {
   static const String _keyAuthToken = 'auth_token';
   static const String _keyUsername = 'username';
   static const String _keyPassword = 'password';
+  static const String _keyBuiltinPlayerId = 'builtin_player_id';
   static const String _keyDefaultServer = 'ma.serverscloud.org';
 
   static Future<String> getServerUrl() async {
@@ -97,6 +98,18 @@ class SettingsService {
     } else {
       await prefs.setString(_keyPassword, password);
     }
+  }
+
+  // Get built-in player ID (persistent UUID for this device)
+  static Future<String?> getBuiltinPlayerId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyBuiltinPlayerId);
+  }
+
+  // Set built-in player ID
+  static Future<void> setBuiltinPlayerId(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyBuiltinPlayerId, id);
   }
 
   static Future<void> clearSettings() async {

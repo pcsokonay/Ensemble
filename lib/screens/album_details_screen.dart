@@ -41,55 +41,20 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
     if (_tracks.isEmpty) return;
 
     final maProvider = context.read<MusicAssistantProvider>();
-    final playerProvider = context.read<MusicPlayerProvider>();
 
     try {
-      // 1. Get available players
-      final players = await maProvider.getPlayers();
-      if (players.isEmpty) {
-        _showError('No players available');
+      // Get the built-in player ID (this mobile app)
+      final playerId = maProvider.builtinPlayerId;
+      if (playerId == null) {
+        _showError('Built-in player not registered');
         return;
       }
 
-      // 2. Find the built-in player or use first available
-      final player = players.firstWhere(
-        (p) => p.playerId.contains('builtin') && p.available,
-        orElse: () => players.firstWhere((p) => p.available, orElse: () => players.first),
-      );
+      print('🎵 Queueing album on built-in player: $playerId');
 
-      print('🎵 Using player: ${player.name} (${player.playerId})');
-
-      // 3. Queue all tracks via Music Assistant WebSocket (starting from index 0)
-      await maProvider.playTracks(player.playerId, _tracks, startIndex: 0);
-      print('✓ Album queued in Music Assistant');
-
-      // 4. Wait a moment for Music Assistant to process the queue
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // 5. Get the stream URL from the queue
-      final streamUrl = await maProvider.getCurrentStreamUrl(player.playerId);
-      if (streamUrl == null) {
-        _showError('Failed to get stream URL from queue');
-        return;
-      }
-
-      print('🎵 Stream URL from queue: $streamUrl');
-
-      // 6. Convert tracks to AudioTrack objects with the queue-based stream URL
-      final audioTracks = _tracks.map((track) {
-        return AudioTrack(
-          id: track.itemId,
-          title: track.name,
-          artist: track.artistsString,
-          album: widget.album.name,
-          filePath: streamUrl, // All tracks will use queue-based streaming
-          duration: track.duration,
-        );
-      }).toList();
-
-      // 7. Play via local audio player
-      await playerProvider.setPlaylist(audioTracks);
-      await playerProvider.play();
+      // Queue all tracks via Music Assistant - the BuiltinPlayerService will handle playback
+      await maProvider.playTracks(playerId, _tracks, startIndex: 0);
+      print('✓ Album queued - playback will start automatically');
 
       if (mounted) {
         Navigator.pop(context);
@@ -102,55 +67,20 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> {
 
   Future<void> _playTrack(int index) async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final playerProvider = context.read<MusicPlayerProvider>();
 
     try {
-      // 1. Get available players
-      final players = await maProvider.getPlayers();
-      if (players.isEmpty) {
-        _showError('No players available');
+      // Get the built-in player ID (this mobile app)
+      final playerId = maProvider.builtinPlayerId;
+      if (playerId == null) {
+        _showError('Built-in player not registered');
         return;
       }
 
-      // 2. Find the built-in player or use first available
-      final player = players.firstWhere(
-        (p) => p.playerId.contains('builtin') && p.available,
-        orElse: () => players.firstWhere((p) => p.available, orElse: () => players.first),
-      );
+      print('🎵 Queueing tracks on built-in player: $playerId starting at index $index');
 
-      print('🎵 Using player: ${player.name} (${player.playerId})');
-
-      // 3. Queue the tracks via Music Assistant WebSocket
-      await maProvider.playTracks(player.playerId, _tracks, startIndex: index);
-      print('✓ Tracks queued in Music Assistant');
-
-      // 4. Wait a moment for Music Assistant to process the queue
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // 5. Get the stream URL from the queue
-      final streamUrl = await maProvider.getCurrentStreamUrl(player.playerId);
-      if (streamUrl == null) {
-        _showError('Failed to get stream URL from queue');
-        return;
-      }
-
-      print('🎵 Stream URL from queue: $streamUrl');
-
-      // 6. Convert tracks to AudioTrack objects with the queue-based stream URL
-      final audioTracks = _tracks.map((track) {
-        return AudioTrack(
-          id: track.itemId,
-          title: track.name,
-          artist: track.artistsString,
-          album: widget.album.name,
-          filePath: streamUrl, // All tracks will use queue-based streaming
-          duration: track.duration,
-        );
-      }).toList();
-
-      // 7. Play via local audio player
-      await playerProvider.setPlaylist(audioTracks, initialIndex: index);
-      await playerProvider.play();
+      // Queue tracks starting at the selected index - BuiltinPlayerService will handle playback
+      await maProvider.playTracks(playerId, _tracks, startIndex: index);
+      print('✓ Tracks queued - playback will start automatically');
 
       if (mounted) {
         Navigator.pop(context);
