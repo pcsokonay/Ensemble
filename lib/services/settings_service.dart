@@ -8,11 +8,10 @@ class SettingsService {
   static const String _keyUsername = 'username';
   static const String _keyPassword = 'password';
   static const String _keyBuiltinPlayerId = 'builtin_player_id';
-  static const String _keyDefaultServer = 'ma.serverscloud.org';
 
-  static Future<String> getServerUrl() async {
+  static Future<String?> getServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyServerUrl) ?? _keyDefaultServer;
+    return prefs.getString(_keyServerUrl);
   }
 
   static Future<void> setServerUrl(String url) async {

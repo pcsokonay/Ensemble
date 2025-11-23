@@ -23,7 +23,7 @@ class NewHomeScreen extends StatelessWidget {
           padding: const EdgeInsets.only(left: 8.0),
           child: Image.asset(
             'assets/images/logo.png',
-            height: 56,
+            height: 72,
             fit: BoxFit.contain,
             alignment: Alignment.centerLeft,
           ),

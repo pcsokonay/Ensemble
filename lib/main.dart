@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/music_assistant_provider.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
+import 'services/settings_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,8 +91,36 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
           ),
           fontFamily: 'Roboto',
         ),
-        home: const HomeScreen(),
+        home: const AppStartup(),
       ),
+    );
+  }
+}
+
+/// Startup widget that checks if user is logged in and shows appropriate screen
+class AppStartup extends StatelessWidget {
+  const AppStartup({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: SettingsService.getServerUrl(),
+      builder: (context, snapshot) {
+        // Show loading while checking settings
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF1a1a1a),
+            body: Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+        }
+
+        // If server URL is saved, go to home screen
+        // Otherwise, show login screen
+        final hasServerUrl = snapshot.data != null && snapshot.data!.isNotEmpty;
+        return hasServerUrl ? const HomeScreen() : const LoginScreen();
+      },
     );
   }
 }

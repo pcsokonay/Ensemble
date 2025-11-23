@@ -33,7 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final provider = context.read<MusicAssistantProvider>();
-    _serverUrlController.text = provider.serverUrl ?? 'ma.serverscloud.org';
+    _serverUrlController.text = provider.serverUrl ?? '';
 
     final authServerUrl = await SettingsService.getAuthServerUrl();
     if (authServerUrl != null) {
@@ -272,7 +272,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               controller: _serverUrlController,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'ma.serverscloud.org or 192.168.1.100',
+                hintText: 'e.g., music.example.com or 192.168.1.100',
                 hintStyle: const TextStyle(color: Colors.white38),
                 filled: true,
                 fillColor: Colors.white12,
@@ -301,7 +301,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Only needed if using Authelia on a separate domain (e.g., auth.serverscloud.org)',
+              'Only needed if using Authelia on a separate domain',
               style: TextStyle(
                 color: Colors.white54,
                 fontSize: 12,
@@ -313,7 +313,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               controller: _authServerUrlController,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'e.g., auth.serverscloud.org',
+                hintText: 'e.g., auth.example.com',
                 hintStyle: const TextStyle(color: Colors.white38),
                 filled: true,
                 fillColor: Colors.white12,

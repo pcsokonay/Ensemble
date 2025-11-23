@@ -654,29 +654,45 @@ class MusicAssistantAPI {
     return await RetryHelper.retryNetwork(
       operation: () async {
         try {
-          final response = await _sendCommand(
-            'music/search',
-            args: {'search': query},
+          _logger.log('Searching for: $query');
+
+          // Search each media type separately
+          final artistsResponse = await _sendCommand(
+            'music/artists/library_items',
+            args: {'search': query, 'limit': 50},
           );
 
-          final result = response['result'] as Map<String, dynamic>?;
-          if (result == null) {
-            return <String, List<MediaItem>>{'artists': [], 'albums': [], 'tracks': []};
-          }
+          final albumsResponse = await _sendCommand(
+            'music/albums/library_items',
+            args: {'search': query, 'limit': 50},
+          );
+
+          final tracksResponse = await _sendCommand(
+            'music/tracks/library_items',
+            args: {'search': query, 'limit': 50},
+          );
+
+          final artists = (artistsResponse['result'] as List<dynamic>?)
+                  ?.map((item) => Artist.fromJson(item as Map<String, dynamic>))
+                  .toList() ??
+              [];
+
+          final albums = (albumsResponse['result'] as List<dynamic>?)
+                  ?.map((item) => Album.fromJson(item as Map<String, dynamic>))
+                  .toList() ??
+              [];
+
+          final tracks = (tracksResponse['result'] as List<dynamic>?)
+                  ?.map((item) => Track.fromJson(item as Map<String, dynamic>))
+                  .toList() ??
+              [];
+
+          _logger.log('Search results: ${artists.length} artists, ${albums.length} albums, ${tracks.length} tracks');
 
           return <String, List<MediaItem>>{
-            'artists': (result['artists'] as List<dynamic>?)
-                    ?.map((item) => Artist.fromJson(item as Map<String, dynamic>))
-                    .toList() ??
-                [],
-            'albums': (result['albums'] as List<dynamic>?)
-                    ?.map((item) => Album.fromJson(item as Map<String, dynamic>))
-                    .toList() ??
-                [],
-            'tracks': (result['tracks'] as List<dynamic>?)
-                    ?.map((item) => Track.fromJson(item as Map<String, dynamic>))
-                    .toList() ??
-                [],
+            'artists': artists,
+            'albums': albums,
+            'tracks': tracks,
           };
         } catch (e) {
           _logger.log('Error searching: $e');
