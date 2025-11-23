@@ -514,14 +514,24 @@ class MusicAssistantProvider with ChangeNotifier {
 
       if (queue != null && queue.currentItem != null) {
         _currentTrack = queue.currentItem!.track;
+        _logger.log('✅ Current track updated: ${_currentTrack!.name}');
         notifyListeners();
-      } else if (_currentTrack != null) {
-        // Clear current track if queue is empty
-        _currentTrack = null;
-        notifyListeners();
+      } else {
+        if (queue == null) {
+          _logger.log('⚠️ Queue is null for player ${_selectedPlayer!.playerId}');
+        } else if (queue.currentItem == null) {
+          _logger.log('⚠️ Queue currentItem is null (currentIndex: ${queue.currentIndex}, items: ${queue.items.length})');
+        }
+
+        if (_currentTrack != null) {
+          // Clear current track if queue is empty
+          _currentTrack = null;
+          _logger.log('🗑️ Cleared current track');
+          notifyListeners();
+        }
       }
     } catch (e) {
-      // Silently fail - don't spam logs
+      _logger.log('❌ Error updating player state: $e');
     }
   }
 
