@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../screens/artist_details_screen.dart';
+import '../constants/hero_tags.dart';
 
 class ArtistRow extends StatefulWidget {
   final String title;
@@ -108,25 +109,34 @@ class _ArtistCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Artist image - circular
-            CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.grey[800],
-              backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
-              child: imageUrl == null
-                  ? const Icon(Icons.person_rounded, size: 60, color: Colors.white54)
-                  : null,
+            // Artist image - circular with Hero animation
+            Hero(
+              tag: HeroTags.artistImage + (artist.uri ?? artist.itemId),
+              child: CircleAvatar(
+                radius: 60,
+                backgroundColor: Colors.grey[800],
+                backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
+                child: imageUrl == null
+                    ? const Icon(Icons.person_rounded, size: 60, color: Colors.white54)
+                    : null,
+              ),
             ),
             const SizedBox(height: 12),
-            // Artist name
-            Text(
-              artist.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
+            // Artist name with Hero animation
+            Hero(
+              tag: HeroTags.artistName + (artist.uri ?? artist.itemId),
+              child: Material(
+                color: Colors.transparent,
+                child: Text(
+                  artist.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                ),
               ),
             ),
           ],

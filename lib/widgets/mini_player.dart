@@ -4,6 +4,7 @@ import '../providers/music_assistant_provider.dart';
 import '../screens/now_playing_screen.dart';
 import '../screens/queue_screen.dart';
 import 'volume_control.dart';
+import '../constants/hero_tags.dart';
 
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
@@ -57,38 +58,41 @@ class MiniPlayer extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
                 child: Row(
                   children: [
-                    // Album art
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: imageUrl != null
-                          ? Image.network(
-                              imageUrl,
-                              width: 48,
-                              height: 48,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  width: 48,
-                                  height: 48,
-                                  color: Colors.white12,
-                                  child: const Icon(
-                                    Icons.music_note_rounded,
-                                    color: Colors.white54,
-                                    size: 24,
-                                  ),
-                                );
-                              },
-                            )
-                          : Container(
-                              width: 48,
-                              height: 48,
-                              color: Colors.white12,
-                              child: const Icon(
-                                Icons.music_note_rounded,
-                                color: Colors.white54,
-                                size: 24,
+                    // Album art with Hero animation
+                    Hero(
+                      tag: 'now_playing_art',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: imageUrl != null
+                            ? Image.network(
+                                imageUrl,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 48,
+                                    height: 48,
+                                    color: Colors.white12,
+                                    child: const Icon(
+                                      Icons.music_note_rounded,
+                                      color: Colors.white54,
+                                      size: 24,
+                                    ),
+                                  );
+                                },
+                              )
+                            : Container(
+                                width: 48,
+                                height: 48,
+                                color: Colors.white12,
+                                child: const Icon(
+                                  Icons.music_note_rounded,
+                                  color: Colors.white54,
+                                  size: 24,
+                                ),
                               ),
-                            ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     // Track info
@@ -141,7 +145,18 @@ class MiniPlayer extends StatelessWidget {
                       icon: const Icon(Icons.skip_previous_rounded),
                       color: Colors.white,
                       iconSize: 26,
-                      onPressed: maProvider.previousTrackSelectedPlayer,
+                      onPressed: () async {
+                        try {
+                          await maProvider.previousTrackSelectedPlayer();
+                        } catch (e) {
+                          print('❌ Error in previous track: $e');
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e')),
+                            );
+                          }
+                        }
+                      },
                     ),
                     IconButton(
                       icon: Icon(
@@ -151,13 +166,35 @@ class MiniPlayer extends StatelessWidget {
                       ),
                       color: Colors.white,
                       iconSize: 32,
-                      onPressed: maProvider.playPauseSelectedPlayer,
+                      onPressed: () async {
+                        try {
+                          await maProvider.playPauseSelectedPlayer();
+                        } catch (e) {
+                          print('❌ Error in play/pause: $e');
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e')),
+                            );
+                          }
+                        }
+                      },
                     ),
                     IconButton(
                       icon: const Icon(Icons.skip_next_rounded),
                       color: Colors.white,
                       iconSize: 28,
-                      onPressed: maProvider.nextTrackSelectedPlayer,
+                      onPressed: () async {
+                        try {
+                          await maProvider.nextTrackSelectedPlayer();
+                        } catch (e) {
+                          print('❌ Error in next track: $e');
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e')),
+                            );
+                          }
+                        }
+                      },
                     ),
                   ],
                 ),

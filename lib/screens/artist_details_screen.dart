@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import 'album_details_screen.dart';
+import '../constants/hero_tags.dart';
 
 class ArtistDetailsScreen extends StatefulWidget {
   final Artist artist;
@@ -83,18 +84,21 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const SizedBox(height: 60),
-                  CircleAvatar(
-                    radius: 100,
-                    backgroundColor: Colors.white12,
-                    backgroundImage:
-                        imageUrl != null ? NetworkImage(imageUrl) : null,
-                    child: imageUrl == null
-                        ? const Icon(
-                            Icons.person_rounded,
-                            size: 100,
-                            color: Colors.white54,
-                          )
-                        : null,
+                  Hero(
+                    tag: HeroTags.artistImage + (widget.artist.uri ?? widget.artist.itemId),
+                    child: CircleAvatar(
+                      radius: 100,
+                      backgroundColor: Colors.white12,
+                      backgroundImage:
+                          imageUrl != null ? NetworkImage(imageUrl) : null,
+                      child: imageUrl == null
+                          ? const Icon(
+                              Icons.person_rounded,
+                              size: 100,
+                              color: Colors.white54,
+                            )
+                          : null,
+                    ),
                   ),
                 ],
               ),
@@ -106,12 +110,18 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.artist.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
+                  Hero(
+                    tag: HeroTags.artistName + (widget.artist.uri ?? widget.artist.itemId),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Text(
+                        widget.artist.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

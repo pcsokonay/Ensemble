@@ -5,6 +5,7 @@ import '../providers/music_assistant_provider.dart';
 import '../models/player.dart';
 import '../widgets/volume_control.dart';
 import 'queue_screen.dart';
+import '../constants/hero_tags.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
@@ -147,37 +148,40 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           child: Column(
             children: [
               const Spacer(),
-              // Album Art
-              Container(
-                width: double.infinity,
-                constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400),
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: imageUrl != null
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: const Color(0xFF2a2a2a),
-                                child: const Icon(
-                                  Icons.music_note_rounded,
-                                  color: Colors.white24,
-                                  size: 120,
-                                ),
-                              );
-                            },
-                          )
-                        : Container(
-                            color: const Color(0xFF2a2a2a),
-                            child: const Icon(
-                              Icons.music_note_rounded,
-                              color: Colors.white24,
-                              size: 120,
+              // Album Art with Hero animation
+              Hero(
+                tag: 'now_playing_art',
+                child: Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400),
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: imageUrl != null
+                          ? Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: const Color(0xFF2a2a2a),
+                                  child: const Icon(
+                                    Icons.music_note_rounded,
+                                    color: Colors.white24,
+                                    size: 120,
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: const Color(0xFF2a2a2a),
+                              child: const Icon(
+                                Icons.music_note_rounded,
+                                color: Colors.white24,
+                                size: 120,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
               ),
@@ -273,7 +277,18 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                     icon: const Icon(Icons.skip_previous_rounded),
                     color: Colors.white,
                     iconSize: 42,
-                    onPressed: maProvider.previousTrackSelectedPlayer,
+                    onPressed: () async {
+                      try {
+                        await maProvider.previousTrackSelectedPlayer();
+                      } catch (e) {
+                        print('❌ Error in previous track: $e');
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
+                      }
+                    },
                   ),
                   const SizedBox(width: 12),
                   // Play/Pause
@@ -292,7 +307,18 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                       ),
                       color: const Color(0xFF1a1a1a),
                       iconSize: 42,
-                      onPressed: maProvider.playPauseSelectedPlayer,
+                      onPressed: () async {
+                        try {
+                          await maProvider.playPauseSelectedPlayer();
+                        } catch (e) {
+                          print('❌ Error in play/pause: $e');
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e')),
+                            );
+                          }
+                        }
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -301,7 +327,18 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                     icon: const Icon(Icons.skip_next_rounded),
                     color: Colors.white,
                     iconSize: 42,
-                    onPressed: maProvider.nextTrackSelectedPlayer,
+                    onPressed: () async {
+                      try {
+                        await maProvider.nextTrackSelectedPlayer();
+                      } catch (e) {
+                        print('❌ Error in next track: $e');
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
+                      }
+                    },
                   ),
                   const SizedBox(width: 12),
                   // Repeat
