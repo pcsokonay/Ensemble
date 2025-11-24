@@ -393,7 +393,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
             ],
           ),
         ),
-        );
+      ),
+    );
       },
     );
   }
