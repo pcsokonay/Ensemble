@@ -13,6 +13,23 @@ The Amass app now:
 
 However, the old players still exist on your Music Assistant server.
 
+## Finding Ghost Players
+
+### Using Amass Player Diagnostics Tool
+
+1. Open Amass app
+2. Go to **Settings** → **Debug Logs**
+3. Tap the **speaker icon** (🔊) in the top right
+4. See all players including hidden ghost players (highlighted in red)
+5. Tap **Copy List** to copy player IDs for manual removal
+
+This shows you:
+- All player names and IDs
+- Whether they're available or unavailable
+- Their current state (idle/playing/paused)
+
+**Note**: Ghost players are likely marked as `available: false`, which is why they don't appear in the Music Assistant web UI.
+
 ## How to Clean Up (Music Assistant Web UI)
 
 ### Option 1: Via Web UI Settings
