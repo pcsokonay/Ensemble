@@ -359,6 +359,16 @@ class MusicAssistantProvider with ChangeNotifier {
     }
   }
 
+  Future<void> seek(String playerId, int position) async {
+    try {
+      await _api?.seek(playerId, position);
+      // Player state will be updated on next poll
+    } catch (e) {
+      ErrorHandler.logError('Seek', e);
+      rethrow;
+    }
+  }
+
   Future<void> toggleShuffle(String queueId) async {
     try {
       await _api?.toggleShuffle(queueId);

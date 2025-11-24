@@ -32,14 +32,25 @@ class Player {
 
   // Calculate current elapsed time (interpolated if playing)
   double get currentElapsedTime {
-    if (elapsedTime == null || elapsedTimeLastUpdated == null) return 0;
+    if (elapsedTime == null) return 0;
 
-    if (!isPlaying) return elapsedTime!;
+    if (!isPlaying || elapsedTimeLastUpdated == null) {
+      return elapsedTime!;
+    }
 
     // If playing, interpolate based on time since last update
     final now = DateTime.now().millisecondsSinceEpoch / 1000.0;
     final timeSinceUpdate = now - elapsedTimeLastUpdated!;
-    return elapsedTime! + timeSinceUpdate;
+
+    // Safety check: if time since update is negative or too large, just return elapsed time
+    if (timeSinceUpdate < 0 || timeSinceUpdate > 10) {
+      print('⚠️ Suspicious time delta: $timeSinceUpdate seconds. Now: $now, Last update: $elapsedTimeLastUpdated');
+      return elapsedTime!;
+    }
+
+    final calculatedTime = elapsedTime! + timeSinceUpdate;
+    print('🕐 Elapsed time calc: base=$elapsedTime, delta=$timeSinceUpdate, result=$calculatedTime');
+    return calculatedTime;
   }
 
   factory Player.fromJson(Map<String, dynamic> json) {

@@ -1085,6 +1085,23 @@ class MusicAssistantAPI {
     }
   }
 
+  /// Seek to position in seconds
+  Future<void> seek(String queueId, int position) async {
+    try {
+      _logger.log('Seeking to $position seconds for queue $queueId');
+      await _sendCommand(
+        'player_queues/seek',
+        args: {
+          'queue_id': queueId,
+          'position': position,
+        },
+      );
+    } catch (e) {
+      _logger.log('Error seeking: $e');
+      rethrow;
+    }
+  }
+
   Future<void> _sendQueueCommand(String queueId, String command) async {
     try {
       _logger.log('🎮 Sending queue command: $command to queue $queueId');

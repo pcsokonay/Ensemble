@@ -83,7 +83,7 @@ class _VolumeControlState extends State<VolumeControl> {
             ),
             child: Slider(
               value: currentVolume.clamp(0.0, 1.0),
-              onChanged: isMuted ? null : (value) {
+              onChanged: (value) {
                 setState(() {
                   _pendingVolume = value * 100;
                 });
@@ -91,6 +91,10 @@ class _VolumeControlState extends State<VolumeControl> {
               onChangeEnd: (value) async {
                 final volumeLevel = (value * 100).round();
                 try {
+                  // Unmute if changing volume while muted
+                  if (isMuted) {
+                    await maProvider.setMute(player.playerId, false);
+                  }
                   await maProvider.setVolume(player.playerId, volumeLevel);
                 } catch (e) {
                   // Error already logged by provider

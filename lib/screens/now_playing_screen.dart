@@ -238,12 +238,37 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
               // Progress Bar (showing elapsed time)
               if (currentTrack.duration != null) ...[
-                Slider(
-                  value: selectedPlayer.currentElapsedTime.clamp(0, currentTrack.duration!.inSeconds.toDouble()),
-                  max: currentTrack.duration!.inSeconds.toDouble(),
-                  onChanged: null, // TODO: Implement seek
-                  activeColor: Colors.white,
-                  inactiveColor: Colors.white24,
+                SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 14,
+                    ),
+                  ),
+                  child: Slider(
+                    value: selectedPlayer.currentElapsedTime.clamp(0, currentTrack.duration!.inSeconds.toDouble()),
+                    max: currentTrack.duration!.inSeconds.toDouble(),
+                    onChanged: (value) {
+                      // Optional: could add visual feedback during drag
+                    },
+                    onChangeEnd: (value) async {
+                      try {
+                        await maProvider.seek(selectedPlayer.playerId, value.round());
+                      } catch (e) {
+                        print('❌ Error seeking: $e');
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error seeking: $e')),
+                          );
+                        }
+                      }
+                    },
+                    activeColor: Colors.white,
+                    inactiveColor: Colors.white24,
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),

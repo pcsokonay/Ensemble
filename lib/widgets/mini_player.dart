@@ -37,10 +37,18 @@ class MiniPlayer extends StatelessWidget {
             tag: HeroTags.nowPlayingBackground,
             child: Material(
               color: const Color(0xFF2a2a2a),
-              elevation: 8,
-              shadowColor: Colors.black,
+              elevation: 0,
               child: Container(
                 height: 64,
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
                 child: Column(
                   children: [
                     // Status indicator bar
