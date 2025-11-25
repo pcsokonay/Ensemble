@@ -232,13 +232,13 @@ class MusicAssistantProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, List<MediaItem>>> search(String query) async {
+  Future<Map<String, List<MediaItem>>> search(String query, {bool libraryOnly = false}) async {
     if (!isConnected) {
       return {'artists': [], 'albums': [], 'tracks': []};
     }
 
     try {
-      return await _api!.search(query);
+      return await _api!.search(query, libraryOnly: libraryOnly);
     } catch (e) {
       ErrorHandler.logError('Search', e);
       return {'artists': [], 'albums': [], 'tracks': []};

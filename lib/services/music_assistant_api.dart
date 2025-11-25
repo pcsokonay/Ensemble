@@ -704,39 +704,42 @@ class MusicAssistantAPI {
   }
 
   // Search
-  Future<Map<String, List<MediaItem>>> search(String query) async {
+  /// Search across all providers (Spotify, etc.) and library
+  /// Set libraryOnly to true to search only local library
+  Future<Map<String, List<MediaItem>>> search(String query, {bool libraryOnly = false}) async {
     return await RetryHelper.retryNetwork(
       operation: () async {
         try {
-          _logger.log('Searching for: $query');
+          _logger.log('Searching for: $query (libraryOnly: $libraryOnly)');
 
-          // Search each media type separately
-          final artistsResponse = await _sendCommand(
-            'music/artists/library_items',
-            args: {'search': query, 'limit': 50},
+          // Use the global search command that searches across all providers
+          final searchResponse = await _sendCommand(
+            'music/search',
+            args: {
+              'search_query': query,
+              'limit': 50, // Results per media type
+              'library_only': libraryOnly,
+            },
           );
 
-          final albumsResponse = await _sendCommand(
-            'music/albums/library_items',
-            args: {'search': query, 'limit': 50},
-          );
+          final result = searchResponse['result'] as Map<String, dynamic>?;
+          if (result == null) {
+            _logger.log('No search results returned');
+            return <String, List<MediaItem>>{'artists': [], 'albums': [], 'tracks': []};
+          }
 
-          final tracksResponse = await _sendCommand(
-            'music/tracks/library_items',
-            args: {'search': query, 'limit': 50},
-          );
-
-          final artists = (artistsResponse['result'] as List<dynamic>?)
+          // Parse results from the search response
+          final artists = (result['artists'] as List<dynamic>?)
                   ?.map((item) => Artist.fromJson(item as Map<String, dynamic>))
                   .toList() ??
               [];
 
-          final albums = (albumsResponse['result'] as List<dynamic>?)
+          final albums = (result['albums'] as List<dynamic>?)
                   ?.map((item) => Album.fromJson(item as Map<String, dynamic>))
                   .toList() ??
               [];
 
-          final tracks = (tracksResponse['result'] as List<dynamic>?)
+          final tracks = (result['tracks'] as List<dynamic>?)
                   ?.map((item) => Track.fromJson(item as Map<String, dynamic>))
                   .toList() ??
               [];
