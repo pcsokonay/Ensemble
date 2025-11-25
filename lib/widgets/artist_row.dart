@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
-import '../screens/artist_details_screen.dart';
-import '../constants/hero_tags.dart';
+import 'artist_card.dart';
 
 class ArtistRow extends StatefulWidget {
   final String title;
@@ -30,6 +29,9 @@ class _ArtistRowState extends State<ArtistRow> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -37,9 +39,9 @@ class _ArtistRowState extends State<ArtistRow> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Text(
             widget.title,
-            style: const TextStyle(
-              fontSize: 20,
+            style: textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
+              color: colorScheme.onBackground,
             ),
           ),
         ),
@@ -60,8 +62,11 @@ class _ArtistRowState extends State<ArtistRow> {
 
               final artists = snapshot.data ?? [];
               if (artists.isEmpty) {
-                return const Center(
-                  child: Text('No artists found'),
+                return Center(
+                  child: Text(
+                    'No artists found',
+                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
+                  ),
                 );
               }
 
@@ -72,8 +77,10 @@ class _ArtistRowState extends State<ArtistRow> {
                 itemCount: artists.length,
                 itemBuilder: (context, index) {
                   final artist = artists[index];
-                  return RepaintBoundary(
-                    child: _ArtistCard(artist: artist),
+                  return Container(
+                    width: 120,
+                    margin: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: ArtistCard(artist: artist),
                   );
                 },
               );
@@ -81,71 +88,6 @@ class _ArtistRowState extends State<ArtistRow> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ArtistCard extends StatelessWidget {
-  final Artist artist;
-
-  const _ArtistCard({required this.artist});
-
-  @override
-  Widget build(BuildContext context) {
-    final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.api?.getImageUrl(artist, size: 200);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ArtistDetailsScreen(
-              artist: artist,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        width: 120,
-        margin: const EdgeInsets.symmetric(horizontal: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Artist image - circular with Hero animation
-            Hero(
-              tag: HeroTags.artistImage + (artist.uri ?? artist.itemId),
-              child: CircleAvatar(
-                radius: 60,
-                backgroundColor: colorScheme.surfaceVariant,
-                backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
-                child: imageUrl == null
-                    ? Icon(Icons.person_rounded, size: 60, color: colorScheme.onSurfaceVariant)
-                    : null,
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Artist name with Hero animation
-            Hero(
-              tag: HeroTags.artistName + (artist.uri ?? artist.itemId),
-              child: Material(
-                color: Colors.transparent,
-                child: Text(
-                  artist.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

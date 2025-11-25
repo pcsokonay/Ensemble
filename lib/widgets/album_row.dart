@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
-import '../screens/album_details_screen.dart';
-import '../constants/hero_tags.dart';
+import 'album_card.dart';
 
 class AlbumRow extends StatefulWidget {
   final String title;
@@ -30,6 +29,9 @@ class _AlbumRowState extends State<AlbumRow> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -37,14 +39,14 @@ class _AlbumRowState extends State<AlbumRow> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Text(
             widget.title,
-            style: const TextStyle(
-              fontSize: 20,
+            style: textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
+              color: colorScheme.onBackground,
             ),
           ),
         ),
         SizedBox(
-          height: 200,
+          height: 210, // Slightly increased for text
           child: FutureBuilder<List<Album>>(
             future: _albumsFuture,
             builder: (context, snapshot) {
@@ -60,8 +62,11 @@ class _AlbumRowState extends State<AlbumRow> {
 
               final albums = snapshot.data ?? [];
               if (albums.isEmpty) {
-                return const Center(
-                  child: Text('No albums found'),
+                return Center(
+                  child: Text(
+                    'No albums found',
+                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
+                  ),
                 );
               }
 
@@ -72,8 +77,10 @@ class _AlbumRowState extends State<AlbumRow> {
                 itemCount: albums.length,
                 itemBuilder: (context, index) {
                   final album = albums[index];
-                  return RepaintBoundary(
-                    child: _AlbumCard(album: album),
+                  return Container(
+                    width: 150,
+                    margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                    child: AlbumCard(album: album),
                   );
                 },
               );
@@ -85,102 +92,3 @@ class _AlbumRowState extends State<AlbumRow> {
   }
 }
 
-class _AlbumCard extends StatelessWidget {
-  final Album album;
-
-  const _AlbumCard({required this.album});
-
-  @override
-  Widget build(BuildContext context) {
-    final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.api?.getImageUrl(album, size: 200);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AlbumDetailsScreen(
-              album: album,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        width: 150,
-        margin: const EdgeInsets.symmetric(horizontal: 4.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Album artwork with Hero animation
-            Hero(
-              tag: HeroTags.albumCover + (album.uri ?? album.itemId),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8.0),
-                child: imageUrl != null
-                    ? Image.network(
-                        imageUrl,
-                        width: 150,
-                        height: 150,
-                        fit: BoxFit.cover,
-                        cacheWidth: 300,
-                        cacheHeight: 300,
-                        filterQuality: FilterQuality.medium,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 150,
-                            height: 150,
-                            color: colorScheme.surfaceVariant,
-                            child: Icon(Icons.album, size: 64, color: colorScheme.onSurfaceVariant),
-                          );
-                        },
-                      )
-                    : Container(
-                        width: 150,
-                        height: 150,
-                        color: colorScheme.surfaceVariant,
-                        child: Icon(Icons.album, size: 64, color: colorScheme.onSurfaceVariant),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Album title with Hero animation
-            Hero(
-              tag: HeroTags.albumTitle + (album.uri ?? album.itemId),
-              child: Material(
-                color: Colors.transparent,
-                child: Text(
-                  album.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-            // Artist name with Hero animation
-            if (album.artists != null && album.artists!.isNotEmpty)
-              Hero(
-                tag: HeroTags.artistName + (album.uri ?? album.itemId),
-                child: Material(
-                  color: Colors.transparent,
-                  child: Text(
-                    album.artists!.first.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.onSurface.withOpacity(0.6),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

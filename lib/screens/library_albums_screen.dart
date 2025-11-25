@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
-import 'album_details_screen.dart';
-import '../constants/hero_tags.dart';
+import '../widgets/album_card.dart';
 
 class LibraryAlbumsScreen extends StatelessWidget {
   const LibraryAlbumsScreen({super.key});
@@ -96,88 +95,10 @@ class LibraryAlbumsScreen extends StatelessWidget {
         itemCount: provider.albums.length,
         itemBuilder: (context, index) {
           final album = provider.albums[index];
-          return _buildAlbumCard(context, album, provider);
+          return AlbumCard(album: album);
         },
       ),
     );
   }
-
-  Widget _buildAlbumCard(
-      BuildContext context, Album album, MusicAssistantProvider provider) {
-    final imageUrl = provider.getImageUrl(album, size: 256);
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AlbumDetailsScreen(album: album),
-          ),
-        );
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Hero(
-              tag: HeroTags.albumCover + (album.uri ?? album.itemId),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(12),
-                  image: imageUrl != null
-                      ? DecorationImage(
-                          image: NetworkImage(imageUrl),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: imageUrl == null
-                    ? Center(
-                        child: Icon(
-                          Icons.album_rounded,
-                          size: 64,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      )
-                    : null,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Hero(
-            tag: HeroTags.albumTitle + (album.uri ?? album.itemId),
-            child: Material(
-              color: Colors.transparent,
-              child: Text(
-                album.name,
-                style: textTheme.titleSmall?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-          Hero(
-            tag: HeroTags.artistName + (album.uri ?? album.itemId),
-            child: Material(
-              color: Colors.transparent,
-              child: Text(
-                album.artistsString,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
+
