@@ -5,6 +5,7 @@ import '../services/music_assistant_api.dart';
 import '../services/settings_service.dart';
 import '../services/auth_service.dart';
 import '../services/debug_logger.dart';
+import '../theme/theme_provider.dart';
 import 'debug_log_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -387,6 +388,146 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ],
+
+            const SizedBox(height: 32),
+
+            // Theme section
+            const Text(
+              'Theme',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Theme mode selector
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white12,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Theme Mode',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Consumer<ThemeProvider>(
+                    builder: (context, themeProvider, _) {
+                      return SegmentedButton<ThemeMode>(
+                        segments: const [
+                          ButtonSegment<ThemeMode>(
+                            value: ThemeMode.light,
+                            label: Text('Light'),
+                            icon: Icon(Icons.light_mode_rounded),
+                          ),
+                          ButtonSegment<ThemeMode>(
+                            value: ThemeMode.dark,
+                            label: Text('Dark'),
+                            icon: Icon(Icons.dark_mode_rounded),
+                          ),
+                          ButtonSegment<ThemeMode>(
+                            value: ThemeMode.system,
+                            label: Text('System'),
+                            icon: Icon(Icons.auto_mode_rounded),
+                          ),
+                        ],
+                        selected: {themeProvider.themeMode},
+                        onSelectionChanged: (Set<ThemeMode> newSelection) {
+                          themeProvider.setThemeMode(newSelection.first);
+                        },
+                        style: ButtonStyle(
+                          backgroundColor: MaterialStateProperty.resolveWith((states) {
+                            if (states.contains(MaterialState.selected)) {
+                              return Colors.white;
+                            }
+                            return Colors.transparent;
+                          }),
+                          foregroundColor: MaterialStateProperty.resolveWith((states) {
+                            if (states.contains(MaterialState.selected)) {
+                              return const Color(0xFF1a1a1a);
+                            }
+                            return Colors.white70;
+                          }),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // High contrast toggle
+            Consumer<ThemeProvider>(
+              builder: (context, themeProvider, _) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white12,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SwitchListTile(
+                    title: const Text(
+                      'High Contrast',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    subtitle: const Text(
+                      'Use pure black and white for better accessibility',
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                    value: themeProvider.highContrast,
+                    onChanged: (value) {
+                      themeProvider.setHighContrast(value);
+                    },
+                    activeColor: Colors.white,
+                    activeTrackColor: Colors.white54,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Material You toggle
+            Consumer<ThemeProvider>(
+              builder: (context, themeProvider, _) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white12,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SwitchListTile(
+                    title: const Text(
+                      'Material You',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    subtitle: const Text(
+                      'Use system colors (Android 12+)',
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                    value: themeProvider.useMaterialTheme,
+                    onChanged: (value) {
+                      themeProvider.setUseMaterialTheme(value);
+                    },
+                    activeColor: Colors.white,
+                    activeTrackColor: Colors.white54,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                );
+              },
+            ),
 
             const SizedBox(height: 32),
 

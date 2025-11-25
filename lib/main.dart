@@ -5,6 +5,9 @@ import 'providers/music_assistant_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/settings_service.dart';
+import 'theme/theme_provider.dart';
+import 'theme/app_theme.dart';
+import 'theme/system_theme_helper.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,12 +39,14 @@ class MusicAssistantApp extends StatefulWidget {
 }
 
 class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindingObserver {
-  late MusicAssistantProvider _provider;
+  late MusicAssistantProvider _musicProvider;
+  late ThemeProvider _themeProvider;
 
   @override
   void initState() {
     super.initState();
-    _provider = MusicAssistantProvider();
+    _musicProvider = MusicAssistantProvider();
+    _themeProvider = ThemeProvider();
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -58,7 +63,7 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
     if (state == AppLifecycleState.resumed) {
       // App came back to foreground - check connection and reconnect if needed
       print('📱 App resumed - checking WebSocket connection...');
-      _provider.checkAndReconnect();
+      _musicProvider.checkAndReconnect();
     } else if (state == AppLifecycleState.paused) {
       print('📱 App paused (backgrounded)');
     } else if (state == AppLifecycleState.detached) {
@@ -68,30 +73,74 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _provider,
-      child: MaterialApp(
-        title: 'Amass',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          brightness: Brightness.dark,
-          primaryColor: const Color(0xFF1a1a1a),
-          scaffoldBackgroundColor: const Color(0xFF1a1a1a),
-          colorScheme: const ColorScheme.dark(
-            primary: Colors.white,
-            secondary: Colors.white70,
-            surface: Color(0xFF2a2a2a),
-            background: Color(0xFF1a1a1a),
-          ),
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            systemOverlayStyle: SystemUiOverlayStyle.light,
-          ),
-          fontFamily: 'Roboto',
-        ),
-        home: const AppStartup(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: _musicProvider),
+        ChangeNotifierProvider.value(value: _themeProvider),
+      ],
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return FutureBuilder<(ColorScheme, ColorScheme)?>(
+            future: themeProvider.useMaterialTheme
+                ? SystemThemeHelper.getSystemColorSchemes(
+                    highContrast: themeProvider.highContrast,
+                  )
+                : null,
+            builder: (context, snapshot) {
+              // Determine which color schemes to use
+              ColorScheme? lightColorScheme;
+              ColorScheme? darkColorScheme;
+
+              if (themeProvider.useMaterialTheme && snapshot.hasData && snapshot.data != null) {
+                // Use system color schemes
+                final (light, dark) = snapshot.data!;
+                lightColorScheme = light;
+                darkColorScheme = dark;
+              } else {
+                // Use brand color schemes
+                lightColorScheme = brandLightColorScheme;
+                darkColorScheme = brandDarkColorScheme;
+
+                // Apply high contrast if enabled
+                if (themeProvider.highContrast) {
+                  lightColorScheme = AppTheme.applyHighContrast(
+                    lightColorScheme,
+                    Brightness.light,
+                  );
+                  darkColorScheme = AppTheme.applyHighContrast(
+                    darkColorScheme,
+                    Brightness.dark,
+                  );
+                }
+              }
+
+              // Update system UI overlay style based on theme mode
+              final isDark = themeProvider.themeMode == ThemeMode.dark ||
+                  (themeProvider.themeMode == ThemeMode.system &&
+                      MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+
+              SystemChrome.setSystemUIOverlayStyle(
+                SystemUiOverlayStyle(
+                  statusBarColor: Colors.transparent,
+                  statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+                  systemNavigationBarColor: isDark
+                      ? darkColorScheme.background
+                      : lightColorScheme.background,
+                  systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+                ),
+              );
+
+              return MaterialApp(
+                title: 'Amass',
+                debugShowCheckedModeBanner: false,
+                themeMode: themeProvider.themeMode,
+                theme: AppTheme.lightTheme(colorScheme: lightColorScheme),
+                darkTheme: AppTheme.darkTheme(colorScheme: darkColorScheme),
+                home: const AppStartup(),
+              );
+            },
+          );
+        },
       ),
     );
   }

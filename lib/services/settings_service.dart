@@ -8,6 +8,10 @@ class SettingsService {
   static const String _keyUsername = 'username';
   static const String _keyPassword = 'password';
   static const String _keyBuiltinPlayerId = 'builtin_player_id';
+  static const String _keyThemeMode = 'theme_mode';
+  static const String _keyHighContrast = 'high_contrast';
+  static const String _keyUseMaterialTheme = 'use_material_theme';
+  static const String _keyCustomColor = 'custom_color';
 
   static Future<String?> getServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -109,6 +113,47 @@ class SettingsService {
   static Future<void> setBuiltinPlayerId(String id) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyBuiltinPlayerId, id);
+  }
+
+  // Theme settings
+  static Future<String?> getThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyThemeMode) ?? 'system';
+  }
+
+  static Future<void> saveThemeMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyThemeMode, mode);
+  }
+
+  static Future<bool> getHighContrast() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyHighContrast) ?? false;
+  }
+
+  static Future<void> saveHighContrast(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyHighContrast, enabled);
+  }
+
+  static Future<bool> getUseMaterialTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyUseMaterialTheme) ?? false;
+  }
+
+  static Future<void> saveUseMaterialTheme(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyUseMaterialTheme, enabled);
+  }
+
+  static Future<String?> getCustomColor() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyCustomColor);
+  }
+
+  static Future<void> saveCustomColor(String color) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyCustomColor, color);
   }
 
   static Future<void> clearSettings() async {
