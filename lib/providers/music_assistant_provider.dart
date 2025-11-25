@@ -339,11 +339,20 @@ class MusicAssistantProvider with ChangeNotifier {
 
   Future<void> togglePower(String playerId) async {
     try {
-      await _api?.togglePower(playerId);
+      // Find the player to get current power state
+      final player = _availablePlayers.firstWhere(
+        (p) => p.playerId == playerId,
+        orElse: () => _selectedPlayer != null && _selectedPlayer!.playerId == playerId
+            ? _selectedPlayer!
+            : throw Exception("Player not found"),
+      );
+      
+      // Toggle the state
+      await _api?.setPower(playerId, !player.powered);
       // Player state will be updated on next poll
     } catch (e) {
       ErrorHandler.logError('Toggle power', e);
-      rethrow;
+      // Don't rethrow to avoid crashing UI, just log
     }
   }
 

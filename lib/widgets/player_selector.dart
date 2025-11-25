@@ -95,10 +95,10 @@ class PlayerSelector extends StatelessWidget {
                   const SizedBox(height: 12),
                   Expanded(
                     child: players.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Text(
                               'No players available',
-                              style: TextStyle(color: Colors.white54),
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.54)),
                             ),
                           )
                         : GridView.builder(
@@ -115,7 +115,10 @@ class PlayerSelector extends StatelessWidget {
                               final player = players[index];
                               final isSelected =
                                   player.playerId == provider.selectedPlayer?.playerId;
-                              final isOn = player.available && player.state != 'off'; // Assuming 'off' state or unavailable means off
+                              // isOn checks if the player is powered on
+                              final isOn = player.available && player.powered;
+                              
+                              final colorScheme = Theme.of(context).colorScheme;
 
                               return InkWell(
                                 onTap: () {
@@ -124,12 +127,12 @@ class PlayerSelector extends StatelessWidget {
                                 },
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    // Tint whole card instead of border
+                                    // Tint whole card based on theme if selected
                                     color: isSelected
-                                        ? Colors.green.withOpacity(0.2)
-                                        : Colors.white12,
+                                        ? colorScheme.primary.withOpacity(0.15)
+                                        : colorScheme.surfaceVariant.withOpacity(0.3),
                                     borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.transparent, width: 2),
+                                    // No border, just tint
                                   ),
                                   child: Stack(
                                     children: [
@@ -142,13 +145,13 @@ class PlayerSelector extends StatelessWidget {
                                             Icons.power_settings_new_rounded,
                                             size: 24,
                                             color: player.available 
-                                                ? (isOn ? Colors.greenAccent : Colors.white24) // Green if on, Grey if off (but available)
-                                                : Colors.white10, // Dim if unavailable
+                                                ? (isOn ? colorScheme.primary : colorScheme.onSurfaceVariant.withOpacity(0.5)) 
+                                                : colorScheme.onSurface.withOpacity(0.1), 
                                           ),
                                           onPressed: player.available
                                               ? () {
                                                   provider.togglePower(player.playerId);
-                                                  // Don't close the sheet when toggling power
+                                                  // Don't close the sheet
                                                 }
                                               : null,
                                         ),
@@ -163,8 +166,8 @@ class PlayerSelector extends StatelessWidget {
                                             Icon(
                                               _getPlayerIcon(player.name),
                                               color: player.available
-                                                  ? Colors.white
-                                                  : Colors.white38,
+                                                  ? (isSelected ? colorScheme.primary : colorScheme.onSurface)
+                                                  : colorScheme.onSurface.withOpacity(0.38),
                                               size: 28,
                                             ),
                                             const SizedBox(height: 12),
@@ -172,8 +175,8 @@ class PlayerSelector extends StatelessWidget {
                                               player.name,
                                               style: TextStyle(
                                                 color: player.available
-                                                    ? Colors.white
-                                                    : Colors.white38,
+                                                    ? colorScheme.onSurface
+                                                    : colorScheme.onSurface.withOpacity(0.38),
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 16,
                                               ),
@@ -191,8 +194,8 @@ class PlayerSelector extends StatelessWidget {
                                                   : 'Unavailable',
                                               style: TextStyle(
                                                 color: player.available
-                                                    ? Colors.white54
-                                                    : Colors.white24,
+                                                    ? colorScheme.onSurfaceVariant
+                                                    : colorScheme.onSurface.withOpacity(0.24),
                                                 fontSize: 12,
                                               ),
                                             ),

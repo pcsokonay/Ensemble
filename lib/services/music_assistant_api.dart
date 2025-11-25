@@ -1014,11 +1014,12 @@ class MusicAssistantAPI {
   }
 
   // Player control commands
-  Future<void> togglePower(String playerId) async {
+  Future<void> setPower(String playerId, bool powered) async {
     await _sendCommand(
       'players/cmd/power',
       args: {
         'player_id': playerId,
+        'powered': powered,
       },
     );
   }
