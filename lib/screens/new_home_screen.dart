@@ -21,7 +21,7 @@ class NewHomeScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Padding(
-          padding: const EdgeInsets.only(left: 8.0, top: 8.0),
+          padding: const EdgeInsets.only(left: 8.0, top: 8.0, bottom: 8.0),
           child: Image.asset(
             'assets/images/attm_logo.png',
             height: 32,
