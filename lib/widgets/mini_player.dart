@@ -66,167 +66,165 @@ class MiniPlayer extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: Row(
-                          children: [
-                            // Album art with Hero animation
-                            Hero(
-                              tag: HeroTags.nowPlayingArt,
-                              transitionOnUserGestures: true,
-                              child: Container(
-                                width: 72,
-                                height: 72,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: imageUrl != null
-                                      ? Image.network(
-                                          imageUrl,
-                                          fit: BoxFit.cover,
-                                          cacheWidth: 96,
-                                          cacheHeight: 96,
-                                          filterQuality: FilterQuality.medium,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Container(
-                                              color: colorScheme.surfaceVariant,
-                                              child: Icon(
-                                                Icons.music_note_rounded,
-                                                color: colorScheme.onSurfaceVariant,
-                                                size: 24,
-                                              ),
-                                            );
-                                          },
-                                        )
-                                      : Container(
+                      children: [
+                        // Album art with Hero animation
+                        Hero(
+                          tag: HeroTags.nowPlayingArt,
+                          transitionOnUserGestures: true,
+                          child: Container(
+                            width: 72,
+                            height: 72,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: imageUrl != null
+                                  ? Image.network(
+                                      imageUrl,
+                                      fit: BoxFit.cover,
+                                      cacheWidth: 96,
+                                      cacheHeight: 96,
+                                      filterQuality: FilterQuality.medium,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
                                           color: colorScheme.surfaceVariant,
                                           child: Icon(
                                             Icons.music_note_rounded,
                                             color: colorScheme.onSurfaceVariant,
                                             size: 24,
                                           ),
-                                        ),
+                                        );
+                                      },
+                                    )
+                                  : Container(
+                                      color: colorScheme.surfaceVariant,
+                                      child: Icon(
+                                        Icons.music_note_rounded,
+                                        color: colorScheme.onSurfaceVariant,
+                                        size: 24,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Track info
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentTrack.name,
+                                style: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Track info
-                            Expanded(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    currentTrack.name,
-                                    style: TextStyle(
-                                      color: colorScheme.onSurface,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    currentTrack.artistsString,
-                                    style: TextStyle(
-                                      color: colorScheme.onSurface.withOpacity(0.7),
-                                      fontSize: 14,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                              const SizedBox(height: 4),
+                              Text(
+                                currentTrack.artistsString,
+                                style: TextStyle(
+                                  color: colorScheme.onSurface.withOpacity(0.7),
+                                  fontSize: 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            // Queue button
-                            IconButton(
-                              icon: const Icon(Icons.queue_music),
-                              color: colorScheme.onSurface.withOpacity(0.7),
-                              iconSize: 26,
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const QueueScreen(),
-                                  ),
-                                );
+                            ],
+                          ),
+                        ),
+                        // Queue button
+                        IconButton(
+                          icon: const Icon(Icons.queue_music),
+                          color: colorScheme.onSurface.withOpacity(0.7),
+                          iconSize: 26,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const QueueScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        // Playback controls for selected player
+                        Hero(
+                          tag: HeroTags.nowPlayingPreviousButton,
+                          transitionOnUserGestures: true,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: AnimatedIconButton(
+                              icon: Icons.skip_previous_rounded,
+                              color: colorScheme.onSurface,
+                              iconSize: 30,
+                              onPressed: () async {
+                                try {
+                                  await maProvider.previousTrackSelectedPlayer();
+                                } catch (e) {
+                                  print('❌ Error in previous track: $e');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
+                                    );
+                                  }
+                                }
                               },
                             ),
-                            // Playback controls for selected player
-                            Hero(
-                              tag: HeroTags.nowPlayingPreviousButton,
-                              transitionOnUserGestures: true,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: AnimatedIconButton(
-                                  icon: Icons.skip_previous_rounded,
-                                  color: colorScheme.onSurface,
-                                  iconSize: 30,
-                                  onPressed: () async {
-                                    try {
-                                      await maProvider.previousTrackSelectedPlayer();
-                                    } catch (e) {
-                                      print('❌ Error in previous track: $e');
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error: $e')),
-                                        );
-                                      }
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                            Hero(
-                              tag: HeroTags.nowPlayingPlayButton,
-                              transitionOnUserGestures: true,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: AnimatedIconButton(
-                                  icon: selectedPlayer.isPlaying
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                  color: colorScheme.onSurface,
-                                  iconSize: 38,
-                                  onPressed: () async {
-                                    try {
-                                      await maProvider.playPauseSelectedPlayer();
-                                    } catch (e) {
-                                      print('❌ Error in play/pause: $e');
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error: $e')),
-                                        );
-                                      }
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                            Hero(
-                              tag: HeroTags.nowPlayingNextButton,
-                              transitionOnUserGestures: true,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: AnimatedIconButton(
-                                  icon: Icons.skip_next_rounded,
-                                  color: colorScheme.onSurface,
-                                  iconSize: 32,
-                                  onPressed: () async {
-                                    try {
-                                      await maProvider.nextTrackSelectedPlayer();
-                                    } catch (e) {
-                                      print('❌ Error in next track: $e');
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error: $e')),
-                                        );
-                                      }
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                        Hero(
+                          tag: HeroTags.nowPlayingPlayButton,
+                          transitionOnUserGestures: true,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: AnimatedIconButton(
+                              icon: selectedPlayer.isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              color: colorScheme.onSurface,
+                              iconSize: 38,
+                              onPressed: () async {
+                                try {
+                                  await maProvider.playPauseSelectedPlayer();
+                                } catch (e) {
+                                  print('❌ Error in play/pause: $e');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                        Hero(
+                          tag: HeroTags.nowPlayingNextButton,
+                          transitionOnUserGestures: true,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: AnimatedIconButton(
+                              icon: Icons.skip_next_rounded,
+                              color: colorScheme.onSurface,
+                              iconSize: 32,
+                              onPressed: () async {
+                                try {
+                                  await maProvider.nextTrackSelectedPlayer();
+                                } catch (e) {
+                                  print('❌ Error in next track: $e');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
