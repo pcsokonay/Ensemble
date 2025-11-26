@@ -24,32 +24,31 @@ class _HomeScreenState extends State<HomeScreen> {
     return PopScope(
       canPop: _selectedIndex == 0,
       onPopInvoked: (didPop) {
-        if (didPop) {
-          // When returning from a pushed screen, unfocus search if not on search tab
-          if (_selectedIndex != 2) {
-            _searchScreenKey.currentState?.removeFocus();
-          }
-          return;
-        }
-
-        // Unfocus search when using back button to go to home
-        if (_selectedIndex == 2) {
-          _searchScreenKey.currentState?.removeFocus();
-        }
-
+        if (didPop) return;
         setState(() {
           _selectedIndex = 0;
         });
       },
       child: Scaffold(
         backgroundColor: colorScheme.background,
-        body: IndexedStack(
-          index: _selectedIndex,
+        body: Stack(
           children: [
-            const NewHomeScreen(),
-            const NewLibraryScreen(),
-            SearchScreen(key: _searchScreenKey),
-            const SettingsScreen(),
+            // Home and Library use IndexedStack for state preservation
+            Offstage(
+              offstage: _selectedIndex > 1,
+              child: IndexedStack(
+                index: _selectedIndex.clamp(0, 1),
+                children: const [
+                  NewHomeScreen(),
+                  NewLibraryScreen(),
+                ],
+              ),
+            ),
+            // Search and Settings are conditionally rendered (removed from tree when not visible)
+            if (_selectedIndex == 2)
+              SearchScreen(key: _searchScreenKey),
+            if (_selectedIndex == 3)
+              const SettingsScreen(),
           ],
         ),
         bottomNavigationBar: Column(
@@ -73,18 +72,16 @@ class _HomeScreenState extends State<HomeScreen> {
               child: BottomNavigationBar(
                 currentIndex: _selectedIndex,
                 onTap: (index) {
-                  // Unfocus search field when leaving search tab
-                  if (_selectedIndex == 2 && index != 2) {
-                    _searchScreenKey.currentState?.removeFocus();
-                  }
-
                   setState(() {
                     _selectedIndex = index;
                   });
 
                   // Auto-focus search field when switching to search tab
                   if (index == 2) {
-                    _searchScreenKey.currentState?.requestFocus();
+                    // Use post-frame callback to ensure SearchScreen is built first
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _searchScreenKey.currentState?.requestFocus();
+                    });
                   }
                 },
                 backgroundColor: Colors.transparent,
