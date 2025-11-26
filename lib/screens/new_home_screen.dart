@@ -131,9 +131,9 @@ class NewHomeScreen extends StatelessWidget {
         children: [
           const SizedBox(height: 16),
 
-          // Recently played albums
+          // Recently added albums (auth bypass prevents true recently played)
           AlbumRow(
-            title: 'Recently Played',
+            title: 'Recently Added',
             loadAlbums: () async {
               if (provider.api == null) return [];
               return await provider.api!.getRecentAlbums(limit: 10);

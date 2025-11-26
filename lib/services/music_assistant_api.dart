@@ -407,69 +407,42 @@ class MusicAssistantAPI {
   }
 
   /// Get recently played albums
+  /// Note: Due to unauthenticated API access, recently_played_items returns no data.
+  /// Instead, we try sorting library albums by timestamp_added as a workaround.
+  /// For true recently played functionality, authentication would be required.
   Future<List<Album>> getRecentAlbums({int limit = 10}) async {
     try {
       _logger.log('Fetching recently played albums (limit=$limit)');
-      // Get recently played tracks, then extract unique albums from them
-      // This is more reliable than using album filter which returns incomplete data
+
+      // Try method 1: Use library_items with order_by timestamp_added (descending)
+      // This will show recently added albums rather than recently played,
+      // but works without authentication
+      _logger.log('🔍 Attempting library_items with order_by=timestamp_added');
       final response = await _sendCommand(
-        'music/recently_played_items',
+        'music/albums/library_items',
         args: {
-          'limit': limit * 5, // Get more tracks to ensure we have enough unique albums
-          'media_types': ['track'],
+          'limit': limit,
+          'order_by': 'timestamp_added',
+          'sort_ascending': false,
         },
       );
 
       final items = response['result'] as List<dynamic>?;
       if (items == null || items.isEmpty) {
-        _logger.log('⚠️ No recently played tracks returned');
+        _logger.log('⚠️ No albums returned from library_items');
         return [];
       }
 
-      _logger.log('📀 Got ${items.length} recently played tracks');
+      _logger.log('✅ Got ${items.length} recently added albums');
 
       if (items.isNotEmpty) {
-        _logger.log('🔍 DEBUG: First track structure: ${items[0]}');
-        _logger.log('🔍 DEBUG: First track keys: ${(items[0] as Map<String, dynamic>).keys.toList()}');
+        _logger.log('   First album: ${items[0]['name']}');
+        _logger.log('   🔍 DEBUG: Album fields: ${(items[0] as Map<String, dynamic>).keys.toList()}');
       }
 
-      // Extract unique albums from tracks
-      final seenAlbumIds = <String>{};
-      final albums = <Album>[];
-      var albumsWithoutData = 0;
-
-      for (final item in items) {
-        final itemMap = item as Map<String, dynamic>;
-        final albumData = itemMap['album'] as Map<String, dynamic>?;
-
-        if (albumData != null) {
-          final albumId = albumData['item_id']?.toString();
-          if (albumId != null && !seenAlbumIds.contains(albumId)) {
-            seenAlbumIds.add(albumId);
-            try {
-              albums.add(Album.fromJson(albumData));
-            } catch (e) {
-              _logger.log('   ⚠️ Failed to parse album: $e');
-            }
-          }
-        } else {
-          albumsWithoutData++;
-        }
-
-        if (albums.length >= limit) break;
-      }
-
-      if (albumsWithoutData > 0) {
-        _logger.log('⚠️ $albumsWithoutData tracks had no album data');
-      }
-
-      _logger.log('✅ Extracted ${albums.length} unique albums from recent tracks');
-
-      if (albums.isNotEmpty) {
-        _logger.log('   First recent album: ${albums[0].name} by ${albums[0].artistsString}');
-      }
-
-      return albums;
+      return items
+          .map((item) => Album.fromJson(item as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       _logger.log('❌ Error getting recent albums: $e');
       return [];
