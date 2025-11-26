@@ -6,6 +6,7 @@ import 'album_details_screen.dart';
 import '../constants/hero_tags.dart';
 import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
+import '../services/metadata_service.dart';
 
 class ArtistDetailsScreen extends StatefulWidget {
   final Artist artist;
@@ -22,12 +23,14 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   ColorScheme? _lightColorScheme;
   ColorScheme? _darkColorScheme;
   bool _isDescriptionExpanded = false;
+  String? _artistDescription;
 
   @override
   void initState() {
     super.initState();
     _loadArtistAlbums();
     _extractColors();
+    _loadArtistDescription();
   }
 
   Future<void> _extractColors() async {
@@ -52,19 +55,21 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
     }
   }
 
-  String? _getArtistDescription() {
-    // Try to get description/biography from metadata
-    final metadata = widget.artist.metadata;
-    if (metadata == null) return null;
+  Future<void> _loadArtistDescription() async {
+    final artistName = widget.artist.name;
 
-    // Check various possible keys for description/biography
-    final description = metadata['description'] ??
-                       metadata['biography'] ??
-                       metadata['wiki'] ??
-                       metadata['bio'] ??
-                       metadata['summary'];
+    if (artistName.isEmpty) return;
 
-    return description as String?;
+    final description = await MetadataService.getArtistDescription(
+      artistName,
+      widget.artist.metadata,
+    );
+
+    if (mounted) {
+      setState(() {
+        _artistDescription = description;
+      });
+    }
   }
 
   Future<void> _loadArtistAlbums() async {
@@ -211,7 +216,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                   ),
                   const SizedBox(height: 16),
                   // Artist Description/Biography
-                  if (_getArtistDescription() != null) ...[
+                  if (_artistDescription != null && _artistDescription!.isNotEmpty) ...[
                     InkWell(
                       onTap: () {
                         setState(() {
@@ -225,7 +230,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _getArtistDescription()!,
+                              _artistDescription!,
                               style: textTheme.bodyMedium?.copyWith(
                                 color: colorScheme.onBackground.withOpacity(0.8),
                               ),

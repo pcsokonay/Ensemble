@@ -20,6 +20,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _portController = TextEditingController(text: '8095');
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _lastFmApiKeyController = TextEditingController();
+  final _audioDbApiKeyController = TextEditingController();
   final _authService = AuthService();
   final _logger = DebugLogger();
   bool _isConnecting = false;
@@ -48,6 +50,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (password != null) {
       _passwordController.text = password;
     }
+
+    final lastFmKey = await SettingsService.getLastFmApiKey();
+    if (lastFmKey != null) {
+      _lastFmApiKeyController.text = lastFmKey;
+    }
+
+    final audioDbKey = await SettingsService.getTheAudioDbApiKey();
+    if (audioDbKey != null) {
+      _audioDbApiKeyController.text = audioDbKey;
+    }
   }
 
   @override
@@ -56,6 +68,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _portController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _lastFmApiKeyController.dispose();
+    _audioDbApiKeyController.dispose();
     super.dispose();
   }
 
@@ -505,6 +519,96 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     contentPadding: EdgeInsets.zero,
                   ),
                 );
+              },
+            ),
+
+            const SizedBox(height: 32),
+
+            Text(
+              'Metadata APIs (Optional)',
+              style: textTheme.titleMedium?.copyWith(
+                color: colorScheme.onBackground,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add API keys to fetch artist biographies and album descriptions when Music Assistant doesn\'t have them',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onBackground.withOpacity(0.6),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            TextField(
+              controller: _lastFmApiKeyController,
+              style: TextStyle(color: colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: 'Last.fm API Key',
+                hintText: 'Get free key at last.fm/api',
+                hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.38)),
+                filled: true,
+                fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: Icon(
+                  Icons.music_note_rounded,
+                  color: colorScheme.onSurface.withOpacity(0.54),
+                ),
+                suffixIcon: _lastFmApiKeyController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _lastFmApiKeyController.clear();
+                          });
+                          SettingsService.setLastFmApiKey(null);
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (value) {
+                SettingsService.setLastFmApiKey(value.trim().isEmpty ? null : value.trim());
+                setState(() {}); // Update UI to show/hide clear button
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            TextField(
+              controller: _audioDbApiKeyController,
+              style: TextStyle(color: colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: 'TheAudioDB API Key (Premium)',
+                hintText: 'Use "2" for free tier or premium key',
+                hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.38)),
+                filled: true,
+                fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: Icon(
+                  Icons.audiotrack_rounded,
+                  color: colorScheme.onSurface.withOpacity(0.54),
+                ),
+                suffixIcon: _audioDbApiKeyController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _audioDbApiKeyController.clear();
+                          });
+                          SettingsService.setTheAudioDbApiKey(null);
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (value) {
+                SettingsService.setTheAudioDbApiKey(value.trim().isEmpty ? null : value.trim());
+                setState(() {}); // Update UI to show/hide clear button
               },
             ),
 

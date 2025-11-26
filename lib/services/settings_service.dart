@@ -12,6 +12,8 @@ class SettingsService {
   static const String _keyUseMaterialTheme = 'use_material_theme';
   static const String _keyAdaptiveTheme = 'adaptive_theme';
   static const String _keyCustomColor = 'custom_color';
+  static const String _keyLastFmApiKey = 'lastfm_api_key';
+  static const String _keyTheAudioDbApiKey = 'theaudiodb_api_key';
 
   static Future<String?> getServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -154,6 +156,35 @@ class SettingsService {
   static Future<void> saveCustomColor(String color) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyCustomColor, color);
+  }
+
+  // Metadata API Keys
+  static Future<String?> getLastFmApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLastFmApiKey);
+  }
+
+  static Future<void> setLastFmApiKey(String? key) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (key == null || key.isEmpty) {
+      await prefs.remove(_keyLastFmApiKey);
+    } else {
+      await prefs.setString(_keyLastFmApiKey, key);
+    }
+  }
+
+  static Future<String?> getTheAudioDbApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyTheAudioDbApiKey);
+  }
+
+  static Future<void> setTheAudioDbApiKey(String? key) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (key == null || key.isEmpty) {
+      await prefs.remove(_keyTheAudioDbApiKey);
+    } else {
+      await prefs.setString(_keyTheAudioDbApiKey, key);
+    }
   }
 
   static Future<void> clearSettings() async {

@@ -5,6 +5,7 @@ import '../providers/music_assistant_provider.dart';
 import '../constants/hero_tags.dart';
 import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
+import '../services/metadata_service.dart';
 import 'artist_details_screen.dart';
 
 class AlbumDetailsScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
   ColorScheme? _darkColorScheme;
   int? _expandedTrackIndex;
   bool _isDescriptionExpanded = false;
+  String? _albumDescription;
 
   @override
   void initState() {
@@ -31,6 +33,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
     _isFavorite = widget.album.favorite ?? false;
     _loadTracks();
     _extractColors();
+    _loadAlbumDescription();
   }
 
   Future<void> _extractColors() async {
@@ -267,18 +270,23 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
     }
   }
 
-  String? _getAlbumDescription() {
-    // Try to get description from metadata
-    final metadata = widget.album.metadata;
-    if (metadata == null) return null;
+  Future<void> _loadAlbumDescription() async {
+    final artistName = widget.album.artists?.firstOrNull?.name ?? '';
+    final albumName = widget.album.name;
 
-    // Check various possible keys for description
-    final description = metadata['description'] ??
-                       metadata['wiki'] ??
-                       metadata['biography'] ??
-                       metadata['summary'];
+    if (artistName.isEmpty || albumName.isEmpty) return;
 
-    return description as String?;
+    final description = await MetadataService.getAlbumDescription(
+      artistName,
+      albumName,
+      widget.album.metadata,
+    );
+
+    if (mounted) {
+      setState(() {
+        _albumDescription = description;
+      });
+    }
   }
 
   void _showError(String message) {
@@ -406,7 +414,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                   ),
                   const SizedBox(height: 16),
                   // Album Description
-                  if (_getAlbumDescription() != null) ...[
+                  if (_albumDescription != null && _albumDescription!.isNotEmpty) ...[
                     InkWell(
                       onTap: () {
                         setState(() {
@@ -420,7 +428,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _getAlbumDescription()!,
+                              _albumDescription!,
                               style: textTheme.bodyMedium?.copyWith(
                                 color: colorScheme.onBackground.withOpacity(0.8),
                               ),
