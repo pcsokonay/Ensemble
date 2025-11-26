@@ -14,7 +14,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  final GlobalKey<SearchScreenState> _searchScreenKey = GlobalKey<SearchScreenState>();
 
   @override
   Widget build(BuildContext context) {
@@ -31,20 +30,27 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         backgroundColor: colorScheme.background,
-        body: IndexedStack(
-          index: _selectedIndex,
+        body: Stack(
           children: [
-            const NewHomeScreen(),
-            const NewLibraryScreen(),
-            // Wrap SearchScreen in ExcludeFocus to prevent it from grabbing focus when hidden
-            ExcludeFocus(
-              excluding: _selectedIndex != 2,
-              child: SearchScreen(
-                key: _searchScreenKey,
-                isSearchActive: _selectedIndex == 2,
+            // Home and Library - Keep alive with IndexedStack
+            Offstage(
+              offstage: _selectedIndex > 1,
+              child: IndexedStack(
+                index: _selectedIndex > 1 ? 0 : _selectedIndex,
+                children: const [
+                  NewHomeScreen(),
+                  NewLibraryScreen(),
+                ],
               ),
             ),
-            const SettingsScreen(),
+            
+            // Search - Mount only when active (preserves state in Provider)
+            if (_selectedIndex == 2)
+              const SearchScreen(),
+              
+            // Settings - Mount only when active
+            if (_selectedIndex == 3)
+              const SettingsScreen(),
           ],
         ),
         bottomNavigationBar: Column(
@@ -76,14 +82,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _selectedIndex = index;
                   });
-
-                  // Focus search field if Search tab is selected
-                  if (index == 2) {
-                    // Small delay to ensure the widget is visible before requesting focus
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      _searchScreenKey.currentState?.focusSearchField();
-                    });
-                  }
                 },
                 backgroundColor: Colors.transparent,
                 selectedItemColor: colorScheme.primary,

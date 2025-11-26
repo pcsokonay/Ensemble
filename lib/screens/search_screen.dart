@@ -6,22 +6,15 @@ import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
 
 class SearchScreen extends StatefulWidget {
-  final bool autofocus;
-  final bool isSearchActive;
-
-  const SearchScreen({
-    super.key, 
-    this.autofocus = false,
-    this.isSearchActive = true, // Default to true for backward compatibility
-  });
+  const SearchScreen({super.key});
 
   @override
   State<SearchScreen> createState() => SearchScreenState();
 }
 
 class SearchScreenState extends State<SearchScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
+  late TextEditingController _searchController;
+  late FocusNode _focusNode;
   Map<String, List<MediaItem>> _searchResults = {
     'artists': [],
     'albums': [],
@@ -29,37 +22,27 @@ class SearchScreenState extends State<SearchScreen> {
   };
   bool _isSearching = false;
   bool _hasSearched = false;
-  String _activeFilter = 'all'; // 'all', 'artists', 'albums', 'tracks'
+  String _activeFilter = 'all';
 
   @override
   void initState() {
     super.initState();
     
-    // Set initial focus capability
-    _focusNode.canRequestFocus = widget.isSearchActive;
-
-    // Auto-focus the search field only if requested and active
-    if (widget.autofocus && widget.isSearchActive) {
+    final provider = context.read<MusicAssistantProvider>();
+    _searchController = TextEditingController(text: provider.lastSearchQuery);
+    _searchResults = provider.lastSearchResults;
+    _hasSearched = provider.lastSearchQuery.isNotEmpty;
+    
+    _focusNode = FocusNode();
+    
+    // Standard autofocus since we are mounting/unmounting the widget
+    // If query is empty, focus. If has results, maybe don't focus?
+    // Let's focus if it's empty.
+    if (provider.lastSearchQuery.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _focusNode.requestFocus();
       });
     }
-  }
-
-  @override
-  void didUpdateWidget(SearchScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    
-    if (widget.isSearchActive != oldWidget.isSearchActive) {
-      _focusNode.canRequestFocus = widget.isSearchActive;
-      if (!widget.isSearchActive) {
-        _focusNode.unfocus();
-      }
-    }
-  }
-
-  void focusSearchField() {
-    _focusNode.requestFocus();
   }
 
   @override
@@ -70,11 +53,14 @@ class SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _performSearch(String query) async {
+    final provider = context.read<MusicAssistantProvider>();
+    
     if (query.isEmpty) {
       setState(() {
         _searchResults = {'artists': [], 'albums': [], 'tracks': []};
         _hasSearched = false;
       });
+      provider.saveSearchState('', _searchResults);
       return;
     }
 
@@ -82,58 +68,53 @@ class SearchScreenState extends State<SearchScreen> {
       _isSearching = true;
     });
 
-    final provider = context.read<MusicAssistantProvider>();
     final results = await provider.search(query);
 
-    setState(() {
-      _searchResults = results;
-      _isSearching = false;
-      _hasSearched = true;
-    });
+    if (mounted) {
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+        _hasSearched = true;
+      });
+      provider.saveSearchState(query, results);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final maProvider = context.watch<MusicAssistantProvider>();
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: colorScheme.background,
       appBar: AppBar(
         backgroundColor: colorScheme.surface,
         elevation: 0,
-        title: widget.isSearchActive 
-          ? TextField(
-              controller: _searchController,
-              focusNode: _focusNode,
-              enabled: widget.isSearchActive,
-              style: TextStyle(color: colorScheme.onSurface),
-              cursorColor: colorScheme.primary,
-              decoration: InputDecoration(
-                hintText: 'Search music...',
-                hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
-                border: InputBorder.none,
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear_rounded, color: colorScheme.onSurface.withOpacity(0.5)),
-                        onPressed: () {
-                          _searchController.clear();
-                          _performSearch('');
-                        },
-                      )
-                    : null,
-              ),
-              onChanged: (value) {
-                setState(() {});
-                _performSearch(value);
-              },
-              onSubmitted: _performSearch,
-            )
-          : Text(
-              'Search',
-              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
-            ),
+        title: TextField(
+          controller: _searchController,
+          focusNode: _focusNode,
+          style: TextStyle(color: colorScheme.onSurface),
+          cursorColor: colorScheme.primary,
+          decoration: InputDecoration(
+            hintText: 'Search music...',
+            hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
+            border: InputBorder.none,
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(Icons.clear_rounded, color: colorScheme.onSurface.withOpacity(0.5)),
+                    onPressed: () {
+                      _searchController.clear();
+                      _performSearch('');
+                    },
+                  )
+                : null,
+          ),
+          onChanged: (value) {
+            setState(() {}); // Rebuild for clear button
+            _performSearch(value);
+          },
+          onSubmitted: _performSearch,
+        ),
       ),
       body: !maProvider.isConnected
           ? _buildDisconnectedView()

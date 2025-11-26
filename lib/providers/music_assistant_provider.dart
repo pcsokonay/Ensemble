@@ -40,6 +40,33 @@ class MusicAssistantProvider with ChangeNotifier {
   String? get error => _error;
   bool get isConnected => _connectionState == MAConnectionState.connected;
 
+  // Search state persistence
+  String _lastSearchQuery = '';
+  Map<String, List<MediaItem>> _lastSearchResults = {
+    'artists': [],
+    'albums': [],
+    'tracks': [],
+  };
+
+  String get lastSearchQuery => _lastSearchQuery;
+  Map<String, List<MediaItem>> get lastSearchResults => _lastSearchResults;
+
+  void saveSearchState(String query, Map<String, List<MediaItem>> results) {
+    _lastSearchQuery = query;
+    _lastSearchResults = results;
+    // No notifyListeners() needed here as SearchScreen manages its own UI updates
+    // and just reads this on init
+  }
+
+  void clearSearchState() {
+    _lastSearchQuery = '';
+    _lastSearchResults = {
+      'artists': [],
+      'albums': [],
+      'tracks': [],
+    };
+  }
+
   // Player selection getters
   Player? get selectedPlayer => _selectedPlayer;
   List<Player> get availablePlayers => _availablePlayers;
