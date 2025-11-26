@@ -31,6 +31,12 @@ class _SearchScreenState extends State<SearchScreen> {
     // This prevents keyboard popup bug when SearchScreen is in widget tree but not visible
   }
 
+  void requestFocus() {
+    if (mounted) {
+      _focusNode.requestFocus();
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();

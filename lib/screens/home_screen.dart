@@ -14,6 +14,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  final GlobalKey<_SearchScreenState> _searchScreenKey = GlobalKey<_SearchScreenState>();
 
   @override
   Widget build(BuildContext context) {
@@ -32,11 +33,11 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: colorScheme.background,
         body: IndexedStack(
           index: _selectedIndex,
-          children: const [
-            NewHomeScreen(),
-            NewLibraryScreen(),
-            SearchScreen(),
-            SettingsScreen(),
+          children: [
+            const NewHomeScreen(),
+            const NewLibraryScreen(),
+            SearchScreen(key: _searchScreenKey),
+            const SettingsScreen(),
           ],
         ),
         bottomNavigationBar: Column(
@@ -63,6 +64,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _selectedIndex = index;
                   });
+
+                  // Auto-focus search field when switching to search tab
+                  if (index == 2) {
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      _searchScreenKey.currentState?.requestFocus();
+                    });
+                  }
                 },
                 backgroundColor: Colors.transparent,
                 selectedItemColor: colorScheme.primary,
