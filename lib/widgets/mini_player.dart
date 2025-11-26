@@ -36,15 +36,16 @@ class MiniPlayer extends StatelessWidget {
             );
           },
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            height: 96, // 1.5x the standard mini player height (64 * 1.5)
+            margin: const EdgeInsets.only(left: 8, right: 8, top: 4),
             decoration: BoxDecoration(
-              color: colorScheme.surface,
-              borderRadius: BorderRadius.circular(12),
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(24), // Quarter circle = height/4 (96/4=24)
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, -2),
                 ),
               ],
             ),
@@ -52,32 +53,32 @@ class MiniPlayer extends StatelessWidget {
               tag: HeroTags.nowPlayingBackground,
               child: Material(
                 color: Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(24),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(24),
                   child: Column(
                     children: [
                       // Status indicator bar
                       Container(
-                      height: 2,
+                      height: 3,
                       color: selectedPlayer.isPlaying
-                          ? colorScheme.primary.withOpacity(0.7)
+                          ? colorScheme.primary.withOpacity(0.8)
                           : colorScheme.onSurface.withOpacity(0.1),
                     ),
                     // Player content
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         child: Row(
                           children: [
                             // Album art with Hero animation
                             Hero(
                               tag: HeroTags.nowPlayingArt,
                               child: Container(
-                                width: 48,
-                                height: 48,
+                                width: 64,
+                                height: 64,
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12),
                                   child: imageUrl != null
                                       ? Image.network(
                                           imageUrl,
@@ -141,7 +142,7 @@ class MiniPlayer extends StatelessWidget {
                             IconButton(
                               icon: const Icon(Icons.queue_music),
                               color: colorScheme.onSurface.withOpacity(0.7),
-                              iconSize: 22,
+                              iconSize: 26,
                               onPressed: () {
                                 Navigator.push(
                                   context,
@@ -159,7 +160,7 @@ class MiniPlayer extends StatelessWidget {
                                 child: AnimatedIconButton(
                                   icon: Icons.skip_previous_rounded,
                                   color: colorScheme.onSurface,
-                                  iconSize: 26,
+                                  iconSize: 30,
                                   onPressed: () async {
                                     try {
                                       await maProvider.previousTrackSelectedPlayer();
@@ -184,7 +185,7 @@ class MiniPlayer extends StatelessWidget {
                                       ? Icons.pause_rounded
                                       : Icons.play_arrow_rounded,
                                   color: colorScheme.onSurface,
-                                  iconSize: 32,
+                                  iconSize: 38,
                                   onPressed: () async {
                                     try {
                                       await maProvider.playPauseSelectedPlayer();
@@ -207,7 +208,7 @@ class MiniPlayer extends StatelessWidget {
                                 child: AnimatedIconButton(
                                   icon: Icons.skip_next_rounded,
                                   color: colorScheme.onSurface,
-                                  iconSize: 28,
+                                  iconSize: 32,
                                   onPressed: () async {
                                     try {
                                       await maProvider.nextTrackSelectedPlayer();
