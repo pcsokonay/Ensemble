@@ -428,9 +428,15 @@ class MusicAssistantAPI {
 
       _logger.log('📀 Got ${items.length} recently played tracks');
 
+      if (items.isNotEmpty) {
+        _logger.log('🔍 DEBUG: First track structure: ${items[0]}');
+        _logger.log('🔍 DEBUG: First track keys: ${(items[0] as Map<String, dynamic>).keys.toList()}');
+      }
+
       // Extract unique albums from tracks
       final seenAlbumIds = <String>{};
       final albums = <Album>[];
+      var albumsWithoutData = 0;
 
       for (final item in items) {
         final itemMap = item as Map<String, dynamic>;
@@ -446,9 +452,15 @@ class MusicAssistantAPI {
               _logger.log('   ⚠️ Failed to parse album: $e');
             }
           }
+        } else {
+          albumsWithoutData++;
         }
 
         if (albums.length >= limit) break;
+      }
+
+      if (albumsWithoutData > 0) {
+        _logger.log('⚠️ $albumsWithoutData tracks had no album data');
       }
 
       _logger.log('✅ Extracted ${albums.length} unique albums from recent tracks');
