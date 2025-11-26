@@ -162,16 +162,16 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
         children: [
           CustomScrollView(
             slivers: [
-          SliverAppBar(
-            expandedHeight: 300,
-            pinned: true,
-            backgroundColor: colorScheme.background,
-            leading: IconButton(
+            SliverAppBar(
+              expandedHeight: 300,
+              pinned: true,
+              backgroundColor: colorScheme.background,
+              leading: IconButton(
               icon: const Icon(Icons.arrow_back_rounded),
               onPressed: () => Navigator.pop(context),
               color: colorScheme.onBackground,
-            ),
-            flexibleSpace: FlexibleSpaceBar(
+              ),
+              flexibleSpace: FlexibleSpaceBar(
               background: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
