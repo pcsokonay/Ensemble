@@ -150,6 +150,109 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
     }
   }
 
+  Future<void> _addAlbumToQueue() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+
+    try {
+      final player = maProvider.selectedPlayer;
+      if (player == null) {
+        _showError('No player selected');
+        return;
+      }
+
+      print('➕ Adding album to queue on ${player.name}');
+
+      // Add all tracks to queue without clearing
+      await maProvider.playTracks(player.playerId, _tracks, startIndex: 0, clearQueue: false);
+      print('✓ Album added to queue on ${player.name}');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Album added to queue'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error adding album to queue: $e');
+      _showError('Failed to add album to queue: $e');
+    }
+  }
+
+  void _addTrackToQueue(BuildContext context, int index) {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final players = maProvider.availablePlayers;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            Text(
+              'Add to queue on...',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            if (players.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32.0),
+                child: Text('No players available'),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: players.length,
+                  itemBuilder: (context, playerIndex) {
+                    final player = players[playerIndex];
+                    return ListTile(
+                      leading: Icon(
+                        Icons.speaker,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      title: Text(player.name),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        try {
+                          // Add tracks from this index onwards to queue
+                          await maProvider.playTracks(
+                            player.playerId,
+                            _tracks,
+                            startIndex: index,
+                            clearQueue: false,
+                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tracks added to queue'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          print('Error adding to queue: $e');
+                          _showError('Failed to add to queue: $e');
+                        }
+                      },
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -290,26 +393,43 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                         ),
                       ),
                       const SizedBox(width: 12),
-                      
-                      // "Play on..." Button
-                      Expanded(
-                        flex: 1,
-                        child: SizedBox(
-                          height: 50,
-                          child: FilledButton.tonal(
-                            onPressed: _isLoading || _tracks.isEmpty ? null : () => _showPlayOnMenu(context),
-                            style: FilledButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+
+                      // "Play on..." Button (Square)
+                      SizedBox(
+                        height: 50,
+                        width: 50,
+                        child: FilledButton.tonal(
+                          onPressed: _isLoading || _tracks.isEmpty ? null : () => _showPlayOnMenu(context),
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.speaker_group_outlined),
                           ),
+                          child: const Icon(Icons.speaker_group_outlined),
                         ),
                       ),
-                      
+
                       const SizedBox(width: 12),
-                      
+
+                      // "Add Album to Queue" Button (Square)
+                      SizedBox(
+                        height: 50,
+                        width: 50,
+                        child: FilledButton.tonal(
+                          onPressed: _isLoading || _tracks.isEmpty ? null : _addAlbumToQueue,
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Icon(Icons.playlist_add),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
                       // Favorite Button
                       Container(
                         height: 50,
@@ -412,7 +532,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                                 ),
                               )
                             : null,
-                        onTap: () {
+                        onTap: () => _playTrack(index),
+                        onLongPress: () {
                           setState(() {
                             _expandedTrackIndex = isExpanded ? null : index;
                           });
@@ -430,23 +551,6 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                                       child: SizedBox(
                                         height: 48,
                                         child: FilledButton.tonal(
-                                          onPressed: () => _showPlayAlbumFromHereMenu(context, index),
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: colorScheme.secondaryContainer,
-                                            foregroundColor: colorScheme.onSecondaryContainer,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                          ),
-                                          child: const Text('Play album from here'),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: SizedBox(
-                                        height: 48,
-                                        child: FilledButton.tonal(
                                           onPressed: () => _showPlayRadioMenu(context, index),
                                           style: FilledButton.styleFrom(
                                             backgroundColor: colorScheme.tertiaryContainer,
@@ -455,7 +559,24 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                                               borderRadius: BorderRadius.circular(12),
                                             ),
                                           ),
-                                          child: const Text('Play radio'),
+                                          child: const Text('Start radio'),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 48,
+                                        child: FilledButton.tonal(
+                                          onPressed: () => _addTrackToQueue(context, index),
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: colorScheme.secondaryContainer,
+                                            foregroundColor: colorScheme.onSecondaryContainer,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                          child: const Text('Add to queue'),
                                         ),
                                       ),
                                     ),
