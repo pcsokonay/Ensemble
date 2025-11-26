@@ -945,20 +945,26 @@ class MusicAssistantAPI {
 
   /// Play multiple tracks via queue
   /// If clearQueue is true, replaces the queue (default behavior)
+  /// If startIndex is provided, only tracks from that index onwards will be queued
   Future<void> playTracks(String playerId, List<Track> tracks, {int? startIndex, bool clearQueue = true}) async {
     return await RetryHelper.retryCritical(
       operation: () async {
+        // If startIndex is provided, slice the tracks list to start from that index
+        // This is a workaround since Music Assistant ignores the start_item parameter
+        final tracksToPlay = startIndex != null && startIndex > 0
+            ? tracks.sublist(startIndex)
+            : tracks;
+
         // Build array of URI strings (not objects!)
-        final mediaUris = tracks.map((track) => _buildTrackUri(track)).toList();
+        final mediaUris = tracksToPlay.map((track) => _buildTrackUri(track)).toList();
 
         final option = clearQueue ? 'replace' : 'play';
-        _logger.log('Playing ${tracks.length} tracks via queue on player $playerId (option: $option, startIndex: $startIndex)');
+        _logger.log('Playing ${tracksToPlay.length} tracks via queue on player $playerId (option: $option, startIndex: $startIndex, sliced: ${startIndex != null && startIndex > 0})');
 
         final args = {
           'queue_id': playerId,
           'media': mediaUris, // Array of URI strings
           'option': option, // 'replace' clears queue, 'play' adds to queue
-          if (startIndex != null) 'start_item': startIndex,
         };
 
         _logger.log('📤 Sending play_media command with args: $args');
@@ -968,7 +974,7 @@ class MusicAssistantAPI {
           args: args,
         );
 
-        _logger.log('✓ ${tracks.length} tracks queued successfully');
+        _logger.log('✓ ${tracksToPlay.length} tracks queued successfully');
       },
     );
   }
@@ -977,8 +983,10 @@ class MusicAssistantAPI {
   Future<void> playRadio(String playerId, Track track) async {
     return await RetryHelper.retryCritical(
       operation: () async {
-        final trackUri = _buildTrackUri(track);
-        _logger.log('Playing radio based on track: $trackUri on player $playerId');
+        // Try using library URI if available, otherwise use provider URI
+        final libraryUri = track.uri;
+        final trackUri = libraryUri ?? _buildTrackUri(track);
+        _logger.log('Playing radio based on track: $trackUri (library URI: $libraryUri) on player $playerId');
 
         final args = {
           'queue_id': playerId,
@@ -988,13 +996,15 @@ class MusicAssistantAPI {
         };
 
         _logger.log('📤 Sending play_media command (RADIO MODE) with args: $args');
+        _logger.log('   Track details: provider=${track.provider}, itemId=${track.itemId}');
+        _logger.log('   Available providers: ${track.providerMappings?.map((m) => '${m.providerDomain}:${m.available}').join(', ')}');
 
         await _sendCommand(
           'player_queues/play_media',
           args: args,
         );
 
-        _logger.log('✓ Radio mode started successfully');
+        _logger.log('✓ Radio mode command sent successfully');
       },
     );
   }
