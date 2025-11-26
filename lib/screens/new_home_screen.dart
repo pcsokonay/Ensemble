@@ -53,6 +53,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         ),
         titleSpacing: 0,
         centerTitle: false,
+        actions: [
+          const PlayerSelector(),
+        ],
       ),
       body: SafeArea(
         child: Consumer<MusicAssistantProvider>(

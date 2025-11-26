@@ -31,6 +31,9 @@ class NewLibraryScreen extends StatelessWidget {
           ),
         ),
         centerTitle: true,
+        actions: [
+          const PlayerSelector(),
+        ],
       ),
       body: !provider.isConnected
           ? _buildDisconnectedView(context, provider)
