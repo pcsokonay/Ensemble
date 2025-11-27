@@ -246,16 +246,32 @@ class MusicAssistantProvider with ChangeNotifier {
   Future<void> _handleLocalPlayerEvent(Map<String, dynamic> event) async {
     if (!_isLocalPlaybackEnabled) return;
 
-    _logger.log('📥 Local player event received: ${event['command']}');
+    _logger.log('📥 Local player event received: ${event['type'] ?? event['command']}');
 
     try {
-      final command = event['command'] as String?;
+      // Server sends 'type', but older versions or some events might use 'command'
+      final command = (event['type'] as String?) ?? (event['command'] as String?);
       
       switch (command) {
         case 'play_media':
-          final url = event['url'] as String?;
-          if (url != null) {
-            await _localPlayer.playUrl(url);
+          // Server sends 'media_url', relative path
+          final urlPath = event['media_url'] as String? ?? event['url'] as String?;
+          
+          if (urlPath != null && _serverUrl != null) {
+            // Construct full URL
+            String fullUrl;
+            if (urlPath.startsWith('http')) {
+              fullUrl = urlPath;
+            } else {
+              // Ensure no double slashes
+              final baseUrl = _serverUrl!.endsWith('/') 
+                  ? _serverUrl!.substring(0, _serverUrl!.length - 1) 
+                  : _serverUrl!;
+              final path = urlPath.startsWith('/') ? urlPath : '/$urlPath';
+              fullUrl = '$baseUrl$path';
+            }
+            
+            await _localPlayer.playUrl(fullUrl);
           }
           break;
 
@@ -285,20 +301,29 @@ class MusicAssistantProvider with ChangeNotifier {
           }
           break;
 
+        case 'power_on':
+        case 'power_off':
         case 'power':
-          _logger.log('🔋 POWER COMMAND RECEIVED!');
-          final powered = event['powered'] as bool?;
-          _logger.log('🔋 Power value from event: $powered');
-          if (powered != null) {
-            _isLocalPlayerPowered = powered;
-            _logger.log('🔋 Local player power set to: $powered');
-            if (!powered) {
+          _logger.log('🔋 POWER COMMAND RECEIVED: $command');
+          
+          bool? newPowerState;
+          if (command == 'power_on') {
+            newPowerState = true;
+          } else if (command == 'power_off') {
+            newPowerState = false;
+          } else {
+            // Legacy 'power' command with 'powered' bool
+            newPowerState = event['powered'] as bool?;
+          }
+
+          if (newPowerState != null) {
+            _isLocalPlayerPowered = newPowerState;
+            _logger.log('🔋 Local player power set to: $_isLocalPlayerPowered');
+            if (!_isLocalPlayerPowered) {
               // When powered off, stop playback
               _logger.log('🔋 Stopping playback because powered off');
               await _localPlayer.stop();
             }
-          } else {
-            _logger.log('🔋 WARNING: power value is null in event');
           }
           break;
       }
