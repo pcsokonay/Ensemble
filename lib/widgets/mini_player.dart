@@ -53,19 +53,20 @@ class MiniPlayer extends StatelessWidget {
                 shadowColor: Colors.black.withOpacity(0.3),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    child: Row(
-                      children: [
-                        // Album art with Hero animation
-                        Hero(
-                          tag: HeroTags.nowPlayingArt,
-                          transitionOnUserGestures: true,
-                          child: Container(
-                            width: 72,
-                            height: 72,
+                  child: Row(
+                    children: [
+                      // Album art with Hero animation - full height
+                      Hero(
+                        tag: HeroTags.nowPlayingArt,
+                        transitionOnUserGestures: true,
+                        child: Container(
+                          width: 80,
+                          height: 80,
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                bottomLeft: Radius.circular(20),
+                              ),
                               child: imageUrl != null
                                   ? Image.network(
                                       imageUrl,
@@ -95,10 +96,12 @@ class MiniPlayer extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 16),
                         // Track info
                         Expanded(
-                          child: Column(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 12.0),
+                            child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -125,20 +128,7 @@ class MiniPlayer extends StatelessWidget {
                             ],
                           ),
                         ),
-                        // Queue button
-                        IconButton(
-                          icon: const Icon(Icons.queue_music),
-                          color: colorScheme.onSurface.withOpacity(0.7),
-                          iconSize: 26,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const QueueScreen(),
-                              ),
-                            );
-                          },
-                        ),
+                      ),
                         // Playback controls for selected player
                         Hero(
                           tag: HeroTags.nowPlayingPreviousButton,
@@ -169,24 +159,47 @@ class MiniPlayer extends StatelessWidget {
                           transitionOnUserGestures: true,
                           child: Material(
                             color: Colors.transparent,
-                            child: AnimatedIconButton(
-                              icon: selectedPlayer.isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: colorScheme.onSurface,
-                              iconSize: 38,
-                              onPressed: () async {
+                            child: GestureDetector(
+                              onLongPress: () async {
                                 try {
-                                  await maProvider.playPauseSelectedPlayer();
+                                  // Clear the queue on long press
+                                  final player = selectedPlayer;
+                                  if (player != null) {
+                                    await maProvider.clearQueue(player.playerId);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Queue cleared')),
+                                      );
+                                    }
+                                  }
                                 } catch (e) {
-                                  print('❌ Error in play/pause: $e');
+                                  print('❌ Error clearing queue: $e');
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error: $e')),
+                                      SnackBar(content: Text('Error clearing queue: $e')),
                                     );
                                   }
                                 }
                               },
+                              child: AnimatedIconButton(
+                                icon: selectedPlayer.isPlaying
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                color: colorScheme.onSurface,
+                                iconSize: 38,
+                                onPressed: () async {
+                                  try {
+                                    await maProvider.playPauseSelectedPlayer();
+                                  } catch (e) {
+                                    print('❌ Error in play/pause: $e');
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Error: $e')),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
                             ),
                           ),
                         ),
