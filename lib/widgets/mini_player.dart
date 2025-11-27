@@ -129,7 +129,7 @@ class MiniPlayer extends StatelessWidget {
                           ),
                         ),
                       ),
-                        // Playback controls for selected player
+                      // Playback controls for selected player
                         Hero(
                           tag: HeroTags.nowPlayingPreviousButton,
                           transitionOnUserGestures: true,
@@ -162,21 +162,18 @@ class MiniPlayer extends StatelessWidget {
                             child: GestureDetector(
                               onLongPress: () async {
                                 try {
-                                  // Clear the queue on long press
-                                  final player = selectedPlayer;
-                                  if (player != null) {
-                                    await maProvider.clearQueue(player.playerId);
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Queue cleared')),
-                                      );
-                                    }
-                                  }
-                                } catch (e) {
-                                  print('❌ Error clearing queue: $e');
+                                  // Stop player and clear queue on long press
+                                  await maProvider.stopPlayer(selectedPlayer.playerId);
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error clearing queue: $e')),
+                                      const SnackBar(content: Text('Playback stopped')),
+                                    );
+                                  }
+                                } catch (e) {
+                                  print('❌ Error stopping player: $e');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
                                     );
                                   }
                                 }
