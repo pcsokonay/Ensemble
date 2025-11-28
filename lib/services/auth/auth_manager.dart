@@ -39,7 +39,10 @@ class AuthManager {
 
     // Try no-auth first (fastest and most common for local deployments)
     _logger.log('Testing no-auth strategy...');
-    if (await _canConnectWithoutAuth(baseUrl)) {
+    final canConnect = await _canConnectWithoutAuth(baseUrl);
+    _logger.log('No-auth result: $canConnect');
+
+    if (canConnect) {
       _logger.log('✓ Server does not require authentication');
       return _strategies.firstWhere((s) => s.name == 'none');
     }
@@ -47,14 +50,19 @@ class AuthManager {
     // Probe server for auth requirements
     try {
       _logger.log('Probing server for auth headers...');
+      final probeUrl = '$baseUrl/api/info';
+      _logger.log('Probe URL: $probeUrl');
+
       final response = await http.get(
-        Uri.parse('$baseUrl/api/info'),
-      ).timeout(const Duration(seconds: 5));
+        Uri.parse(probeUrl),
+      ).timeout(const Duration(seconds: 10));
+
+      _logger.log('Probe status: ${response.statusCode}');
 
       // Server returned 401 Unauthorized - check WWW-Authenticate header
       if (response.statusCode == 401) {
         final wwwAuth = response.headers['www-authenticate']?.toLowerCase();
-        _logger.log('Server returned 401 with WWW-Authenticate: $wwwAuth');
+        _logger.log('401 with WWW-Authenticate: $wwwAuth');
 
         // Check for Basic Auth
         if (wwwAuth != null && wwwAuth.contains('basic')) {
@@ -71,9 +79,14 @@ class AuthManager {
 
       // Check for Authelia-specific endpoints
       _logger.log('Testing for Authelia endpoints...');
+      final verifyUrl = '$baseUrl/api/verify';
+      _logger.log('Verify URL: $verifyUrl');
+
       final verifyResponse = await http.get(
-        Uri.parse('$baseUrl/api/verify'),
-      ).timeout(const Duration(seconds: 5));
+        Uri.parse(verifyUrl),
+      ).timeout(const Duration(seconds: 10));
+
+      _logger.log('Verify status: ${verifyResponse.statusCode}');
 
       if (verifyResponse.statusCode == 401) {
         // Authelia typically returns 401 on /api/verify without session
@@ -82,7 +95,7 @@ class AuthManager {
       }
     } catch (e) {
       _logger.log('✗ Auth detection error: $e');
-      rethrow; // Rethrow so LoginScreen can show the actual error
+      return null; // Return null instead of rethrow to show generic error
     }
 
     _logger.log('⚠️ Could not determine auth method');
@@ -92,13 +105,19 @@ class AuthManager {
   /// Test if server is accessible without authentication
   Future<bool> _canConnectWithoutAuth(String serverUrl) async {
     try {
+      final testUrl = '$serverUrl/api/info';
+      _logger.log('No-auth test URL: $testUrl');
+
       final response = await http.get(
-        Uri.parse('$serverUrl/api/info'),
-      ).timeout(const Duration(seconds: 5));
+        Uri.parse(testUrl),
+      ).timeout(const Duration(seconds: 10));
+
+      _logger.log('No-auth status: ${response.statusCode}');
 
       // 200 = no auth required, 401 = auth required
       return response.statusCode == 200;
     } catch (e) {
+      _logger.log('No-auth error: $e');
       return false;
     }
   }
