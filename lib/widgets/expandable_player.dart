@@ -11,8 +11,8 @@ import 'volume_control.dart';
 
 /// A unified player widget that seamlessly expands from mini to full-screen.
 ///
-/// This replaces the separate MiniPlayer and NowPlayingScreen with a single
-/// component that animates smoothly between collapsed and expanded states.
+/// Uses smooth morphing animations where each element (album art, track info,
+/// controls) transitions smoothly from their mini to full positions.
 class ExpandablePlayer extends StatefulWidget {
   /// Whether there's a bottom navigation bar below this player.
   /// When true, the collapsed player will be positioned above the nav bar.
@@ -45,10 +45,11 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   Timer? _progressTimer;
   double? _seekPosition;
 
-  // Collapsed height - more compact mini player
+  // Collapsed dimensions
   static const double _collapsedHeight = 64.0;
   static const double _collapsedMargin = 8.0;
   static const double _collapsedBorderRadius = 16.0;
+  static const double _collapsedArtSize = 64.0;
 
   @override
   void initState() {
@@ -187,7 +188,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         return AnimatedBuilder(
           animation: _expandAnimation,
           builder: (context, _) {
-            return _buildPlayer(
+            return _buildMorphingPlayer(
               context,
               maProvider,
               selectedPlayer,
@@ -201,7 +202,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     );
   }
 
-  Widget _buildPlayer(
+  Widget _buildMorphingPlayer(
     BuildContext context,
     MusicAssistantProvider maProvider,
     dynamic selectedPlayer,
@@ -215,54 +216,99 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Animation progress
+    final t = _expandAnimation.value;
+
     // Get adaptive colors if available
     final adaptiveScheme = themeProvider.adaptiveTheme
         ? (isDark ? _darkColorScheme : _lightColorScheme)
         : null;
 
-    // Interpolate colors based on expansion
-    final expandProgress = _expandAnimation.value;
-
-    // Background color transitions from primaryContainer to adaptive/dark background
+    // Color transitions
     final collapsedBg = colorScheme.primaryContainer;
     final expandedBg = adaptiveScheme?.surface ?? const Color(0xFF1a1a1a);
-    final backgroundColor = Color.lerp(collapsedBg, expandedBg, expandProgress)!;
+    final backgroundColor = Color.lerp(collapsedBg, expandedBg, t)!;
 
-    // Text/icon colors
     final collapsedTextColor = colorScheme.onPrimaryContainer;
     final expandedTextColor = adaptiveScheme?.onSurface ?? Colors.white;
-    final textColor = Color.lerp(collapsedTextColor, expandedTextColor, expandProgress)!;
+    final textColor = Color.lerp(collapsedTextColor, expandedTextColor, t)!;
 
-    // Primary accent color for buttons/sliders
     final primaryColor = adaptiveScheme?.primary ?? Colors.white;
 
-    // Bottom nav bar height (standard is ~56 + safe area)
+    // Container dimensions
     const bottomNavHeight = 56.0;
     final collapsedBottomOffset = widget.hasBottomNav
         ? bottomNavHeight + bottomPadding + _collapsedMargin
         : _collapsedMargin;
 
-    // Calculate dimensions based on expansion
     final collapsedWidth = screenSize.width - (_collapsedMargin * 2);
-    final expandedWidth = screenSize.width;
-    final width = lerpDouble(collapsedWidth, expandedWidth, expandProgress);
+    final width = lerpDouble(collapsedWidth, screenSize.width, t);
+    final height = lerpDouble(_collapsedHeight, screenSize.height, t);
+    final horizontalMargin = lerpDouble(_collapsedMargin, 0, t);
+    final bottomOffset = lerpDouble(collapsedBottomOffset, 0, t);
+    final borderRadius = lerpDouble(_collapsedBorderRadius, 0, t);
 
-    final collapsedTotalHeight = _collapsedHeight;
-    final expandedTotalHeight = screenSize.height;
-    final height = lerpDouble(collapsedTotalHeight, expandedTotalHeight, expandProgress);
-
-    // Margins shrink to zero when expanded
-    final horizontalMargin = lerpDouble(_collapsedMargin, 0, expandProgress);
-    // Bottom offset: above nav bar when collapsed, at screen bottom when expanded
-    final bottomOffset = lerpDouble(collapsedBottomOffset, 0, expandProgress);
-
-    // Border radius shrinks when expanded
-    final borderRadius = lerpDouble(_collapsedBorderRadius, 0, expandProgress);
-
-    // Album art size
-    final collapsedArtSize = _collapsedHeight;
+    // Album art morphing calculations
     final expandedArtSize = screenSize.width * 0.75;
-    final artSize = lerpDouble(collapsedArtSize, expandedArtSize, expandProgress);
+    final artSize = lerpDouble(_collapsedArtSize, expandedArtSize, t);
+    final artBorderRadius = lerpDouble(_collapsedBorderRadius, 16, t);
+
+    // Art position: left-aligned in collapsed, centered in expanded
+    final collapsedArtLeft = 0.0;
+    final expandedArtLeft = (screenSize.width - expandedArtSize) / 2;
+    final artLeft = lerpDouble(collapsedArtLeft, expandedArtLeft, t);
+
+    // Art vertical position: centered in collapsed bar, upper area in expanded
+    final collapsedArtTop = 0.0;
+    final expandedArtTop = topPadding + 80;
+    final artTop = lerpDouble(collapsedArtTop, expandedArtTop, t);
+
+    // Track title morphing
+    final collapsedTitleFontSize = 14.0;
+    final expandedTitleFontSize = 24.0;
+    final titleFontSize = lerpDouble(collapsedTitleFontSize, expandedTitleFontSize, t);
+
+    // Title position: next to art in collapsed, centered below art in expanded
+    final collapsedTitleLeft = _collapsedArtSize + 12;
+    final expandedTitleLeft = 24.0;
+    final titleLeft = lerpDouble(collapsedTitleLeft, expandedTitleLeft, t);
+
+    final collapsedTitleTop = (_collapsedHeight - 32) / 2; // Centered vertically
+    final expandedTitleTop = expandedArtTop + expandedArtSize + 40;
+    final titleTop = lerpDouble(collapsedTitleTop, expandedTitleTop, t);
+
+    final collapsedTitleWidth = screenSize.width - _collapsedArtSize - 150; // Leave room for controls
+    final expandedTitleWidth = screenSize.width - 48;
+    final titleWidth = lerpDouble(collapsedTitleWidth, expandedTitleWidth, t);
+
+    // Artist name morphing
+    final collapsedArtistFontSize = 12.0;
+    final expandedArtistFontSize = 16.0;
+    final artistFontSize = lerpDouble(collapsedArtistFontSize, expandedArtistFontSize, t);
+
+    final collapsedArtistTop = collapsedTitleTop + 18;
+    final expandedArtistTop = expandedTitleTop + 40;
+    final artistTop = lerpDouble(collapsedArtistTop, expandedArtistTop, t);
+
+    // Controls morphing
+    final collapsedControlsRight = 8.0;
+    final expandedControlsRight = (screenSize.width - 280) / 2; // Centered
+    final controlsRight = lerpDouble(collapsedControlsRight, expandedControlsRight, t);
+
+    final collapsedControlsTop = (_collapsedHeight - 34) / 2;
+    final expandedControlsTop = expandedArtistTop + 100;
+    final controlsTop = lerpDouble(collapsedControlsTop, expandedControlsTop, t);
+
+    // Control button sizes
+    final skipButtonSize = lerpDouble(28, 42, t);
+    final playButtonSize = lerpDouble(34, 42, t);
+    final playButtonContainerSize = lerpDouble(34, 72, t);
+
+    // Progress bar and extra controls opacity (only visible when expanded)
+    final expandedElementsOpacity = Curves.easeIn.transform((t - 0.5).clamp(0, 0.5) * 2);
+
+    // Volume control position
+    final volumeTop = expandedControlsTop + 80;
 
     return Positioned(
       left: horizontalMargin,
@@ -273,7 +319,6 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           if (!isExpanded) expand();
         },
         onVerticalDragUpdate: (details) {
-          // Swipe up to expand, down to collapse
           if (details.primaryDelta! < -10 && !isExpanded) {
             expand();
           } else if (details.primaryDelta! > 10 && isExpanded) {
@@ -283,38 +328,264 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         child: Material(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(borderRadius!),
-          elevation: lerpDouble(4, 0, expandProgress)!,
+          elevation: lerpDouble(4, 0, t)!,
           shadowColor: Colors.black.withOpacity(0.3),
           clipBehavior: Clip.antiAlias,
           child: SizedBox(
             width: width,
             height: height,
             child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                // Main content
-                _buildContent(
-                  context,
-                  maProvider,
-                  selectedPlayer,
-                  currentTrack,
-                  imageUrl,
-                  expandProgress,
-                  artSize!,
-                  textColor,
-                  primaryColor,
-                  backgroundColor,
-                  topPadding,
-                  bottomPadding,
-                  screenSize,
+                // Album art - morphs from left to center
+                Positioned(
+                  left: artLeft,
+                  top: artTop,
+                  child: Container(
+                    width: artSize,
+                    height: artSize,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(artBorderRadius!),
+                      boxShadow: t > 0.3
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3 * t),
+                                blurRadius: 24 * t,
+                                offset: Offset(0, 8 * t),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(artBorderRadius),
+                      child: imageUrl != null
+                          ? Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              cacheWidth: t > 0.5 ? 1024 : 128,
+                              cacheHeight: t > 0.5 ? 1024 : 128,
+                              errorBuilder: (_, __, ___) => _buildPlaceholderArt(colorScheme, t),
+                            )
+                          : _buildPlaceholderArt(colorScheme, t),
+                    ),
+                  ),
                 ),
 
-                // Collapse button (only visible when expanded)
-                if (expandProgress > 0.3)
+                // Track title - morphs from beside art to centered below
+                Positioned(
+                  left: titleLeft,
+                  top: titleTop,
+                  child: SizedBox(
+                    width: titleWidth,
+                    child: Text(
+                      currentTrack.name,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: titleFontSize,
+                        fontWeight: t > 0.5 ? FontWeight.bold : FontWeight.w500,
+                      ),
+                      textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
+                      maxLines: t > 0.5 ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+
+                // Artist name - morphs similarly
+                Positioned(
+                  left: titleLeft,
+                  top: artistTop,
+                  child: SizedBox(
+                    width: titleWidth,
+                    child: Text(
+                      currentTrack.artistsString,
+                      style: TextStyle(
+                        color: textColor.withOpacity(0.7),
+                        fontSize: artistFontSize,
+                      ),
+                      textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+
+                // Album name (only visible when expanded)
+                if (currentTrack.album != null && t > 0.3)
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    top: artistTop + 28,
+                    child: Opacity(
+                      opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0),
+                      child: Text(
+                        currentTrack.album!.name,
+                        style: TextStyle(
+                          color: textColor.withOpacity(0.5),
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+
+                // Progress bar (fades in when expanded)
+                if (t > 0.5 && currentTrack.duration != null)
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    top: expandedArtistTop + 60,
+                    child: Opacity(
+                      opacity: expandedElementsOpacity,
+                      child: Column(
+                        children: [
+                          SliderTheme(
+                            data: SliderThemeData(
+                              trackHeight: 3,
+                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                            ),
+                            child: Slider(
+                              value: (_seekPosition ?? selectedPlayer.currentElapsedTime)
+                                  .clamp(0, currentTrack.duration!.inSeconds.toDouble()),
+                              max: currentTrack.duration!.inSeconds.toDouble(),
+                              onChanged: (value) => setState(() => _seekPosition = value),
+                              onChangeStart: (value) => setState(() => _seekPosition = value),
+                              onChangeEnd: (value) async {
+                                try {
+                                  await maProvider.seek(selectedPlayer.playerId, value.round());
+                                  await Future.delayed(const Duration(milliseconds: 200));
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error seeking: $e')),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) setState(() => _seekPosition = null);
+                                }
+                              },
+                              activeColor: primaryColor,
+                              inactiveColor: primaryColor.withOpacity(0.24),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _formatDuration((_seekPosition ?? selectedPlayer.currentElapsedTime).toInt()),
+                                  style: TextStyle(color: textColor.withOpacity(0.5), fontSize: 12),
+                                ),
+                                Text(
+                                  _formatDuration(currentTrack.duration!.inSeconds),
+                                  style: TextStyle(color: textColor.withOpacity(0.5), fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Playback controls - morph from right side to centered
+                Positioned(
+                  right: controlsRight,
+                  top: controlsTop,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Shuffle button (fades in when expanded)
+                      if (t > 0.5)
+                        Opacity(
+                          opacity: expandedElementsOpacity,
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.shuffle,
+                              color: _queue?.shuffle == true ? primaryColor : textColor.withOpacity(0.5),
+                            ),
+                            iconSize: 24,
+                            onPressed: _isLoadingQueue ? null : _toggleShuffle,
+                          ),
+                        ),
+                      if (t > 0.5) SizedBox(width: 12 * t),
+
+                      // Previous button
+                      _buildMorphingControlButton(
+                        icon: Icons.skip_previous_rounded,
+                        color: textColor,
+                        size: skipButtonSize!,
+                        onPressed: () => maProvider.previousTrackSelectedPlayer(),
+                        useAnimation: t > 0.5,
+                      ),
+                      SizedBox(width: lerpDouble(0, 12, t)),
+
+                      // Play/Pause button - morphs from simple to circular
+                      _buildMorphingPlayButton(
+                        isPlaying: selectedPlayer.isPlaying,
+                        textColor: textColor,
+                        primaryColor: primaryColor,
+                        backgroundColor: backgroundColor,
+                        size: playButtonSize!,
+                        containerSize: playButtonContainerSize!,
+                        progress: t,
+                        onPressed: () => maProvider.playPauseSelectedPlayer(),
+                        onLongPress: () => maProvider.stopPlayer(selectedPlayer.playerId),
+                      ),
+                      SizedBox(width: lerpDouble(0, 12, t)),
+
+                      // Next button
+                      _buildMorphingControlButton(
+                        icon: Icons.skip_next_rounded,
+                        color: textColor,
+                        size: skipButtonSize,
+                        onPressed: () => maProvider.nextTrackSelectedPlayer(),
+                        useAnimation: t > 0.5,
+                      ),
+
+                      // Repeat button (fades in when expanded)
+                      if (t > 0.5) SizedBox(width: 12 * t),
+                      if (t > 0.5)
+                        Opacity(
+                          opacity: expandedElementsOpacity,
+                          child: IconButton(
+                            icon: Icon(
+                              _queue?.repeatMode == 'one' ? Icons.repeat_one : Icons.repeat,
+                              color: _queue?.repeatMode != null && _queue!.repeatMode != 'off'
+                                  ? primaryColor
+                                  : textColor.withOpacity(0.5),
+                            ),
+                            iconSize: 24,
+                            onPressed: _isLoadingQueue ? null : _cycleRepeat,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Volume control (fades in when expanded)
+                if (t > 0.5)
+                  Positioned(
+                    left: 40,
+                    right: 40,
+                    top: volumeTop,
+                    child: Opacity(
+                      opacity: expandedElementsOpacity,
+                      child: const VolumeControl(compact: false),
+                    ),
+                  ),
+
+                // Collapse button (fades in when expanded)
+                if (t > 0.3)
                   Positioned(
                     top: topPadding + 8,
                     left: 8,
                     child: Opacity(
-                      opacity: ((expandProgress - 0.3) / 0.7).clamp(0.0, 1.0),
+                      opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0),
                       child: IconButton(
                         icon: Icon(Icons.keyboard_arrow_down, color: textColor, size: 32),
                         onPressed: collapse,
@@ -322,13 +593,13 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     ),
                   ),
 
-                // Queue button (only visible when expanded)
-                if (expandProgress > 0.3)
+                // Queue button (fades in when expanded)
+                if (t > 0.3)
                   Positioned(
                     top: topPadding + 8,
                     right: 8,
                     child: Opacity(
-                      opacity: ((expandProgress - 0.3) / 0.7).clamp(0.0, 1.0),
+                      opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0),
                       child: IconButton(
                         icon: Icon(Icons.queue_music, color: textColor),
                         onPressed: () {
@@ -341,14 +612,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     ),
                   ),
 
-                // Player name (only visible when expanded)
-                if (expandProgress > 0.5)
+                // Player name (fades in when expanded)
+                if (t > 0.5)
                   Positioned(
                     top: topPadding + 16,
                     left: 0,
                     right: 0,
                     child: Opacity(
-                      opacity: ((expandProgress - 0.5) / 0.5).clamp(0.0, 1.0),
+                      opacity: ((t - 0.5) / 0.5).clamp(0.0, 1.0),
                       child: Text(
                         selectedPlayer.name,
                         style: TextStyle(
@@ -368,415 +639,32 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     );
   }
 
-  Widget _buildContent(
-    BuildContext context,
-    MusicAssistantProvider maProvider,
-    dynamic selectedPlayer,
-    dynamic currentTrack,
-    String? imageUrl,
-    double expandProgress,
-    double artSize,
-    Color textColor,
-    Color primaryColor,
-    Color backgroundColor,
-    double topPadding,
-    double bottomPadding,
-    Size screenSize,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (expandProgress < 0.3) {
-      // Collapsed (mini player) layout
-      return _buildCollapsedLayout(
-        context,
-        maProvider,
-        selectedPlayer,
-        currentTrack,
-        imageUrl,
-        textColor,
-        colorScheme,
-      );
-    } else if (expandProgress > 0.7) {
-      // Expanded (full screen) layout
-      return _buildExpandedLayout(
-        context,
-        maProvider,
-        selectedPlayer,
-        currentTrack,
-        imageUrl,
-        artSize,
-        textColor,
-        primaryColor,
-        backgroundColor,
-        topPadding,
-        bottomPadding,
-        screenSize,
-      );
-    } else {
-      // Transition state - crossfade between layouts
-      final transitionProgress = ((expandProgress - 0.3) / 0.4).clamp(0.0, 1.0);
-      return Stack(
-        children: [
-          Opacity(
-            opacity: 1 - transitionProgress,
-            child: _buildCollapsedLayout(
-              context,
-              maProvider,
-              selectedPlayer,
-              currentTrack,
-              imageUrl,
-              textColor,
-              colorScheme,
-            ),
-          ),
-          Opacity(
-            opacity: transitionProgress,
-            child: _buildExpandedLayout(
-              context,
-              maProvider,
-              selectedPlayer,
-              currentTrack,
-              imageUrl,
-              artSize,
-              textColor,
-              primaryColor,
-              backgroundColor,
-              topPadding,
-              bottomPadding,
-              screenSize,
-            ),
-          ),
-        ],
-      );
-    }
-  }
-
-  Widget _buildCollapsedLayout(
-    BuildContext context,
-    MusicAssistantProvider maProvider,
-    dynamic selectedPlayer,
-    dynamic currentTrack,
-    String? imageUrl,
-    Color textColor,
-    ColorScheme colorScheme,
-  ) {
-    return Row(
-      children: [
-        // Album art - square, full height
-        SizedBox(
-          width: _collapsedHeight,
-          height: _collapsedHeight,
-          child: ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(_collapsedBorderRadius),
-              bottomLeft: Radius.circular(_collapsedBorderRadius),
-            ),
-            child: imageUrl != null
-                ? Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    cacheWidth: 128,
-                    cacheHeight: 128,
-                    errorBuilder: (_, __, ___) => _buildPlaceholderArt(colorScheme),
-                  )
-                : _buildPlaceholderArt(colorScheme),
-          ),
-        ),
-        const SizedBox(width: 12),
-
-        // Track info
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                currentTrack.name,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                currentTrack.artistsString,
-                style: TextStyle(
-                  color: textColor.withOpacity(0.7),
-                  fontSize: 12,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-
-        // Compact controls
-        _buildControlButton(
-          icon: Icons.skip_previous_rounded,
-          color: textColor,
-          size: 28,
-          onPressed: () => maProvider.previousTrackSelectedPlayer(),
-        ),
-        _buildPlayPauseButton(
-          isPlaying: selectedPlayer.isPlaying,
-          color: textColor,
-          size: 34,
-          onPressed: () => maProvider.playPauseSelectedPlayer(),
-          onLongPress: () => maProvider.stopPlayer(selectedPlayer.playerId),
-        ),
-        _buildControlButton(
-          icon: Icons.skip_next_rounded,
-          color: textColor,
-          size: 28,
-          onPressed: () => maProvider.nextTrackSelectedPlayer(),
-        ),
-        const SizedBox(width: 8),
-      ],
-    );
-  }
-
-  Widget _buildExpandedLayout(
-    BuildContext context,
-    MusicAssistantProvider maProvider,
-    dynamic selectedPlayer,
-    dynamic currentTrack,
-    String? imageUrl,
-    double artSize,
-    Color textColor,
-    Color primaryColor,
-    Color backgroundColor,
-    double topPadding,
-    double bottomPadding,
-    Size screenSize,
-  ) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: topPadding + 40,
-          left: 24,
-          right: 24,
-          bottom: 16,
-        ),
-        child: Column(
-          children: [
-            const Spacer(),
-
-            // Large album art
-            Center(
-              child: Container(
-                width: artSize,
-                height: artSize,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: imageUrl != null
-                      ? Image.network(
-                          imageUrl,
-                          fit: BoxFit.cover,
-                          cacheWidth: 1024,
-                          cacheHeight: 1024,
-                          errorBuilder: (_, __, ___) => _buildLargePlaceholderArt(),
-                        )
-                      : _buildLargePlaceholderArt(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
-
-            // Track info
-            Text(
-              currentTrack.name,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              currentTrack.artistsString,
-              style: TextStyle(
-                color: textColor.withOpacity(0.7),
-                fontSize: 16,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (currentTrack.album != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                currentTrack.album!.name,
-                style: TextStyle(
-                  color: textColor.withOpacity(0.5),
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-            const SizedBox(height: 32),
-
-            // Progress bar
-            if (currentTrack.duration != null) ...[
-              SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 3,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                ),
-                child: Slider(
-                  value: (_seekPosition ?? selectedPlayer.currentElapsedTime)
-                      .clamp(0, currentTrack.duration!.inSeconds.toDouble()),
-                  max: currentTrack.duration!.inSeconds.toDouble(),
-                  onChanged: (value) => setState(() => _seekPosition = value),
-                  onChangeStart: (value) => setState(() => _seekPosition = value),
-                  onChangeEnd: (value) async {
-                    try {
-                      await maProvider.seek(selectedPlayer.playerId, value.round());
-                      await Future.delayed(const Duration(milliseconds: 200));
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error seeking: $e')),
-                        );
-                      }
-                    } finally {
-                      if (mounted) setState(() => _seekPosition = null);
-                    }
-                  },
-                  activeColor: primaryColor,
-                  inactiveColor: primaryColor.withOpacity(0.24),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _formatDuration((_seekPosition ?? selectedPlayer.currentElapsedTime).toInt()),
-                      style: TextStyle(color: textColor.withOpacity(0.5), fontSize: 12),
-                    ),
-                    Text(
-                      _formatDuration(currentTrack.duration!.inSeconds),
-                      style: TextStyle(color: textColor.withOpacity(0.5), fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ] else
-              LinearProgressIndicator(
-                backgroundColor: Colors.white24,
-                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-              ),
-            const SizedBox(height: 16),
-
-            // Playback controls
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    Icons.shuffle,
-                    color: _queue?.shuffle == true ? primaryColor : textColor.withOpacity(0.5),
-                  ),
-                  iconSize: 24,
-                  onPressed: _isLoadingQueue ? null : _toggleShuffle,
-                ),
-                const SizedBox(width: 12),
-                AnimatedIconButton(
-                  icon: Icons.skip_previous_rounded,
-                  color: textColor,
-                  iconSize: 42,
-                  onPressed: () => maProvider.previousTrackSelectedPlayer(),
-                ),
-                const SizedBox(width: 12),
-                _buildLargePlayPauseButton(
-                  isPlaying: selectedPlayer.isPlaying,
-                  primaryColor: primaryColor,
-                  backgroundColor: backgroundColor,
-                  onPressed: () => maProvider.playPauseSelectedPlayer(),
-                ),
-                const SizedBox(width: 12),
-                AnimatedIconButton(
-                  icon: Icons.skip_next_rounded,
-                  color: textColor,
-                  iconSize: 42,
-                  onPressed: () => maProvider.nextTrackSelectedPlayer(),
-                ),
-                const SizedBox(width: 12),
-                IconButton(
-                  icon: Icon(
-                    _queue?.repeatMode == 'one' ? Icons.repeat_one : Icons.repeat,
-                    color: _queue?.repeatMode != null && _queue!.repeatMode != 'off'
-                        ? primaryColor
-                        : textColor.withOpacity(0.5),
-                  ),
-                  iconSize: 24,
-                  onPressed: _isLoadingQueue ? null : _cycleRepeat,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-
-            // Volume control
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: const VolumeControl(compact: false),
-            ),
-            const Spacer(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholderArt(ColorScheme colorScheme) {
+  Widget _buildPlaceholderArt(ColorScheme colorScheme, double t) {
     return Container(
-      color: colorScheme.surfaceVariant,
+      color: Color.lerp(colorScheme.surfaceVariant, const Color(0xFF2a2a2a), t),
       child: Icon(
         Icons.music_note_rounded,
-        color: colorScheme.onSurfaceVariant,
-        size: 24,
+        color: Color.lerp(colorScheme.onSurfaceVariant, Colors.white24, t),
+        size: lerpDouble(24, 120, t),
       ),
     );
   }
 
-  Widget _buildLargePlaceholderArt() {
-    return Container(
-      color: const Color(0xFF2a2a2a),
-      child: const Icon(
-        Icons.music_note_rounded,
-        color: Colors.white24,
-        size: 120,
-      ),
-    );
-  }
-
-  Widget _buildControlButton({
+  Widget _buildMorphingControlButton({
     required IconData icon,
     required Color color,
     required double size,
     required VoidCallback onPressed,
+    required bool useAnimation,
   }) {
+    if (useAnimation) {
+      return AnimatedIconButton(
+        icon: icon,
+        color: color,
+        iconSize: size,
+        onPressed: onPressed,
+      );
+    }
     return IconButton(
       icon: Icon(icon),
       color: color,
@@ -787,44 +675,37 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     );
   }
 
-  Widget _buildPlayPauseButton({
+  Widget _buildMorphingPlayButton({
     required bool isPlaying,
-    required Color color,
+    required Color textColor,
+    required Color primaryColor,
+    required Color backgroundColor,
     required double size,
+    required double containerSize,
+    required double progress,
     required VoidCallback onPressed,
     VoidCallback? onLongPress,
   }) {
+    // Interpolate between no background (collapsed) and circular background (expanded)
+    final bgColor = Color.lerp(Colors.transparent, primaryColor, progress);
+    final iconColor = Color.lerp(textColor, backgroundColor, progress);
+
     return GestureDetector(
       onLongPress: onLongPress,
-      child: IconButton(
-        icon: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
-        color: color,
-        iconSize: size,
-        onPressed: onPressed,
-        padding: const EdgeInsets.all(4),
-        constraints: const BoxConstraints(),
-      ),
-    );
-  }
-
-  Widget _buildLargePlayPauseButton({
-    required bool isPlaying,
-    required Color primaryColor,
-    required Color backgroundColor,
-    required VoidCallback onPressed,
-  }) {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        color: primaryColor,
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
-        color: backgroundColor,
-        iconSize: 42,
-        onPressed: onPressed,
+      child: Container(
+        width: containerSize,
+        height: containerSize,
+        decoration: BoxDecoration(
+          color: bgColor,
+          shape: BoxShape.circle,
+        ),
+        child: IconButton(
+          icon: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+          color: iconColor,
+          iconSize: size,
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+        ),
       ),
     );
   }
