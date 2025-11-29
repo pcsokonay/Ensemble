@@ -236,16 +236,21 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final primaryColor = adaptiveScheme?.primary ?? Colors.white;
 
     // Container dimensions
+    // Always account for bottom nav bar space so it remains visible
     const bottomNavHeight = 56.0;
-    final collapsedBottomOffset = widget.hasBottomNav
-        ? bottomNavHeight + bottomPadding + _collapsedMargin
-        : bottomPadding + _collapsedMargin; // Include safe area even without nav
+    final bottomNavSpace = bottomNavHeight + bottomPadding;
+
+    final collapsedBottomOffset = bottomNavSpace + _collapsedMargin;
+    // When expanded, stay above the bottom nav bar
+    final expandedBottomOffset = bottomNavSpace;
 
     final collapsedWidth = screenSize.width - (_collapsedMargin * 2);
     final width = lerpDouble(collapsedWidth, screenSize.width, t);
-    final height = lerpDouble(_collapsedHeight, screenSize.height, t);
+    // Expanded height should not cover bottom nav
+    final expandedHeight = screenSize.height - bottomNavSpace;
+    final height = lerpDouble(_collapsedHeight, expandedHeight, t);
     final horizontalMargin = lerpDouble(_collapsedMargin, 0, t);
-    final bottomOffset = lerpDouble(collapsedBottomOffset, 0, t);
+    final bottomOffset = lerpDouble(collapsedBottomOffset, expandedBottomOffset, t);
     final borderRadius = lerpDouble(_collapsedBorderRadius, 0, t);
 
     // Album art morphing calculations
@@ -297,7 +302,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final controlsRight = collapsedControlsRight; // Only used when collapsed
 
     // Vertical: in collapsed, center the 34px play button in 64px height
-    final collapsedControlsTop = (_collapsedHeight - 34) / 2 - 2; // Slight adjustment up
+    final collapsedControlsTop = (_collapsedHeight - 34) / 2 - 4; // Adjust up for visual centering
     final expandedControlsTop = expandedArtistTop + 100;
     final controlsTop = lerpDouble(collapsedControlsTop, expandedControlsTop, t);
 
