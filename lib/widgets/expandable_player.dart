@@ -245,52 +245,67 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final bottomOffset = _lerpDouble(collapsedBottomOffset, expandedBottomOffset, t);
     final borderRadius = _lerpDouble(_collapsedBorderRadius, 0, t);
 
-    // Album art morphing
-    final expandedArtSize = screenSize.width * 0.75;
+    // Calculate available space for expanded layout
+    // Available height = expandedHeight - topPadding - header(60) - bottomPadding(20)
+    final availableHeight = expandedHeight - topPadding - 80;
+
+    // Distribute space: art(40%) + info(25%) + controls(20%) + volume(15%)
+    final expandedArtSize = (screenSize.width * 0.70).clamp(200.0, 320.0);
     final artSize = _lerpDouble(_collapsedArtSize, expandedArtSize, t);
     final artBorderRadius = _lerpDouble(_collapsedBorderRadius, 16, t);
 
-    // Art position
+    // Art position - centered horizontally, positioned with good top margin
     final collapsedArtLeft = 0.0;
     final expandedArtLeft = (screenSize.width - expandedArtSize) / 2;
     final artLeft = _lerpDouble(collapsedArtLeft, expandedArtLeft, t);
 
     final collapsedArtTop = 0.0;
-    final expandedArtTop = topPadding + 60;
+    // Position art with comfortable top spacing
+    final expandedArtTop = topPadding + 56;
     final artTop = _lerpDouble(collapsedArtTop, expandedArtTop, t);
 
-    // Track title morphing
-    final titleFontSize = _lerpDouble(14.0, 24.0, t);
+    // Track title morphing - account for 2-line titles (max ~60px height)
+    final titleFontSize = _lerpDouble(14.0, 22.0, t);
     final collapsedTitleLeft = _collapsedArtSize + 12;
     final expandedTitleLeft = 24.0;
     final titleLeft = _lerpDouble(collapsedTitleLeft, expandedTitleLeft, t);
 
     final collapsedTitleTop = (_collapsedHeight - 32) / 2;
-    final expandedTitleTop = expandedArtTop + expandedArtSize + 32;
+    // Space after art for title
+    final expandedTitleTop = expandedArtTop + expandedArtSize + 24;
     final titleTop = _lerpDouble(collapsedTitleTop, expandedTitleTop, t);
 
     final collapsedTitleWidth = screenSize.width - _collapsedArtSize - 150;
     final expandedTitleWidth = screenSize.width - 48;
     final titleWidth = _lerpDouble(collapsedTitleWidth, expandedTitleWidth, t);
 
-    // Artist name morphing
-    final artistFontSize = _lerpDouble(12.0, 16.0, t);
+    // Artist name morphing - positioned after title with enough gap for 2-line title
+    final artistFontSize = _lerpDouble(12.0, 15.0, t);
     final collapsedArtistTop = collapsedTitleTop + 18;
-    final expandedArtistTop = expandedTitleTop + 36;
+    // Add 56px gap to account for potential 2-line title (22px * 2 + padding)
+    final expandedArtistTop = expandedTitleTop + 56;
     final artistTop = _lerpDouble(collapsedArtistTop, expandedArtistTop, t);
 
-    // Controls
+    // Album name position (only shown expanded)
+    final expandedAlbumTop = expandedArtistTop + 24;
+
+    // Progress bar position
+    final expandedProgressTop = expandedAlbumTop + 32;
+
+    // Controls - positioned after progress bar
     final collapsedControlsRight = 8.0;
     final collapsedControlsTop = (_collapsedHeight - 34) / 2 - 6;
-    final expandedControlsTop = expandedArtistTop + 90;
+    final expandedControlsTop = expandedProgressTop + 56;
     final controlsTop = _lerpDouble(collapsedControlsTop, expandedControlsTop, t);
 
-    final skipButtonSize = _lerpDouble(28, 42, t);
-    final playButtonSize = _lerpDouble(34, 42, t);
-    final playButtonContainerSize = _lerpDouble(34, 72, t);
+    final skipButtonSize = _lerpDouble(28, 40, t);
+    final playButtonSize = _lerpDouble(34, 40, t);
+    final playButtonContainerSize = _lerpDouble(34, 68, t);
 
     final expandedElementsOpacity = Curves.easeIn.transform((t - 0.5).clamp(0, 0.5) * 2);
-    final volumeTop = expandedControlsTop + 80;
+
+    // Volume control - at the bottom with good spacing
+    final volumeTop = expandedControlsTop + 72;
 
     return Positioned(
       left: horizontalMargin,
@@ -397,7 +412,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                   Positioned(
                     left: 24,
                     right: 24,
-                    top: artistTop + 24,
+                    top: _lerpDouble(artistTop + 24, expandedAlbumTop, t),
                     child: Opacity(
                       opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0),
                       child: Text(
@@ -418,7 +433,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                   Positioned(
                     left: 24,
                     right: 24,
-                    top: expandedArtistTop + 50,
+                    top: expandedProgressTop,
                     child: Opacity(
                       opacity: expandedElementsOpacity,
                       child: Column(

@@ -139,118 +139,160 @@ class PlayerSelector extends StatelessWidget {
                                   style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.54)),
                                 ),
                               )
-                            : GridView.builder(
+                            : ListView.builder(
                                 controller: scrollController,
-                                padding: const EdgeInsets.all(16),
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  childAspectRatio: 1.6, // Shorter cards
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 itemCount: currentPlayers.length,
                                 itemBuilder: (context, index) {
                                   final player = currentPlayers[index];
                                   final isSelected =
                                       player.playerId == maProvider.selectedPlayer?.playerId;
-                                  // isOn checks if the player is powered on
                                   final isOn = player.available && player.powered;
-
-                                  // Debug log for each player
-                                  if (index == 0) {
-                                    print('📱 Device list opened, showing ${currentPlayers.length} players:');
-                                  }
-                                  print('   - ${player.name}: available=${player.available}, powered=${player.powered}, state=${player.state}');
+                                  final isPlaying = player.state == 'playing';
+                                  final isPaused = player.state == 'paused';
 
                                   final colorScheme = Theme.of(context).colorScheme;
 
-                                  return InkWell(
-                                    onTap: () {
-                                      maProvider.selectPlayer(player);
-                                      Navigator.pop(context);
-                                    },
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        // Tint whole card based on theme if selected
-                                        color: isSelected
-                                            ? colorScheme.primary.withOpacity(0.15)
-                                            : colorScheme.surfaceVariant.withOpacity(0.3),
-                                        borderRadius: BorderRadius.circular(16),
-                                        // No border, just tint
-                                      ),
-                                      child: Stack(
-                                        children: [
-                                          // Power/Status Indicator (Functional)
-                                          Positioned(
-                                            top: 0,
-                                            right: 0,
-                                            child: IconButton(
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: InkWell(
+                                      onTap: () {
+                                        maProvider.selectPlayer(player);
+                                        Navigator.pop(context);
+                                      },
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Container(
+                                        height: 72,
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? colorScheme.primary.withOpacity(0.15)
+                                              : colorScheme.surfaceVariant.withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: isSelected
+                                              ? Border.all(color: colorScheme.primary, width: 2)
+                                              : null,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            // Player icon
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 16),
+                                              child: Icon(
+                                                _getPlayerIcon(player.name),
+                                                color: player.available
+                                                    ? (isSelected ? colorScheme.primary : colorScheme.onSurface)
+                                                    : colorScheme.onSurface.withOpacity(0.38),
+                                                size: 28,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            // Player info
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    player.name,
+                                                    style: TextStyle(
+                                                      color: player.available
+                                                          ? colorScheme.onSurface
+                                                          : colorScheme.onSurface.withOpacity(0.38),
+                                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                                      fontSize: 16,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Row(
+                                                    children: [
+                                                      // Status indicator dot
+                                                      Container(
+                                                        width: 8,
+                                                        height: 8,
+                                                        decoration: BoxDecoration(
+                                                          shape: BoxShape.circle,
+                                                          color: !player.available
+                                                              ? colorScheme.onSurface.withOpacity(0.24)
+                                                              : isPlaying
+                                                                  ? Colors.green
+                                                                  : isPaused
+                                                                      ? Colors.orange
+                                                                      : colorScheme.onSurfaceVariant.withOpacity(0.5),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 6),
+                                                      Text(
+                                                        !player.available
+                                                            ? 'Unavailable'
+                                                            : isPlaying
+                                                                ? 'Playing'
+                                                                : isPaused
+                                                                    ? 'Paused'
+                                                                    : 'Idle',
+                                                        style: TextStyle(
+                                                          color: player.available
+                                                              ? colorScheme.onSurfaceVariant
+                                                              : colorScheme.onSurface.withOpacity(0.24),
+                                                          fontSize: 13,
+                                                        ),
+                                                      ),
+                                                      if (isSelected) ...[
+                                                        const SizedBox(width: 8),
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: colorScheme.primary.withOpacity(0.2),
+                                                            borderRadius: BorderRadius.circular(4),
+                                                          ),
+                                                          child: Text(
+                                                            'Selected',
+                                                            style: TextStyle(
+                                                              color: colorScheme.primary,
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            // Play/Pause button
+                                            if (player.available && isOn)
+                                              IconButton(
+                                                icon: Icon(
+                                                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                                  color: colorScheme.onSurface,
+                                                  size: 28,
+                                                ),
+                                                onPressed: () {
+                                                  if (isPlaying) {
+                                                    maProvider.pausePlayer(player.playerId);
+                                                  } else {
+                                                    maProvider.playPlayer(player.playerId);
+                                                  }
+                                                },
+                                              ),
+                                            // Power button
+                                            IconButton(
                                               icon: Icon(
                                                 Icons.power_settings_new_rounded,
                                                 size: 24,
-                                                color: player.available 
-                                                    ? (isOn ? colorScheme.primary : colorScheme.onSurfaceVariant.withOpacity(0.5)) 
-                                                    : colorScheme.onSurface.withOpacity(0.1), 
+                                                color: player.available
+                                                    ? (isOn ? colorScheme.primary : colorScheme.onSurfaceVariant.withOpacity(0.5))
+                                                    : colorScheme.onSurface.withOpacity(0.2),
                                               ),
                                               onPressed: player.available
-                                                  ? () {
-                                                      print('🔋 Power button tapped for ${player.name} (${player.playerId})');
-                                                      print('🔋 Player available: ${player.available}, powered: ${player.powered}');
-                                                      maProvider.togglePower(player.playerId);
-                                                      // Don't close the sheet
-                                                    }
-                                                  : () {
-                                                      print('🔋 Power button tapped but DISABLED for ${player.name} (available: ${player.available})');
-                                                    },
+                                                  ? () => maProvider.togglePower(player.playerId)
+                                                  : null,
                                             ),
-                                          ),
-                                          // Content
-                                          Padding(
-                                            padding: const EdgeInsets.all(16.0),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              mainAxisAlignment: MainAxisAlignment.end,
-                                              children: [
-                                                Icon(
-                                                  _getPlayerIcon(player.name),
-                                                  color: player.available
-                                                      ? (isSelected ? colorScheme.primary : colorScheme.onSurface)
-                                                      : colorScheme.onSurface.withOpacity(0.38),
-                                                  size: 28,
-                                                ),
-                                                const SizedBox(height: 12),
-                                                Text(
-                                                  player.name,
-                                                  style: TextStyle(
-                                                    color: player.available
-                                                        ? colorScheme.onSurface
-                                                        : colorScheme.onSurface.withOpacity(0.38),
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  player.available
-                                                      ? (player.state == 'playing'
-                                                          ? 'Playing'
-                                                          : (player.state == 'paused'
-                                                              ? 'Paused'
-                                                              : 'Idle'))
-                                                      : 'Unavailable',
-                                                  style: TextStyle(
-                                                    color: player.available
-                                                        ? colorScheme.onSurfaceVariant
-                                                        : colorScheme.onSurface.withOpacity(0.24),
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 4),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   );
