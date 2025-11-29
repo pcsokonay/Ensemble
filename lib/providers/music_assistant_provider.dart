@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:just_audio/just_audio.dart';
 import '../models/media_item.dart';
 import '../models/player.dart';
 import '../services/music_assistant_api.dart';
@@ -7,11 +8,16 @@ import '../services/settings_service.dart';
 import '../services/auth_service.dart';
 import '../services/debug_logger.dart';
 import '../services/error_handler.dart';
+import '../services/local_player_service.dart';
+import '../services/auth/auth_manager.dart';
 
 class MusicAssistantProvider with ChangeNotifier {
   MusicAssistantAPI? _api;
-  final AuthService _authService = AuthService();
+  final AuthService _authService = AuthService(); // TODO: Remove after full migration
+  final AuthManager _authManager = AuthManager(); // NEW: Universal auth system
   final DebugLogger _logger = DebugLogger();
+  late final LocalPlayerService _localPlayer;
+  
   MAConnectionState _connectionState = MAConnectionState.disconnected;
   String? _serverUrl;
 
@@ -26,6 +32,12 @@ class MusicAssistantProvider with ChangeNotifier {
   List<Player> _availablePlayers = [];
   Track? _currentTrack; // Current track playing on selected player
   Timer? _playerStateTimer;
+  
+  // Local Playback
+  bool _isLocalPlaybackEnabled = false;
+  bool _isLocalPlayerPowered = true; // Track local player power state
+  StreamSubscription? _localPlayerEventSubscription;
+  Timer? _localPlayerStateReportTimer;
 
   // Player list caching
   DateTime? _playersLastFetched;
@@ -80,7 +92,11 @@ class MusicAssistantProvider with ChangeNotifier {
   // API access
   MusicAssistantAPI? get api => _api;
 
+  // Auth manager access for login screen
+  AuthManager get authManager => _authManager;
+
   MusicAssistantProvider() {
+    _localPlayer = LocalPlayerService(_authManager);
     _initialize();
   }
 
@@ -92,21 +108,76 @@ class MusicAssistantProvider with ChangeNotifier {
       final password = await SettingsService.getPassword();
 
       if (username != null && password != null && username.isNotEmpty && password.isNotEmpty) {
-        _logger.log('🔐 Auto-login with saved credentials...');
         try {
-          final token = await _authService.login(_serverUrl!, username, password);
-          if (token != null) {
-            _logger.log('✓ Auto-login successful');
-          } else {
-            _logger.log('⚠️ Auto-login failed - session cookie may be expired');
-          }
+          await _authService.login(_serverUrl!, username, password);
         } catch (e) {
-          _logger.log('⚠️ Auto-login error: $e');
+          // Auto-login failed, continue anyway
         }
       }
 
       await connectToServer(_serverUrl!);
+      
+      // Initialize local playback if enabled
+      _isLocalPlaybackEnabled = await SettingsService.getEnableLocalPlayback();
+      if (_isLocalPlaybackEnabled) {
+        await _initializeLocalPlayback();
+      }
     }
+  }
+
+  Future<void> _initializeLocalPlayback() async {
+    await _localPlayer.initialize();
+    _isLocalPlayerPowered = true; // Default to powered on when enabling local playback
+    if (isConnected) {
+      await _registerLocalPlayer();
+    }
+  }
+
+  Future<void> _registerLocalPlayer() async {
+    if (_api == null) return;
+    
+    final playerId = await SettingsService.getBuiltinPlayerId();
+    final name = await SettingsService.getLocalPlayerName();
+    
+    if (playerId != null) {
+      await _api!.registerBuiltinPlayer(playerId, name);
+      _startReportingLocalPlayerState();
+    }
+  }
+  
+  void _startReportingLocalPlayerState() {
+    _localPlayerStateReportTimer?.cancel();
+    // Report state every second (for smooth seek bar)
+    _localPlayerStateReportTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+      await _reportLocalPlayerState();
+    });
+  }
+  
+  Future<void> _reportLocalPlayerState() async {
+    if (_api == null || !_isLocalPlaybackEnabled) return;
+
+    final playerId = await SettingsService.getBuiltinPlayerId();
+    if (playerId == null) return;
+
+    // Get current player state
+    final isPlaying = _localPlayer.isPlaying;
+    final position = _localPlayer.position.inSeconds;
+    final volume = (_localPlayer.volume * 100).round();
+
+    // Calculate paused state: not playing but has a position (i.e., paused, not stopped)
+    final isPaused = !isPlaying && position > 0;
+
+    // Send state as proper dataclass object (not string)
+    // Fixed: Server expects BuiltinPlayerState with boolean fields
+    await _api!.updateBuiltinPlayerState(
+      playerId,
+      powered: _isLocalPlayerPowered,
+      playing: isPlaying,
+      paused: isPaused,
+      position: position,
+      volume: volume,
+      muted: _localPlayer.volume == 0.0,
+    );
   }
 
   Future<void> connectToServer(String serverUrl) async {
@@ -118,7 +189,7 @@ class MusicAssistantProvider with ChangeNotifier {
       // Disconnect existing connection
       await _api?.disconnect();
 
-      _api = MusicAssistantAPI(serverUrl);
+      _api = MusicAssistantAPI(serverUrl, _authManager);
 
       // Listen to connection state changes
       _api!.connectionState.listen((state) {
@@ -131,11 +202,20 @@ class MusicAssistantProvider with ChangeNotifier {
 
           // Auto-load library when connected
           loadLibrary();
+          
+          // Re-register local player if enabled
+          if (_isLocalPlaybackEnabled) {
+            _registerLocalPlayer();
+          }
         } else if (state == MAConnectionState.disconnected) {
           _availablePlayers = [];
           _selectedPlayer = null;
         }
       });
+      
+      // Listen to built-in player events
+      _localPlayerEventSubscription?.cancel();
+      _localPlayerEventSubscription = _api!.builtinPlayerEvents.listen(_handleLocalPlayerEvent);
 
       await _api!.connect();
       notifyListeners();
@@ -149,9 +229,133 @@ class MusicAssistantProvider with ChangeNotifier {
     }
   }
 
+  Future<void> _handleLocalPlayerEvent(Map<String, dynamic> event) async {
+    if (!_isLocalPlaybackEnabled) return;
+
+    _logger.log('📥 Local player event received: ${event['type'] ?? event['command']}');
+
+    try {
+      // Server sends 'type', but older versions or some events might use 'command'
+      final command = (event['type'] as String?) ?? (event['command'] as String?);
+      
+      switch (command) {
+        case 'play_media':
+          // Server sends 'media_url', relative path
+          final urlPath = event['media_url'] as String? ?? event['url'] as String?;
+
+          _logger.log('🎵 play_media: urlPath=$urlPath, _serverUrl=$_serverUrl');
+
+          if (urlPath != null && _serverUrl != null) {
+            // Construct full URL
+            String fullUrl;
+            if (urlPath.startsWith('http')) {
+              fullUrl = urlPath;
+              _logger.log('🎵 Using absolute URL from server: $fullUrl');
+            } else {
+              // Add protocol if not present
+              var baseUrl = _serverUrl!;
+              if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+                baseUrl = 'https://$baseUrl';
+                _logger.log('🎵 Added https:// protocol to baseUrl: $baseUrl');
+              }
+
+              // Ensure no double slashes
+              baseUrl = baseUrl.endsWith('/')
+                  ? baseUrl.substring(0, baseUrl.length - 1)
+                  : baseUrl;
+              final path = urlPath.startsWith('/') ? urlPath : '/$urlPath';
+              fullUrl = '$baseUrl$path';
+              _logger.log('🎵 Constructed URL: baseUrl=$baseUrl + path=$path = $fullUrl');
+            }
+
+            await _localPlayer.playUrl(fullUrl);
+          } else {
+            _logger.log('❌ Cannot play media: urlPath=$urlPath, _serverUrl=$_serverUrl');
+          }
+          break;
+
+        case 'stop':
+          await _localPlayer.stop();
+          break;
+
+        case 'pause':
+          await _localPlayer.pause();
+          break;
+
+        case 'play':
+          await _localPlayer.play();
+          break;
+
+        case 'seek':
+          final position = event['position'] as int?;
+          if (position != null) {
+            await _localPlayer.seek(Duration(seconds: position));
+          }
+          break;
+
+        case 'volume_set':
+          final volume = event['volume_level'] as int?;
+          if (volume != null) {
+            await _localPlayer.setVolume(volume / 100.0);
+          }
+          break;
+
+        case 'power_on':
+        case 'power_off':
+        case 'power':
+          _logger.log('🔋 POWER COMMAND RECEIVED: $command');
+          
+          bool? newPowerState;
+          if (command == 'power_on') {
+            newPowerState = true;
+          } else if (command == 'power_off') {
+            newPowerState = false;
+          } else {
+            // Legacy 'power' command with 'powered' bool
+            newPowerState = event['powered'] as bool?;
+          }
+
+          if (newPowerState != null) {
+            _isLocalPlayerPowered = newPowerState;
+            _logger.log('🔋 Local player power set to: $_isLocalPlayerPowered');
+            if (!_isLocalPlayerPowered) {
+              // When powered off, stop playback
+              _logger.log('🔋 Stopping playback because powered off');
+              await _localPlayer.stop();
+            }
+          }
+          break;
+      }
+      
+      // Report state immediately after command
+      await _reportLocalPlayerState();
+      
+    } catch (e) {
+      _logger.log('Error handling local player event: $e');
+    }
+  }
+  
+  Future<void> enableLocalPlayback() async {
+    _isLocalPlaybackEnabled = true;
+    await SettingsService.setEnableLocalPlayback(true);
+    await _initializeLocalPlayback();
+    notifyListeners();
+  }
+  
+  Future<void> disableLocalPlayback() async {
+    _isLocalPlaybackEnabled = false;
+    await SettingsService.setEnableLocalPlayback(false);
+    await _localPlayer.stop();
+    _localPlayerStateReportTimer?.cancel();
+    // Ideally unregister from server here if API supports it
+    notifyListeners();
+  }
+
   Future<void> disconnect() async {
     _playerStateTimer?.cancel();
     _playerStateTimer = null;
+    _localPlayerStateReportTimer?.cancel();
+    _localPlayerEventSubscription?.cancel();
     await _api?.disconnect();
     _connectionState = MAConnectionState.disconnected;
     _artists = [];
@@ -187,7 +391,6 @@ class MusicAssistantProvider with ChangeNotifier {
       final errorInfo = ErrorHandler.handleError(e, context: 'Load library');
       _error = errorInfo.userMessage;
       _isLoading = false;
-      _logger.log('Library load error: ${errorInfo.technicalMessage}');
       notifyListeners();
     }
   }
@@ -212,7 +415,6 @@ class MusicAssistantProvider with ChangeNotifier {
       final errorInfo = ErrorHandler.handleError(e, context: 'Load artists');
       _error = errorInfo.userMessage;
       _isLoading = false;
-      _logger.log('Artists load error: ${errorInfo.technicalMessage}');
       notifyListeners();
     }
   }
@@ -243,7 +445,6 @@ class MusicAssistantProvider with ChangeNotifier {
       final errorInfo = ErrorHandler.handleError(e, context: 'Load albums');
       _error = errorInfo.userMessage;
       _isLoading = false;
-      _logger.log('Albums load error: ${errorInfo.technicalMessage}');
       notifyListeners();
     }
   }
@@ -379,20 +580,56 @@ class MusicAssistantProvider with ChangeNotifier {
 
   Future<void> togglePower(String playerId) async {
     try {
-      // Find the player to get current power state
-      final player = _availablePlayers.firstWhere(
-        (p) => p.playerId == playerId,
-        orElse: () => _selectedPlayer != null && _selectedPlayer!.playerId == playerId
-            ? _selectedPlayer!
-            : throw Exception("Player not found"),
-      );
-      
-      // Toggle the state
-      await _api?.setPower(playerId, !player.powered);
-      
-      // Immediately refresh players to update UI
-      await refreshPlayers();
+      _logger.log('🔋 togglePower called for playerId: $playerId');
+
+      // Check if this is the local builtin player
+      final localPlayerId = await SettingsService.getBuiltinPlayerId();
+      final isLocalPlayer = localPlayerId != null && playerId == localPlayerId;
+
+      _logger.log('🔋 Is local builtin player: $isLocalPlayer (local ID: $localPlayerId)');
+
+      if (isLocalPlayer && _isLocalPlaybackEnabled) {
+        // For builtin player, manage power state locally
+        _logger.log('🔋 Handling power toggle LOCALLY for builtin player');
+
+        // Toggle the local power state
+        _isLocalPlayerPowered = !_isLocalPlayerPowered;
+        _logger.log('🔋 Local player power set to: $_isLocalPlayerPowered');
+
+        // If powering off, stop playback
+        if (!_isLocalPlayerPowered) {
+          _logger.log('🔋 Stopping playback because powered off');
+          await _localPlayer.stop();
+        }
+
+        // Report the new state to the server immediately
+        await _reportLocalPlayerState();
+
+        // Refresh player list to update UI
+        await refreshPlayers();
+      } else {
+        // For regular MA players, send power command to server
+        _logger.log('🔋 Sending power command to server for regular player');
+
+        final player = _availablePlayers.firstWhere(
+          (p) => p.playerId == playerId,
+          orElse: () => _selectedPlayer != null && _selectedPlayer!.playerId == playerId
+              ? _selectedPlayer!
+              : throw Exception("Player not found"),
+        );
+
+        _logger.log('🔋 Current power state: ${player.powered}, will set to: ${!player.powered}');
+
+        // Toggle the state
+        await _api?.setPower(playerId, !player.powered);
+
+        _logger.log('🔋 setPower command sent successfully');
+
+        // Immediately refresh players to update UI
+        await refreshPlayers();
+      }
     } catch (e) {
+      _logger.log('🔋 ERROR in togglePower: $e');
       ErrorHandler.logError('Toggle power', e);
       // Don't rethrow to avoid crashing UI, just log
     }
@@ -494,48 +731,36 @@ class MusicAssistantProvider with ChangeNotifier {
       final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
 
       // Filter out ghost players and duplicates
-      // 1. "Music Assistant Mobile" players are legacy/ghosts
-      // 2. "This Device" players: Only keep the one matching our client ID
+      // 1. "Music Assistant Mobile" players are legacy/ghosts (created by old versions)
+      // 2. Valid players are those matching our current builtinPlayerId (if any)
+      
       int filteredCount = 0;
       final List<String> ghostPlayerIds = [];
 
       _availablePlayers = allPlayers.where((player) {
         final nameLower = player.name.toLowerCase();
 
-        // Legacy ghosts
+        // Filter out legacy "Music Assistant Mobile" ghosts
         if (nameLower.contains('music assistant mobile')) {
           filteredCount++;
           ghostPlayerIds.add('${player.playerId} (Mobile Ghost)');
           return false;
         }
 
-        // Filter "This Device" duplicates
-        if (nameLower.contains('this device')) {
-          // If we have a builtin ID, only keep the player that matches it
-          if (builtinPlayerId != null && player.playerId != builtinPlayerId) {
-            filteredCount++;
-            ghostPlayerIds.add('${player.playerId} (Duplicate This Device)');
-            return false;
-          }
-          // If we don't have a builtin ID yet (rare), or this matches, keep it
+        // "This Device" / Local Players
+        // If this player matches OUR persistent ID, keep it (it's us!)
+        if (builtinPlayerId != null && player.playerId == builtinPlayerId) {
+          return true;
         }
 
+        // If it's some OTHER "This Device" (from another installation/device), keep it too
+        // We only strictly filter the known "Music Assistant Mobile" ghosts
+        
         return true;
       }).toList();
 
       _playersLastFetched = DateTime.now();
 
-      // Log details about ghost players
-      if (filteredCount > 0) {
-        _logger.log('🧹 Filtered out $filteredCount ghost players:');
-        for (int i = 0; i < ghostPlayerIds.length && i < 5; i++) {
-          _logger.log('   - ${ghostPlayerIds[i]}');
-        }
-        if (ghostPlayerIds.length > 5) {
-          _logger.log('   ... and ${ghostPlayerIds.length - 5} more');
-        }
-        _logger.log('📊 Result: ${_availablePlayers.length} valid players from ${allPlayers.length} total');
-      }
 
       if (_availablePlayers.isNotEmpty) {
         // Smart player selection logic:
@@ -554,7 +779,6 @@ class MusicAssistantProvider with ChangeNotifier {
             playerToSelect = _availablePlayers.firstWhere(
               (p) => p.playerId == _selectedPlayer!.playerId,
             );
-            _logger.log('Keeping current player: ${playerToSelect.name}');
           }
         }
 
@@ -565,20 +789,16 @@ class MusicAssistantProvider with ChangeNotifier {
             playerToSelect = _availablePlayers.firstWhere(
               (p) => p.state == 'playing' && p.available,
             );
-            _logger.log('Auto-selected playing player: ${playerToSelect.name}');
           } catch (e) {
             // No playing player found, pick first available
             playerToSelect = _availablePlayers.firstWhere(
               (p) => p.available,
               orElse: () => _availablePlayers.first,
             );
-            _logger.log('Selected first available player: ${playerToSelect.name}');
           }
         }
 
         selectPlayer(playerToSelect);
-      } else {
-        _logger.log('⚠️ No players available');
       }
 
       // Don't call notifyListeners here - selectPlayer already does it
@@ -590,7 +810,6 @@ class MusicAssistantProvider with ChangeNotifier {
   /// Select a player for playback
   void selectPlayer(Player player, {bool skipNotify = false}) {
     _selectedPlayer = player;
-    _logger.log('Selected player: ${player.name} (${player.playerId})');
 
     // Start polling for player state
     _startPlayerStatePolling();
@@ -686,17 +905,12 @@ class MusicAssistantProvider with ChangeNotifier {
   /// Control the selected player
   Future<void> playPauseSelectedPlayer() async {
     if (_selectedPlayer == null) {
-      _logger.log('⚠️ playPause: No player selected');
       return;
     }
 
-    _logger.log('🎮 playPause: ${_selectedPlayer!.name} - current state: ${_selectedPlayer!.state}');
-
     if (_selectedPlayer!.isPlaying) {
-      _logger.log('⏸️ Pausing player');
       await pausePlayer(_selectedPlayer!.playerId);
     } else {
-      _logger.log('▶️ Resuming player');
       await resumePlayer(_selectedPlayer!.playerId);
     }
 
@@ -759,21 +973,17 @@ class MusicAssistantProvider with ChangeNotifier {
   /// Check connection and reconnect if needed (called when app resumes)
   Future<void> checkAndReconnect() async {
     if (_api == null || _serverUrl == null) {
-      _logger.log('⚠️ No API or server URL configured');
       return;
     }
 
     // Check if we're disconnected
     if (_connectionState != MAConnectionState.connected) {
-      _logger.log('🔄 App resumed and disconnected - attempting reconnect...');
       try {
         await connectToServer(_serverUrl!);
-        _logger.log('✅ Reconnected successfully');
       } catch (e) {
-        _logger.log('❌ Reconnection failed: $e');
+        // Reconnection failed, will try again later
       }
     } else {
-      _logger.log('✓ Already connected, no reconnection needed');
       // Even if connected, refresh player state
       await refreshPlayers();
     }

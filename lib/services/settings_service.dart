@@ -1,10 +1,12 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class SettingsService {
   static const String _keyServerUrl = 'server_url';
   static const String _keyAuthServerUrl = 'auth_server_url';
   static const String _keyWebSocketPort = 'websocket_port';
   static const String _keyAuthToken = 'auth_token';
+  static const String _keyAuthCredentials = 'auth_credentials'; // NEW: Serialized auth strategy credentials
   static const String _keyUsername = 'username';
   static const String _keyPassword = 'password';
   static const String _keyBuiltinPlayerId = 'builtin_player_id';
@@ -14,6 +16,8 @@ class SettingsService {
   static const String _keyCustomColor = 'custom_color';
   static const String _keyLastFmApiKey = 'lastfm_api_key';
   static const String _keyTheAudioDbApiKey = 'theaudiodb_api_key';
+  static const String _keyEnableLocalPlayback = 'enable_local_playback';
+  static const String _keyLocalPlayerName = 'local_player_name';
 
   static Future<String?> getServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -71,6 +75,30 @@ class SettingsService {
     } else {
       await prefs.setString(_keyAuthToken, token);
     }
+  }
+
+  // Get authentication credentials (serialized auth strategy credentials)
+  static Future<Map<String, dynamic>?> getAuthCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final json = prefs.getString(_keyAuthCredentials);
+    if (json == null) return null;
+    try {
+      return jsonDecode(json) as Map<String, dynamic>;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Set authentication credentials (serialized auth strategy credentials)
+  static Future<void> setAuthCredentials(Map<String, dynamic> credentials) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyAuthCredentials, jsonEncode(credentials));
+  }
+
+  // Clear authentication credentials
+  static Future<void> clearAuthCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyAuthCredentials);
   }
 
   // Get username for authentication
@@ -185,6 +213,27 @@ class SettingsService {
     } else {
       await prefs.setString(_keyTheAudioDbApiKey, key);
     }
+  }
+
+  // Local Playback Settings
+  static Future<bool> getEnableLocalPlayback() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyEnableLocalPlayback) ?? false;
+  }
+
+  static Future<void> setEnableLocalPlayback(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyEnableLocalPlayback, enabled);
+  }
+
+  static Future<String> getLocalPlayerName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLocalPlayerName) ?? 'Assistant To The Music';
+  }
+
+  static Future<void> setLocalPlayerName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLocalPlayerName, name);
   }
 
   static Future<void> clearSettings() async {
