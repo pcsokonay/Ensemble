@@ -228,7 +228,7 @@ class SettingsService {
 
   static Future<String> getLocalPlayerName() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyLocalPlayerName) ?? 'Assistant To The Music';
+    return prefs.getString(_keyLocalPlayerName) ?? 'Massiv';
   }
 
   static Future<void> setLocalPlayerName(String name) async {

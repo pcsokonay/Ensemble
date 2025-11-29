@@ -48,7 +48,7 @@ jobs:
           keytool -genkey -v -keystore android/app/upload-keystore.jks \
             -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
-            -alias upload -dname "CN=AssistantToTheMusic, OU=HomeServer, O=Personal, L=Home, S=Home, C=US"
+            -alias upload -dname "CN=Massiv, OU=HomeServer, O=Personal, L=Home, S=Home, C=US"
 
           # Create key.properties file
           cat > android/key.properties << EOF
@@ -64,7 +64,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: amass-apk
+          name: massiv-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 

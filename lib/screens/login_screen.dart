@@ -349,10 +349,9 @@ class _LoginScreenState extends State<LoginScreen> {
               // Logo
               Center(
                 child: Image.asset(
-                  'assets/images/attm_long_logo.png',
+                  'assets/images/massiv_logo.png',
                   height: 160,
                   fit: BoxFit.contain,
-                  color: colorScheme.onBackground,
                 ),
               ),
 

@@ -117,7 +117,7 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
               );
 
               return MaterialApp(
-                title: 'ATTM', // Updated title
+                title: 'Massiv',
                 debugShowCheckedModeBanner: false,
                 themeMode: themeProvider.themeMode,
                 theme: AppTheme.lightTheme(colorScheme: lightColorScheme),

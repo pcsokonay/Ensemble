@@ -43,11 +43,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         title: Padding(
           padding: const EdgeInsets.only(left: 8.0, top: 8.0, bottom: 8.0),
           child: Image.asset(
-            'assets/images/attm_short_logo.png',
+            'assets/images/massiv_icon.png',
             height: 32,
             fit: BoxFit.contain,
             alignment: Alignment.centerLeft,
-            color: colorScheme.onBackground,
           ),
         ),
         titleSpacing: 0,
