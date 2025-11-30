@@ -169,7 +169,8 @@ class MassivAudioHandler extends BaseAudioHandler with SeekHandler {
 
   /// Update the current media item (for notification display)
   /// This can be called when metadata arrives after playback starts
-  void updateMediaItem(MediaItem item) {
+  @override
+  Future<void> updateMediaItem(MediaItem item) async {
     _logger.log('MassivAudioHandler: Updating media item: ${item.title} by ${item.artist}');
     _currentMediaItem = item;
     mediaItem.add(item);

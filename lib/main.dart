@@ -28,10 +28,10 @@ Future<void> main() async {
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'io.github.collotsspot.massiv.audio',
       androidNotificationChannelName: 'Massiv Audio',
-      androidNotificationOngoing: true,
+      androidNotificationOngoing: false,  // Must be false when androidStopForegroundOnPause is false
       androidNotificationIcon: 'drawable/ic_notification',
       androidShowNotificationBadge: false,
-      androidStopForegroundOnPause: false,
+      androidStopForegroundOnPause: false,  // Keep service alive when paused for background playback
     ),
   );
   print('🎵 AudioService initialized - background playback and media notifications ENABLED');
