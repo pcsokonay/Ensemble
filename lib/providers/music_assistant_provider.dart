@@ -471,7 +471,7 @@ class MusicAssistantProvider with ChangeNotifier {
         } catch (e) {
           _logger.log('📋 Failed to rewrite image URL: $e');
           // Fall back to just HTTP->HTTPS conversion
-          if (imageUrl.startsWith('http://')) {
+          if (imageUrl != null && imageUrl.startsWith('http://')) {
             imageUrl = imageUrl.replaceFirst('http://', 'https://');
           }
         }
