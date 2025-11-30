@@ -33,8 +33,7 @@ class MusicAssistantProvider with ChangeNotifier {
   Track? _currentTrack; // Current track playing on selected player
   Timer? _playerStateTimer;
   
-  // Local Playback
-  bool _isLocalPlaybackEnabled = false;
+  // Local Playback - always enabled
   bool _isLocalPlayerPowered = true; // Track local player power state
   StreamSubscription? _localPlayerEventSubscription;
   Timer? _localPlayerStateReportTimer;
@@ -116,12 +115,9 @@ class MusicAssistantProvider with ChangeNotifier {
       }
 
       await connectToServer(_serverUrl!);
-      
-      // Initialize local playback if enabled
-      _isLocalPlaybackEnabled = await SettingsService.getEnableLocalPlayback();
-      if (_isLocalPlaybackEnabled) {
-        await _initializeLocalPlayback();
-      }
+
+      // Always initialize local playback
+      await _initializeLocalPlayback();
     }
   }
 
@@ -165,7 +161,7 @@ class MusicAssistantProvider with ChangeNotifier {
   }
   
   Future<void> _reportLocalPlayerState() async {
-    if (_api == null || !_isLocalPlaybackEnabled) return;
+    if (_api == null) return;
 
     final playerId = await SettingsService.getBuiltinPlayerId();
     if (playerId == null) return;
@@ -217,10 +213,8 @@ class MusicAssistantProvider with ChangeNotifier {
           // Auto-load library when connected
           loadLibrary();
 
-          // Re-register local player if enabled
-          if (_isLocalPlaybackEnabled) {
-            _registerLocalPlayer();
-          }
+          // Always register local player
+          _registerLocalPlayer();
         } else if (state == MAConnectionState.disconnected) {
           _availablePlayers = [];
           _selectedPlayer = null;
@@ -244,8 +238,6 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   Future<void> _handleLocalPlayerEvent(Map<String, dynamic> event) async {
-    if (!_isLocalPlaybackEnabled) return;
-
     _logger.log('📥 Local player event received: ${event['type'] ?? event['command']}');
 
     try {
@@ -347,22 +339,6 @@ class MusicAssistantProvider with ChangeNotifier {
     } catch (e) {
       _logger.log('Error handling local player event: $e');
     }
-  }
-  
-  Future<void> enableLocalPlayback() async {
-    _isLocalPlaybackEnabled = true;
-    await SettingsService.setEnableLocalPlayback(true);
-    await _initializeLocalPlayback();
-    notifyListeners();
-  }
-  
-  Future<void> disableLocalPlayback() async {
-    _isLocalPlaybackEnabled = false;
-    await SettingsService.setEnableLocalPlayback(false);
-    await _localPlayer.stop();
-    _localPlayerStateReportTimer?.cancel();
-    // Ideally unregister from server here if API supports it
-    notifyListeners();
   }
 
   Future<void> disconnect() async {
@@ -602,7 +578,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
       _logger.log('🔋 Is local builtin player: $isLocalPlayer (local ID: $localPlayerId)');
 
-      if (isLocalPlayer && _isLocalPlaybackEnabled) {
+      if (isLocalPlayer) {
         // For builtin player, manage power state locally
         _logger.log('🔋 Handling power toggle LOCALLY for builtin player');
 
