@@ -1,119 +1,81 @@
-import 'dart:convert';
-import 'dart:io';
-import 'package:crypto/crypto.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'debug_logger.dart';
 
-/// Service to generate consistent device-based player IDs
-/// This prevents ghost players from accumulating on reinstalls
+/// Service to generate unique per-installation player IDs
+/// Uses random UUID to ensure each installation has a unique ID
+/// This prevents the critical bug where multiple devices of the same model
+/// would share the same player ID and trigger playback on all devices
 class DeviceIdService {
-  static const String _keyDevicePlayerId = 'device_player_id';
+  static const String _keyLocalPlayerId = 'local_player_id';
+  static const String _legacyKeyDevicePlayerId = 'device_player_id';
+  static const String _legacyKeyBuiltinPlayerId = 'builtin_player_id';
   static final _logger = DebugLogger();
+  static const _uuid = Uuid();
 
-  /// Get or generate a consistent player ID based on device hardware
-  /// This ID will be the same across reinstalls on the same device
+  /// Get or generate a unique player ID for this installation
+  /// ID is generated once and persisted across app restarts
+  /// Format: ensemble_<uuid>
   static Future<String> getOrCreateDevicePlayerId() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // First check if we already have a device-based ID stored
-    final existingId = prefs.getString(_keyDevicePlayerId);
-    if (existingId != null && existingId.startsWith('massiv_')) {
-      _logger.log('Using existing device-based player ID: $existingId');
+    // Check for new UUID-based ID
+    final existingId = prefs.getString(_keyLocalPlayerId);
+    if (existingId != null && existingId.startsWith('ensemble_')) {
+      _logger.log('Using existing installation UUID: $existingId');
       return existingId;
     }
 
-    // Generate new device-based ID
-    final deviceId = await _generateDeviceId();
-    final playerId = 'massiv_$deviceId';
+    // Check for legacy IDs and migrate
+    final legacyDeviceId = prefs.getString(_legacyKeyDevicePlayerId);
+    final legacyBuiltinId = prefs.getString(_legacyKeyBuiltinPlayerId);
 
-    // Store it
-    await prefs.setString(_keyDevicePlayerId, playerId);
-    _logger.log('Generated new device-based player ID: $playerId');
+    if (legacyDeviceId != null || legacyBuiltinId != null) {
+      _logger.log('Migrating from legacy ID (device: $legacyDeviceId, builtin: $legacyBuiltinId)');
+      // Don't try to clean up old player from server - just generate new ID
+    }
+
+    // Generate new UUID-based ID
+    final uuid = _uuid.v4();
+    final playerId = 'ensemble_$uuid';
+
+    // Store it permanently
+    await prefs.setString(_keyLocalPlayerId, playerId);
+
+    // Update builtin_player_id for compatibility with existing code
+    await prefs.setString(_legacyKeyBuiltinPlayerId, playerId);
+
+    _logger.log('Generated new installation UUID: $playerId');
 
     return playerId;
   }
 
-  /// Generate a consistent device identifier from hardware info
-  static Future<String> _generateDeviceId() async {
-    final deviceInfo = DeviceInfoPlugin();
-    String deviceIdentifier;
-
-    try {
-      if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        // Use a combination of hardware identifiers that survive reinstalls
-        // Note: androidId may change on factory reset, but fingerprint is more stable
-        deviceIdentifier = [
-          androidInfo.fingerprint, // Build fingerprint (hardware + software)
-          androidInfo.hardware,    // Hardware name
-          androidInfo.device,      // Device name
-          androidInfo.model,       // Model name
-          androidInfo.brand,       // Brand
-        ].join('|');
-        _logger.log('Android device info: ${androidInfo.model} (${androidInfo.device})');
-      } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        // iOS identifierForVendor persists across reinstalls (but not across uninstall+reinstall)
-        // Combine with model info for additional uniqueness
-        deviceIdentifier = [
-          iosInfo.identifierForVendor ?? '',
-          iosInfo.model,
-          iosInfo.name,
-          iosInfo.systemName,
-        ].join('|');
-        _logger.log('iOS device info: ${iosInfo.model} (${iosInfo.name})');
-      } else {
-        // Fallback for other platforms
-        deviceIdentifier = 'unknown_platform_${DateTime.now().millisecondsSinceEpoch}';
-        _logger.log('Unknown platform, using timestamp-based ID');
-      }
-    } catch (e) {
-      _logger.log('Error getting device info: $e');
-      // Fallback to timestamp if device info fails
-      deviceIdentifier = 'fallback_${DateTime.now().millisecondsSinceEpoch}';
-    }
-
-    // Hash the device identifier to create a consistent, shorter ID
-    final bytes = utf8.encode(deviceIdentifier);
-    final hash = sha256.convert(bytes);
-
-    // Take first 12 characters of the hash for a manageable ID
-    return hash.toString().substring(0, 12);
-  }
-
-  /// Check if we're using a legacy random UUID (for migration purposes)
+  /// Check if we're using a legacy hardware-based ID (for migration purposes)
   static Future<bool> isUsingLegacyId() async {
     final prefs = await SharedPreferences.getInstance();
-    final builtinId = prefs.getString('builtin_player_id');
-    final deviceId = prefs.getString(_keyDevicePlayerId);
+    final newId = prefs.getString(_keyLocalPlayerId);
 
-    // If we have a builtin_player_id but no device_player_id, we're on legacy
-    if (builtinId != null && deviceId == null) {
+    // If we don't have the new UUID-based ID, we're on legacy
+    if (newId == null || !newId.startsWith('ensemble_')) {
       return true;
     }
-    // If builtin_player_id doesn't start with 'massiv_', it's a legacy UUID
-    if (builtinId != null && !builtinId.startsWith('massiv_')) {
-      return true;
-    }
+
     return false;
   }
 
-  /// Migrate from legacy random UUID to device-based ID
-  /// Returns the new device-based ID
+  /// Migrate from legacy hardware-based ID to UUID-based ID
+  /// Returns the new UUID-based ID
   static Future<String> migrateToDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
-    final legacyId = prefs.getString('builtin_player_id');
+    final legacyId = prefs.getString(_legacyKeyBuiltinPlayerId) ??
+                     prefs.getString(_legacyKeyDevicePlayerId);
 
     _logger.log('Migrating from legacy ID: $legacyId');
 
-    // Generate new device-based ID
+    // Generate new UUID-based ID
     final newId = await getOrCreateDevicePlayerId();
 
-    // Update the builtin_player_id to use the new device-based ID
-    await prefs.setString('builtin_player_id', newId);
-
-    _logger.log('Migrated to device-based ID: $newId');
+    _logger.log('Migrated to UUID-based ID: $newId');
 
     return newId;
   }

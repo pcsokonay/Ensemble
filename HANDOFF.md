@@ -1,67 +1,108 @@
-# CONTEXT HANDOFF: Ensemble - audio_service Migration
+# CONTEXT HANDOFF: Ensemble - Local Player Isolation Fix
 
 ## Current State
 
-- **Branch:** `feature/audio-service-migration`
-- **Build in progress:** 19806903746 (triggered 00:05:54)
-- **Previous branch** `feature/background-playback-just-audio-debug` was merged to master and deleted
+- **Branch:** `feature/fix-local-player-isolation`
+- **Last build:** TBD (needs to be triggered)
+- **Previous branch:** `feature/audio-service-migration` (contains audio_service migration work)
 
-## What Was Done Tonight
+## CRITICAL BUG FIXED: Local Player Isolation
 
-### 1. Background playback working with just_audio_background - merged to master
-### 2. Known issues with that implementation:
-   - Notification shows previous track on local IP (race condition - play_media arrives before player_updated with metadata)
-   - White square stop button icon on Android 13+
-   - `updateNotificationWhilePlaying()` didn't actually update the visible notification
+### The Problem
+When the app was installed on multiple phones (e.g., Chris's phone and wife's phone), playing music on one device triggered playback on BOTH devices simultaneously. This was a critical bug caused by both devices sharing the same `player_id` with the Music Assistant server.
 
-### 3. Migrated to audio_service for full control:
-   - Replaced `just_audio_background` with `audio_service: ^0.18.12` and `rxdart: ^0.27.7` in pubspec.yaml
-   - Created `lib/services/audio/massiv_audio_handler.dart` - custom AudioHandler
-   - Updated `lib/main.dart` to initialize AudioService with global audioHandler
-   - Updated `lib/services/local_player_service.dart` to use global audioHandler
-   - Notification buttons: Skip Prev, Play/Pause, Skip Next (removed stop to fix white square)
+### Root Cause
+The `DeviceIdService` generated player IDs by hashing hardware characteristics (`androidInfo.fingerprint`, `hardware`, `device`, `model`, `brand`). These values are **identical for devices of the same model** (e.g., two Pixel 8 phones), causing both phones to hash to the same player ID.
 
-### 4. Fixed build errors:
-   - `AudioServiceConfig` assertion: `androidNotificationOngoing` must be false when `androidStopForegroundOnPause` is false
-   - `updateMediaItem` override: changed return type from `void` to `Future<void>`
+### The Fix (Based on KMP Client Pattern)
 
-### 5. Wired up skip buttons:
-   - Added `onSkipToNext` / `onSkipToPrevious` callbacks to `MassivAudioHandler`
-   - Wired callbacks in `MusicAssistantProvider` to call `nextTrackSelectedPlayer()` / `previousTrackSelectedPlayer()`
+#### 1. UUID-Based Device ID Generation
+**File:** `lib/services/device_id_service.dart`
+- Replaced hardware-based ID generation with random UUID generation
+- ID is generated ONCE per installation and persisted in SharedPreferences
+- Format changed: `massiv_<hash>` → `ensemble_<uuid>`
+- Key used: `local_player_id` (new), migrates from legacy `device_player_id` and `builtin_player_id`
+- Migration: Detects legacy IDs and generates new UUID without attempting server cleanup
 
-### 6. Rebranded app from Massiv → Ensemble:
-   - New grey logo at `assets/images/ensemble_logo.png` (works for light/dark modes)
-   - Updated logo references in `login_screen.dart` and `new_home_screen.dart`
-   - Updated app name in `AndroidManifest.xml`, `pubspec.yaml`, `main.dart`
-   - Updated `README.md` with new branding and repo URLs
-   - Default local player name now "Ensemble"
-   - Notification channel name now "Ensemble Audio"
+#### 2. Owner Name System
+**File:** `lib/services/settings_service.dart`
+- Added `_keyOwnerName` constant for storing user's name
+- Added `getOwnerName()` and `setOwnerName(String)` methods
+- Updated `getLocalPlayerName()` to derive name from owner name
+- Added `_makePlayerName(String)` helper for proper possessive apostrophe handling:
+  - "Chris" → "Chris' Phone" (ends with 's')
+  - "Mom" → "Mom's Phone" (doesn't end with 's')
 
-## Key Files Changed
+#### 3. Login Screen "Your Name" Field
+**File:** `lib/screens/login_screen.dart`
+- Added `_ownerNameController` text field controller
+- Added "Your Name" field after server URL, before port
+- Placeholder: "e.g., Chris, Mom, Dad"
+- Validation: Required, non-empty
+- Saves to `SettingsService.setOwnerName()` on successful connection
+- Loads saved owner name on screen init
 
-- `pubspec.yaml` - swapped `just_audio_background` for `audio_service` + `rxdart`, renamed to `ensemble`
-- `lib/main.dart` - `AudioService.init()` with MassivAudioHandler, app title "Ensemble"
-- `lib/services/audio/massiv_audio_handler.dart` - custom handler with skip callbacks
-- `lib/services/local_player_service.dart` - wraps global audioHandler
-- `lib/providers/music_assistant_provider.dart` - wires skip callbacks, added debug logging for players
-- `lib/screens/login_screen.dart` - Ensemble logo
-- `lib/screens/new_home_screen.dart` - Ensemble logo
-- `android/app/src/main/AndroidManifest.xml` - app label "Ensemble"
-- `assets/images/ensemble_logo.png` - NEW FILE
-- `README.md` - updated branding
+#### 4. Removed Local Player Settings Section
+**File:** `lib/screens/settings_screen.dart`
+- Removed `_localPlayerNameController` (no longer needed)
+- Removed entire "Local Player" section (device name customization, enable/disable toggle)
+- Moved "Ghost Players" purge button to appear after Disconnect button
+- Local playback is now always enabled when connected
 
-## What's Working (Confirmed by User)
+### Migration Strategy
+- Existing installations with legacy hardware-based IDs will automatically migrate on next app start
+- New UUID is generated and stored in `local_player_id`
+- Legacy keys (`device_player_id`, `builtin_player_id`) are detected but not deleted
+- No attempt to clean up old player from server (user can use "Purge Unavailable Players")
+- Owner name defaults to empty; user will be prompted on next login
 
-- ✅ Local IP connection works
-- ✅ Correct track metadata shows in notification
-- ✅ Background playback works
-- ✅ No white square icon (stop button removed)
+## Previous Work (audio_service Migration)
+
+### Background playback with audio_service:
+   - Replaced `just_audio_background` with `audio_service: ^0.18.12` and `rxdart: ^0.27.7`
+   - Custom AudioHandler at `lib/services/audio/massiv_audio_handler.dart`
+   - Notification buttons: Skip Prev, Play/Pause, Skip Next
+   - Fixed white square stop button issue
+
+### Ensemble Rebranding:
+   - Grey logo at `assets/images/ensemble_logo.png`
+   - Updated app name in all manifests and config files
+   - Default player name: "Ensemble"
+   - Notification channel: "Ensemble Audio"
+
+## Key Files Changed (This Fix)
+
+- `lib/services/device_id_service.dart` - **REWRITTEN** to use UUID instead of hardware hash
+- `lib/services/settings_service.dart` - Added owner name storage and player name derivation
+- `lib/screens/login_screen.dart` - Added "Your Name" field, validates owner name
+- `lib/screens/settings_screen.dart` - Removed "Local Player" customization section
 
 ## What Needs Testing (Current Build)
 
-1. Skip next/previous buttons in notification
-2. New Ensemble branding (logo on login/home screens)
-3. App name shows as "Ensemble"
+### Critical Test - Player Isolation
+1. Install app on two devices of the same model (e.g., two Pixel 8 phones)
+2. Login with different owner names (e.g., "Chris" and "Sarah")
+3. Verify each device gets unique player ID starting with `ensemble_`
+4. Verify player names show as "Chris' Phone" and "Sarah's Phone"
+5. Play music on one device - verify other device does NOT start playing
+6. Check Music Assistant server shows TWO distinct players
+
+### Owner Name Field
+1. Login screen shows "Your Name" field after server URL, before port
+2. Field is required - shows error if empty
+3. Owner name is saved and persists across app restarts
+4. Player name correctly handles possessive apostrophes
+
+### Settings Screen
+1. "Local Player" section is removed
+2. "Ghost Players" button still appears when connected
+3. No device name customization or local playback toggle
+
+### Migration from Legacy
+1. Existing installations detect legacy hardware-based ID
+2. New UUID is generated automatically
+3. Old player appears as "unavailable" in Music Assistant
+4. User can purge unavailable players manually
 
 ## Outstanding Issues / Next Features
 
@@ -113,7 +154,7 @@ gh run list --workflow="Build Android APK" --limit 2
 gh run watch <run_id>
 
 # Trigger new build
-gh workflow run "Build Android APK" --ref feature/audio-service-migration
+gh workflow run "Build Android APK" --ref feature/fix-local-player-isolation
 ```
 
 ## Debug Logging Added

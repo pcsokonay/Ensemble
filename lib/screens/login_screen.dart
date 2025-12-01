@@ -15,6 +15,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _serverUrlController = TextEditingController();
+  final TextEditingController _ownerNameController = TextEditingController();
   final TextEditingController _portController = TextEditingController(text: '8095');
   final TextEditingController _authServerUrlController = TextEditingController(); // For separate auth server (Authelia)
   final TextEditingController _usernameController = TextEditingController();
@@ -37,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadSavedSettings() async {
     final savedPort = await SettingsService.getWebSocketPort();
     final savedAuthServerUrl = await SettingsService.getAuthServerUrl();
+    final savedOwnerName = await SettingsService.getOwnerName();
 
     if (savedPort != null) {
       setState(() {
@@ -49,11 +51,18 @@ class _LoginScreenState extends State<LoginScreen> {
         _authServerUrlController.text = savedAuthServerUrl;
       });
     }
+
+    if (savedOwnerName != null) {
+      setState(() {
+        _ownerNameController.text = savedOwnerName;
+      });
+    }
   }
 
   @override
   void dispose() {
     _serverUrlController.dispose();
+    _ownerNameController.dispose();
     _portController.dispose();
     _authServerUrlController.dispose();
     _usernameController.dispose();
@@ -210,6 +219,14 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // Validate owner name
+    if (_ownerNameController.text.trim().isEmpty) {
+      setState(() {
+        _error = 'Please enter your name';
+      });
+      return;
+    }
+
     setState(() {
       _isConnecting = true;
       _error = null;
@@ -237,7 +254,8 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // Save port to settings
+      // Save owner name and port to settings
+      await SettingsService.setOwnerName(_ownerNameController.text.trim());
       await SettingsService.setWebSocketPort(portNum);
 
       final provider = context.read<MusicAssistantProvider>();
@@ -386,6 +404,40 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 enabled: !_isConnecting && !_isDetectingAuth,
                 keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.next,
+              ),
+
+              const SizedBox(height: 24),
+
+              // Your Name
+              Text(
+                'Your Name',
+                style: textTheme.titleMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              TextField(
+                controller: _ownerNameController,
+                style: TextStyle(color: colorScheme.onSurface),
+                decoration: InputDecoration(
+                  hintText: 'e.g., Chris, Mom, Dad',
+                  hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.38)),
+                  filled: true,
+                  fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.person_rounded,
+                    color: colorScheme.onSurface.withOpacity(0.54),
+                  ),
+                ),
+                enabled: !_isConnecting && !_isDetectingAuth,
+                keyboardType: TextInputType.name,
                 textInputAction: TextInputAction.next,
               ),
 

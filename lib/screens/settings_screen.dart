@@ -23,7 +23,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _audioDbApiKeyController = TextEditingController();
   final _logger = DebugLogger();
   bool _isConnecting = false;
-  final _localPlayerNameController = TextEditingController();
 
   @override
   void initState() {
@@ -59,8 +58,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (audioDbKey != null) {
       _audioDbApiKeyController.text = audioDbKey;
     }
-
-    _localPlayerNameController.text = await SettingsService.getLocalPlayerName();
   }
 
   @override
@@ -71,7 +68,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _passwordController.dispose();
     _lastFmApiKeyController.dispose();
     _audioDbApiKeyController.dispose();
-    _localPlayerNameController.dispose();
     super.dispose();
   }
 
@@ -414,53 +410,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 32),
 
-            const SizedBox(height: 32),
-
-            Text(
-              'Local Player',
-              style: textTheme.titleMedium?.copyWith(
-                color: colorScheme.onBackground,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'This device appears as a player in Music Assistant',
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onBackground.withOpacity(0.6),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _localPlayerNameController,
-              style: TextStyle(color: colorScheme.onSurface),
-              decoration: InputDecoration(
-                labelText: 'Device Name',
-                hintText: 'e.g., My Phone',
-                hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.38)),
-                filled: true,
-                fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                prefixIcon: Icon(
-                  Icons.phone_android_rounded,
-                  color: colorScheme.onSurface.withOpacity(0.54),
-                ),
-              ),
-              onChanged: (value) {
-                SettingsService.setLocalPlayerName(value);
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Purge unavailable players button
-            if (provider.isConnected)
+            // Purge unavailable players button (moved from Local Player section)
+            if (provider.isConnected) ...[
               _buildPurgePlayersButton(context, provider, colorScheme, textTheme),
-
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
+            ],
 
             Text(
               'Theme',

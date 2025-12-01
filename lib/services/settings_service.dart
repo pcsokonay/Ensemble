@@ -18,6 +18,7 @@ class SettingsService {
   static const String _keyTheAudioDbApiKey = 'theaudiodb_api_key';
   static const String _keyEnableLocalPlayback = 'enable_local_playback';
   static const String _keyLocalPlayerName = 'local_player_name';
+  static const String _keyOwnerName = 'owner_name';
 
   static Future<String?> getServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -227,6 +228,13 @@ class SettingsService {
   }
 
   static Future<String> getLocalPlayerName() async {
+    // Derive player name from owner name
+    final ownerName = await getOwnerName();
+    if (ownerName != null && ownerName.isNotEmpty) {
+      return _makePlayerName(ownerName);
+    }
+
+    // Fallback to stored local player name or default
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyLocalPlayerName) ?? 'Ensemble';
   }
@@ -234,6 +242,27 @@ class SettingsService {
   static Future<void> setLocalPlayerName(String name) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLocalPlayerName, name);
+  }
+
+  // Owner Name - used to derive player name
+  static Future<String?> getOwnerName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyOwnerName);
+  }
+
+  static Future<void> setOwnerName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyOwnerName, name.trim());
+  }
+
+  // Helper to create player name with possessive apostrophe
+  static String _makePlayerName(String ownerName) {
+    // Handle possessive: "Chris" -> "Chris' Phone", "Mom" -> "Mom's Phone"
+    if (ownerName.toLowerCase().endsWith('s')) {
+      return "$ownerName' Phone";
+    } else {
+      return "$ownerName's Phone";
+    }
   }
 
   static Future<void> clearSettings() async {
