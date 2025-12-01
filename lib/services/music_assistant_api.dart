@@ -42,11 +42,22 @@ class MusicAssistantAPI {
 
   MusicAssistantAPI(this.serverUrl, this.authManager);
 
+  // Guard to prevent multiple simultaneous connection attempts
+  Completer<void>? _connectionInProgress;
+
   Future<void> connect() async {
-    if (_currentState == MAConnectionState.connected ||
-        _currentState == MAConnectionState.connecting) {
+    // If already connected, nothing to do
+    if (_currentState == MAConnectionState.connected) {
       return;
     }
+
+    // If connection is in progress, wait for it instead of starting another
+    if (_connectionInProgress != null) {
+      _logger.log('Connection already in progress, waiting...');
+      return _connectionInProgress!.future;
+    }
+
+    _connectionInProgress = Completer<void>();
 
     try {
       _updateConnectionState(MAConnectionState.connecting);
@@ -78,16 +89,17 @@ class MusicAssistantAPI {
       }
 
       // Get or generate a device-based client ID to prevent ghost players
-      // This ID is consistent across reinstalls on the same device
+      // This ID is consistent across app sessions
       var clientId = await SettingsService.getBuiltinPlayerId();
 
-      // Check if we need to migrate from legacy random UUID to device-based ID
-      if (clientId == null || await DeviceIdService.isUsingLegacyId()) {
-        _logger.log('Migrating to device-based player ID...');
+      // ONLY generate new ID if we truly don't have one
+      // Previously, checking isUsingLegacyId() caused new IDs on every reconnect!
+      if (clientId == null) {
+        _logger.log('No existing player ID found, generating new one...');
         clientId = await DeviceIdService.migrateToDeviceId();
-        _logger.log('Now using device-based client ID: $clientId');
+        _logger.log('Generated new client ID: $clientId');
       } else {
-        _logger.log('Using existing device-based client ID: $clientId');
+        _logger.log('Using existing client ID: $clientId');
       }
 
       // Construct WebSocket URL with proper port handling
@@ -189,9 +201,13 @@ class MusicAssistantAPI {
       );
 
       _logger.log('Connected to Music Assistant successfully');
+      _connectionInProgress?.complete();
+      _connectionInProgress = null;
     } catch (e) {
       _logger.log('Connection error: $e');
       _updateConnectionState(MAConnectionState.error);
+      _connectionInProgress?.completeError(e);
+      _connectionInProgress = null;
       rethrow;
     }
   }
