@@ -102,51 +102,31 @@ These are now filtered out of the player selector since they're unavailable.
 
 ## Outstanding Issues / Next Features
 
-### 1. Ghost Player Prevention (MEDIUM PRIORITY)
+### 1. Ghost Player Prevention - IMPLEMENTED
 
 **Problem:** Ghost players accumulate on the MA server when users:
 - Clear app data
 - Uninstall/reinstall the app
 - Get a new phone (SharedPreferences don't transfer)
 
-Each of these creates a NEW UUID, leaving the old player as an unavailable ghost.
+**Solution Implemented (2025-12-01):**
 
-**Current mitigation:** Unavailable players are hidden from the app UI, but they still exist on MA server.
+1. **Ghost Player Adoption**: Fresh installations now check for existing unavailable players matching the owner name (e.g., "Chris' Phone"). If found, the app adopts that player ID instead of generating a new one, effectively "reviving" the ghost player.
 
-**Potential Solutions:**
+2. **Improved Auto-Cleanup**: On connect, the app tries both `players/remove` and `builtin_player/unregister` to remove ghost players that don't match the owner name.
 
-#### Option A: Auto-cleanup on connect
-When the app connects and registers the local player, automatically remove other unavailable builtin players.
+3. **Manual Cleanup Button**: Settings screen now has a "Clean Up Ghost Players" button (when connected) to manually remove all unavailable players.
 
-```dart
-On connect:
-1. Register our player (ensemble_<uuid>)
-2. Find all unavailable builtin players that aren't ours
-3. Remove them via builtin_player/unregister
-```
+**Files Changed:**
+- `lib/services/device_id_service.dart` - Added `adoptPlayerId()`, `isFreshInstallation()`
+- `lib/services/music_assistant_api.dart` - Added `findAdoptableGhostPlayer()`, improved cleanup
+- `lib/providers/music_assistant_provider.dart` - Added `_tryAdoptGhostPlayer()` in connect flow
+- `lib/screens/settings_screen.dart` - Added "Clean Up Ghost Players" button
 
-**Pros:** Simple, automatic, no user interaction needed
-**Cons:** `players/remove` doesn't permanently delete (MA re-adds them); `builtin_player/unregister` might work better
-
-#### Option B: Tie ID to owner name on server
-Store a mapping of owner name → player ID on the MA server. When "Chris" connects, reuse the existing player ID.
-
-**Pros:** Truly persistent across reinstalls
-**Cons:** Requires server-side storage, more complex
-
-#### Option C: Use Android backup system
-Ensure SharedPreferences are backed up to Google Drive so the UUID persists across device changes.
-
-**Pros:** Uses existing Android infrastructure
-**Cons:** Not guaranteed to work, user must have backup enabled
-
-#### Option D: Prompt user to reuse existing player
-On first connect, check if there's an unavailable player matching the owner name pattern. Ask user: "Found existing player 'Chris' Phone' - reuse it?"
-
-**Pros:** User control, handles edge cases
-**Cons:** More UI complexity, confusing for non-technical users
-
-**Recommended approach:** Start with Option A (auto-cleanup on connect). If `builtin_player/unregister` works better than `players/remove`, use that.
+**Testing Needed:**
+- Install app fresh, set owner name "Chris", connect
+- Verify it adopts existing "Chris' Phone" ghost player instead of creating new one
+- Verify manual cleanup button removes remaining ghosts
 
 ### 2. Remote Player Notification (HIGH PRIORITY)
 **Problem:** Notification ONLY shows when playing locally on the phone. When controlling a remote player (e.g., Dining Room), there's NO notification at all.
