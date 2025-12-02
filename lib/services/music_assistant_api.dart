@@ -1396,26 +1396,36 @@ class MusicAssistantAPI {
 
       _logger.log('🔍 Looking for players named: "$expectedName1" or "$expectedName2"');
 
-      // Find unavailable players that match the name pattern
-      // Prioritize ensemble_ prefixed IDs (our app), then any matching name
+      // Find players that match the name pattern
+      // Prioritize: 1) ensemble_ + unavailable, 2) ensemble_ + available, 3) other unavailable
+      // Key insight: When app disconnects cleanly, player may still show as "available"
+      // So we must also adopt available ensemble_ players to prevent ghost accumulation
       Player? matchedPlayer;
+      int matchPriority = 0; // Higher = better match
 
       for (final player in allPlayers) {
-        if (!player.available) {
-          final nameMatch = player.name == expectedName1 ||
-                           player.name == expectedName2 ||
-                           player.name.toLowerCase() == expectedName1.toLowerCase() ||
-                           player.name.toLowerCase() == expectedName2.toLowerCase();
+        final nameMatch = player.name == expectedName1 ||
+                         player.name == expectedName2 ||
+                         player.name.toLowerCase() == expectedName1.toLowerCase() ||
+                         player.name.toLowerCase() == expectedName2.toLowerCase();
 
-          if (nameMatch) {
-            _logger.log('🔍 Found matching ghost: ${player.name} (${player.playerId})');
+        if (nameMatch) {
+          final isEnsemblePlayer = player.playerId.startsWith('ensemble_');
+          final isUnavailable = !player.available;
 
-            // Prefer ensemble_ prefixed IDs (most recent app version)
-            if (player.playerId.startsWith('ensemble_')) {
-              matchedPlayer = player;
-              break; // Perfect match, stop looking
-            } else if (matchedPlayer == null) {
-              matchedPlayer = player; // Keep looking for better match
+          // Priority scoring: ensemble prefix (2 points) + unavailable (1 point)
+          final priority = (isEnsemblePlayer ? 2 : 0) + (isUnavailable ? 1 : 0);
+
+          _logger.log('🔍 Found matching player: ${player.name} (${player.playerId}) '
+                     'available=${player.available} priority=$priority');
+
+          if (priority > matchPriority) {
+            matchedPlayer = player;
+            matchPriority = priority;
+
+            // Perfect match: ensemble_ and unavailable
+            if (priority == 3) {
+              break;
             }
           }
         }

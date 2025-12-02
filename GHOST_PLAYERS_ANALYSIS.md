@@ -882,3 +882,81 @@ This issue took **15+ commits** and **deep investigation** to fully resolve. The
 
 **Lesson Learned**: When in doubt, explicitly save the config. Don't assume registration implies persistence.
 
+---
+
+## Root Cause #10: Ghost Adoption Only Checked Unavailable Players (2025-12-02)
+
+**Location**: `lib/services/music_assistant_api.dart`, `findAdoptableGhostPlayer()`
+
+**The Problem**:
+The ghost adoption function only looked for players with `available=false`:
+
+```dart
+// OLD CODE - BROKEN
+for (final player in allPlayers) {
+  if (!player.available) {  // <-- BUG: Only unavailable players!
+    final nameMatch = ...
+```
+
+But properly registered players can remain `available=true` even after the app disconnects (if MA hasn't timed them out yet). When the user cleared app storage and reconnected:
+
+1. Existing "Chris' Phone" player was `available=true`
+2. `findAdoptableGhostPlayer` skipped it (looking only for unavailable)
+3. App generated NEW player ID → ghost created
+
+**Symptoms**:
+```
+👻 Fresh install detected, searching for adoptable ghost for "Chris"...
+🔍 Looking for players named: "Chris' Phone" or "Chris's Phone"
+🔍 No adoptable ghost player found  // <-- Wrong! Chris' Phone exists!
+👻 No matching ghost player found - will generate new ID
+Generated new player ID: ensemble_8556a5a6...
+```
+
+**The Fix** (Commit: pending):
+Changed to check ALL players with matching name, prioritizing by:
+1. `ensemble_` prefix + unavailable (priority 3) - best match
+2. `ensemble_` prefix + available (priority 2) - still good, adopt it!
+3. Other unavailable players (priority 1) - fallback
+
+```dart
+// NEW CODE - FIXED
+for (final player in allPlayers) {
+  final nameMatch = player.name == expectedName1 || ...
+
+  if (nameMatch) {
+    final isEnsemblePlayer = player.playerId.startsWith('ensemble_');
+    final isUnavailable = !player.available;
+
+    // Priority scoring: ensemble prefix (2 points) + unavailable (1 point)
+    final priority = (isEnsemblePlayer ? 2 : 0) + (isUnavailable ? 1 : 0);
+
+    _logger.log('🔍 Found matching player: ${player.name} (${player.playerId}) '
+               'available=${player.available} priority=$priority');
+
+    if (priority > matchPriority) {
+      matchedPlayer = player;
+      matchPriority = priority;
+    }
+  }
+}
+```
+
+**Key Insight**: Ghost adoption should reuse ANY existing `ensemble_*` player for that owner, regardless of availability status. The player is ours, we should take it back!
+
+---
+
+## Updated Final State (2025-12-02)
+
+| Feature | Status | Verified |
+|---------|--------|----------|
+| Single player ID per device | ✅ Fixed | 2025-12-02 |
+| ID persists across app restarts | ✅ Fixed | 2025-12-02 |
+| No ghost creation on reconnect | ✅ Fixed | 2025-12-02 |
+| Complete config persistence | ✅ Fixed | 2025-12-02 |
+| Playback works | ✅ Fixed | 2025-12-02 |
+| Ghost adoption on reinstall | ✅ Fixed | 2025-12-02 (Root Cause #10) |
+| Ghost adoption of AVAILABLE players | ✅ Fixed | 2025-12-02 |
+| Cross-device isolation | ✅ Fixed | 2025-12-01 |
+| 3-step ghost deletion | ✅ Fixed | 2025-12-02 |
+
