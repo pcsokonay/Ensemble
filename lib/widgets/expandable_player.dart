@@ -172,12 +172,13 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
   void _openQueue() {
     print('🎵 _openQueue called!');
-    // Navigate immediately, then collapse
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const QueueScreen()),
-    ).then((_) {
-      // Collapse when returning from queue screen
-      if (mounted) collapse();
+    // Defer navigation to next frame to escape animation/build context
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      print('🎵 PostFrameCallback executing navigation');
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const QueueScreen()),
+      );
     });
   }
 
