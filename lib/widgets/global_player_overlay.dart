@@ -60,18 +60,21 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay> {
         // The main app content (Navigator, screens, etc.)
         widget.child,
         // Global player overlay - sits above everything
-        if (!_isHidden)
-          Consumer<MusicAssistantProvider>(
-            builder: (context, maProvider, _) {
-              // Only show player if connected and has a track
-              if (!maProvider.isConnected ||
-                  maProvider.currentTrack == null ||
-                  maProvider.selectedPlayer == null) {
-                return const SizedBox.shrink();
-              }
-              return ExpandablePlayer(key: globalPlayerKey);
-            },
-          ),
+        // Use Offstage instead of conditional to preserve widget state when hidden
+        Consumer<MusicAssistantProvider>(
+          builder: (context, maProvider, _) {
+            // Only show player if connected and has a track
+            if (!maProvider.isConnected ||
+                maProvider.currentTrack == null ||
+                maProvider.selectedPlayer == null) {
+              return const SizedBox.shrink();
+            }
+            return Offstage(
+              offstage: _isHidden,
+              child: ExpandablePlayer(key: globalPlayerKey),
+            );
+          },
+        ),
       ],
     );
   }

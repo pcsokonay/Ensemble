@@ -78,7 +78,10 @@ class PlayerSelector extends StatelessWidget {
       GlobalPlayerOverlay.collapsePlayer();
     }
 
-    // Just show the bottom sheet - it will naturally slide up over the mini player
+    // Hide mini player while sheet is shown to avoid visual conflict
+    GlobalPlayerOverlay.hidePlayer();
+
+    // Show the bottom sheet above everything
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -88,7 +91,10 @@ class PlayerSelector extends StatelessWidget {
       builder: (context) {
         return _PlayerSelectorSheet();
       },
-    );
+    ).whenComplete(() {
+      // Restore mini player when sheet is dismissed
+      GlobalPlayerOverlay.showPlayer();
+    });
   }
 }
 

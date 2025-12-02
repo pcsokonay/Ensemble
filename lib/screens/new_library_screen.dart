@@ -25,7 +25,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadPlaylists();
   }
 
@@ -105,7 +105,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           tabs: const [
             Tab(text: 'Artists'),
             Tab(text: 'Albums'),
-            Tab(text: 'Tracks'),
             Tab(text: 'Playlists'),
           ],
         ),
@@ -115,7 +114,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         children: [
           _buildArtistsTab(context, provider),
           _buildAlbumsTab(context, provider),
-          _buildTracksTab(context, provider),
           _buildPlaylistsTab(context, provider),
         ],
       ),
@@ -286,104 +284,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         },
       ),
     );
-  }
-
-  // ============ TRACKS TAB ============
-  Widget _buildTracksTab(BuildContext context, MusicAssistantProvider provider) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (provider.isLoading) {
-      return Center(child: CircularProgressIndicator(color: colorScheme.primary));
-    }
-
-    if (provider.tracks.isEmpty) {
-      return _buildEmptyState(
-        context,
-        icon: Icons.music_note_outlined,
-        message: 'No tracks found',
-        onRefresh: provider.loadLibrary,
-      );
-    }
-
-    return RefreshIndicator(
-      color: colorScheme.primary,
-      backgroundColor: colorScheme.surface,
-      onRefresh: () async => provider.loadLibrary(),
-      child: ListView.builder(
-        itemCount: provider.tracks.length,
-        padding: const EdgeInsets.only(left: 8, right: 8, top: 8, bottom: 140),
-        itemBuilder: (context, index) {
-          final track = provider.tracks[index];
-          return _buildTrackTile(context, track, provider, index);
-        },
-      ),
-    );
-  }
-
-  Widget _buildTrackTile(BuildContext context, Track track, MusicAssistantProvider provider, int index) {
-    final imageUrl = track.album != null ? provider.getImageUrl(track.album!, size: 128) : null;
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return ListTile(
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant,
-          borderRadius: BorderRadius.circular(8),
-          image: imageUrl != null
-              ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
-              : null,
-        ),
-        child: imageUrl == null
-            ? Icon(Icons.music_note_rounded, color: colorScheme.onSurfaceVariant)
-            : null,
-      ),
-      title: Text(
-        track.name,
-        style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurface),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        track.artistsString,
-        style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurface.withOpacity(0.7)),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: track.duration != null
-          ? Text(
-              _formatDuration(track.duration!),
-              style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurface.withOpacity(0.54)),
-            )
-          : null,
-      onTap: () => _playTrack(context, provider, index),
-    );
-  }
-
-  Future<void> _playTrack(BuildContext context, MusicAssistantProvider provider, int startIndex) async {
-    final tracks = provider.tracks;
-    if (tracks.isEmpty) return;
-
-    if (provider.selectedPlayer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No player selected')),
-      );
-      return;
-    }
-
-    await provider.playTracks(
-      provider.selectedPlayer!.playerId,
-      tracks,
-      startIndex: startIndex,
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   // ============ PLAYLISTS TAB ============

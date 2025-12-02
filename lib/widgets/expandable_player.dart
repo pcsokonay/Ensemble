@@ -285,8 +285,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Title: bold, prominent (24px)
     // Artist: medium weight, secondary (16px)
     // Album: light, tertiary (13px)
-    final titleFontSize = _lerpDouble(14.0, 24.0, t);
-    final artistFontSize = _lerpDouble(12.0, 16.0, t);
+    final titleFontSize = _lerpDouble(16.0, 24.0, t);
+    final artistFontSize = _lerpDouble(14.0, 16.0, t);
 
     final collapsedTitleLeft = _collapsedArtSize + 12;
     final expandedTitleLeft = contentPadding;
