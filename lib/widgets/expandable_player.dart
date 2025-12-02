@@ -661,11 +661,29 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                       opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0),
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
+                        onTapDown: (_) => print('🎵 Queue button TAP DOWN'),
+                        onTapUp: (_) => print('🎵 Queue button TAP UP'),
+                        onTapCancel: () => print('🎵 Queue button TAP CANCEL'),
                         onTap: () {
-                          print('🎵 Queue button tapped!');
-                          Navigator.of(context, rootNavigator: true).push(
-                            MaterialPageRoute(builder: (_) => const QueueScreen()),
-                          );
+                          print('🎵 Queue button onTap FIRED!');
+                          try {
+                            final navigator = Navigator.of(context, rootNavigator: true);
+                            print('🎵 Got navigator: $navigator');
+                            navigator.push(
+                              MaterialPageRoute(builder: (_) {
+                                print('🎵 Building QueueScreen route');
+                                return const QueueScreen();
+                              }),
+                            ).then((_) {
+                              print('🎵 Navigation completed');
+                            }).catchError((e) {
+                              print('🎵 Navigation error: $e');
+                            });
+                            print('🎵 Push called');
+                          } catch (e, stack) {
+                            print('🎵 Exception: $e');
+                            print('🎵 Stack: $stack');
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.all(12),
