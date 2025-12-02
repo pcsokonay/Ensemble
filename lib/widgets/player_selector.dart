@@ -78,17 +78,22 @@ class PlayerSelector extends StatelessWidget {
       GlobalPlayerOverlay.collapsePlayer();
     }
 
-    // Show the bottom sheet - useRootNavigator puts it above everything including mini player
+    // Slide mini player down out of the way
+    GlobalPlayerOverlay.hidePlayer();
+
+    // Show the bottom sheet
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       isDismissible: true,
-      useRootNavigator: true,
       builder: (context) {
         return _PlayerSelectorSheet();
       },
-    );
+    ).whenComplete(() {
+      // Slide mini player back up when sheet is dismissed
+      GlobalPlayerOverlay.showPlayer();
+    });
   }
 }
 

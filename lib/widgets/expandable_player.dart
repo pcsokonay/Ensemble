@@ -16,7 +16,13 @@ import 'volume_control.dart';
 /// the bottom navigation bar. It uses smooth morphing animations where each
 /// element transitions from their mini to full positions.
 class ExpandablePlayer extends StatefulWidget {
-  const ExpandablePlayer({super.key});
+  /// Slide offset for hiding the mini player (0.0 = visible, 1.0 = hidden below screen)
+  final double slideOffset;
+
+  const ExpandablePlayer({
+    super.key,
+    this.slideOffset = 0.0,
+  });
 
   @override
   State<ExpandablePlayer> createState() => ExpandablePlayerState();
@@ -245,11 +251,19 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final expandedBottomOffset = bottomNavSpace;
     final expandedHeight = screenSize.height - bottomNavSpace;
 
+    // Apply slide offset to hide mini player (slides down off-screen)
+    // Only apply when collapsed (t == 0), don't affect expanded state
+    final slideDownAmount = widget.slideOffset * (_collapsedHeight + collapsedBottomOffset + 20);
+    final slideAdjustedBottomOffset = t < 0.1
+        ? collapsedBottomOffset - slideDownAmount
+        : _lerpDouble(collapsedBottomOffset, expandedBottomOffset, t);
+
     final collapsedWidth = screenSize.width - (_collapsedMargin * 2);
     final width = _lerpDouble(collapsedWidth, screenSize.width, t);
     final height = _lerpDouble(_collapsedHeight, expandedHeight, t);
     final horizontalMargin = _lerpDouble(_collapsedMargin, 0, t);
-    final bottomOffset = _lerpDouble(collapsedBottomOffset, expandedBottomOffset, t);
+    // Use slide-adjusted offset when collapsed, normal lerp otherwise
+    final bottomOffset = slideAdjustedBottomOffset;
     final borderRadius = _lerpDouble(_collapsedBorderRadius, 0, t);
 
     // ===========================================

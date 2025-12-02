@@ -34,22 +34,47 @@ class GlobalPlayerOverlay extends StatefulWidget {
       globalPlayerKey.currentState?.isExpanded ?? false;
 
   /// Hide the mini player temporarily (e.g., when showing device selector)
+  /// The player slides down off-screen with animation
   static void hidePlayer() {
     _overlayStateKey.currentState?._setHidden(true);
   }
 
-  /// Show the mini player again
+  /// Show the mini player again (slides back up)
   static void showPlayer() {
     _overlayStateKey.currentState?._setHidden(false);
   }
 }
 
-class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay> {
-  bool _isHidden = false;
+class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _slideController;
+  late Animation<double> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _slideAnimation = CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _slideController.dispose();
+    super.dispose();
+  }
 
   void _setHidden(bool hidden) {
-    if (_isHidden != hidden) {
-      setState(() => _isHidden = hidden);
+    if (hidden) {
+      _slideController.forward();
+    } else {
+      _slideController.reverse();
     }
   }
 
@@ -59,19 +84,26 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay> {
       children: [
         // The main app content (Navigator, screens, etc.)
         widget.child,
-        // Global player overlay - sits above everything
-        if (!_isHidden)
-          Consumer<MusicAssistantProvider>(
-            builder: (context, maProvider, _) {
-              // Only show player if connected and has a track
-              if (!maProvider.isConnected ||
-                  maProvider.currentTrack == null ||
-                  maProvider.selectedPlayer == null) {
-                return const SizedBox.shrink();
-              }
-              return ExpandablePlayer(key: globalPlayerKey);
-            },
-          ),
+        // Global player overlay - slides down when hidden
+        AnimatedBuilder(
+          animation: _slideAnimation,
+          builder: (context, child) {
+            return Consumer<MusicAssistantProvider>(
+              builder: (context, maProvider, _) {
+                // Only show player if connected and has a track
+                if (!maProvider.isConnected ||
+                    maProvider.currentTrack == null ||
+                    maProvider.selectedPlayer == null) {
+                  return const SizedBox.shrink();
+                }
+                return ExpandablePlayer(
+                  key: globalPlayerKey,
+                  slideOffset: _slideAnimation.value,
+                );
+              },
+            );
+          },
+        ),
       ],
     );
   }
