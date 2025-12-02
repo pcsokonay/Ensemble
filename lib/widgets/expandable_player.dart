@@ -659,23 +659,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     right: 4,
                     child: Opacity(
                       opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0),
-                      child: IgnorePointer(
-                        ignoring: t < 0.5,
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.of(context, rootNavigator: true).push(
-                                MaterialPageRoute(builder: (_) => const QueueScreen()),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(24),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Icon(Icons.queue_music_rounded, color: textColor, size: 24),
-                            ),
-                          ),
-                        ),
+                      child: IconButton(
+                        icon: Icon(Icons.queue_music_rounded, color: textColor, size: 24),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const QueueScreen()),
+                          );
+                        },
+                        padding: const EdgeInsets.all(12),
                       ),
                     ),
                   ),
