@@ -104,12 +104,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Logo
+            // Logo - same size as login screen (50% of screen width)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24.0),
+              padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
               child: Image.asset(
                 'assets/images/ensemble_icon_transparent.png',
-                height: 120,
+                width: MediaQuery.of(context).size.width * 0.5,
                 fit: BoxFit.contain,
               ),
             ),
@@ -121,45 +121,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: colorScheme.surfaceVariant.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Row(
+              child: Column(
                 children: [
                   Icon(
                     _getStatusIcon(provider.connectionState),
                     color: _getStatusColor(provider.connectionState, colorScheme),
-                    size: 24,
+                    size: 32,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Connection Status',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _getStatusText(provider.connectionState),
-                          style: textTheme.titleMedium?.copyWith(
-                            color: _getStatusColor(provider.connectionState, colorScheme),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (provider.serverUrl != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            provider.serverUrl!,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
+                  const SizedBox(height: 8),
+                  Text(
+                    _getStatusText(provider.connectionState),
+                    style: textTheme.titleMedium?.copyWith(
+                      color: _getStatusColor(provider.connectionState, colorScheme),
+                      fontWeight: FontWeight.bold,
                     ),
+                    textAlign: TextAlign.center,
                   ),
+                  if (provider.serverUrl != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      provider.serverUrl!,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ],
               ),
             ),

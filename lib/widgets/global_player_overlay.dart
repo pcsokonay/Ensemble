@@ -9,6 +9,14 @@ final globalPlayerKey = GlobalKey<ExpandablePlayerState>();
 /// Key for the overlay state to control visibility
 final _overlayStateKey = GlobalKey<_GlobalPlayerOverlayState>();
 
+/// ValueNotifier for player expansion progress (0.0 to 1.0) and background color
+class PlayerExpansionState {
+  final double progress;
+  final Color? backgroundColor;
+  PlayerExpansionState(this.progress, this.backgroundColor);
+}
+final playerExpansionNotifier = ValueNotifier<PlayerExpansionState>(PlayerExpansionState(0.0, null));
+
 /// Wrapper widget that provides a global player overlay above all navigation.
 ///
 /// This ensures the mini player and expanded player are consistent across
@@ -32,6 +40,14 @@ class GlobalPlayerOverlay extends StatefulWidget {
   /// Check if the player is currently expanded
   static bool get isPlayerExpanded =>
       globalPlayerKey.currentState?.isExpanded ?? false;
+
+  /// Get the current expansion progress (0.0 to 1.0)
+  static double get expansionProgress =>
+      globalPlayerKey.currentState?.expansionProgress ?? 0.0;
+
+  /// Get the current expanded background color
+  static Color? get expandedBackgroundColor =>
+      globalPlayerKey.currentState?.currentExpandedBgColor;
 
   /// Hide the mini player temporarily (e.g., when showing device selector)
   /// The player slides down off-screen with animation

@@ -8,6 +8,7 @@ import '../models/player.dart';
 import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
 import 'animated_icon_button.dart';
+import 'global_player_overlay.dart';
 import 'volume_control.dart';
 
 /// A unified player widget that seamlessly expands from mini to full-screen.
@@ -65,7 +66,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
     _expandAnimation = CurvedAnimation(
@@ -73,6 +74,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
+
+    // Notify listeners of expansion progress changes
+    _controller.addListener(_notifyExpansionProgress);
 
     // Queue panel animation
     _queuePanelController = AnimationController(
@@ -144,6 +148,18 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   }
 
   bool get isExpanded => _controller.value > 0.5;
+
+  double get expansionProgress => _controller.value;
+
+  Color? _currentExpandedBgColor;
+  Color? get currentExpandedBgColor => _currentExpandedBgColor;
+
+  void _notifyExpansionProgress() {
+    playerExpansionNotifier.value = PlayerExpansionState(
+      _controller.value,
+      _currentExpandedBgColor,
+    );
+  }
 
   void _startProgressTimer() {
     _progressTimer?.cancel();
@@ -299,6 +315,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         ? adaptiveScheme.primaryContainer
         : colorScheme.primaryContainer;
     final expandedBg = adaptiveScheme?.surface ?? const Color(0xFF121212);
+    _currentExpandedBgColor = expandedBg;
     final backgroundColor = Color.lerp(collapsedBg, expandedBg, t)!;
 
     final collapsedTextColor = themeProvider.adaptiveTheme && adaptiveScheme != null

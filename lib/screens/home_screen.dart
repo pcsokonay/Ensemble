@@ -101,18 +101,26 @@ class _HomeScreenState extends State<HomeScreen> {
               const SettingsScreen(),
           ],
         ),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
+        bottomNavigationBar: ValueListenableBuilder<PlayerExpansionState>(
+          valueListenable: playerExpansionNotifier,
+          builder: (context, expansionState, child) {
+            // Lerp between surface color and player background when expanded
+            final navBgColor = expansionState.progress > 0 && expansionState.backgroundColor != null
+                ? Color.lerp(colorScheme.surface, expansionState.backgroundColor, expansionState.progress)!
+                : colorScheme.surface;
+
+            return Container(
+              decoration: BoxDecoration(
+                color: navBgColor,
+                boxShadow: expansionState.progress < 0.5 ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ] : null,
               ),
-            ],
-          ),
-          child: BottomNavigationBar(
+              child: BottomNavigationBar(
             currentIndex: _selectedIndex,
             onTap: (index) {
               // Collapse player if expanded
@@ -169,7 +177,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: 'Settings',
               ),
             ],
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
