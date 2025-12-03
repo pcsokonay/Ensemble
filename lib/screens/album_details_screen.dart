@@ -402,33 +402,36 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const SizedBox(height: 60),
-                  Container(
-                    width: 280, // Increased size
-                    height: 280,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(16), // Slightly more rounded
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                      image: imageUrl != null
-                          ? DecorationImage(
-                              image: NetworkImage(imageUrl),
-                              fit: BoxFit.cover,
+                  Hero(
+                    tag: HeroTags.albumCover + (widget.album.uri ?? widget.album.itemId) + _heroTagSuffix,
+                    child: Container(
+                      width: 280, // Increased size
+                      height: 280,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(16), // Slightly more rounded
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                        image: imageUrl != null
+                            ? DecorationImage(
+                                image: NetworkImage(imageUrl),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: imageUrl == null
+                          ? Icon(
+                              Icons.album_rounded,
+                              size: 120,
+                              color: colorScheme.onSurfaceVariant,
                             )
                           : null,
                     ),
-                    child: imageUrl == null
-                        ? Icon(
-                            Icons.album_rounded,
-                            size: 120,
-                            color: colorScheme.onSurfaceVariant,
-                          )
-                        : null,
                   ),
                 ],
               ),
@@ -440,23 +443,35 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.album.name,
-                    style: textTheme.headlineMedium?.copyWith(
-                      color: colorScheme.onBackground,
-                      fontWeight: FontWeight.bold,
+                  Hero(
+                    tag: HeroTags.albumTitle + (widget.album.uri ?? widget.album.itemId) + _heroTagSuffix,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Text(
+                        widget.album.name,
+                        style: textTheme.headlineMedium?.copyWith(
+                          color: colorScheme.onBackground,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () => _navigateToArtist(),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0),
-                      child: Text(
-                        widget.album.artistsString,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: colorScheme.onBackground.withOpacity(0.7),
+                  Hero(
+                    tag: HeroTags.artistName + (widget.album.uri ?? widget.album.itemId) + _heroTagSuffix,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _navigateToArtist(),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Text(
+                            widget.album.artistsString,
+                            style: textTheme.titleMedium?.copyWith(
+                              color: colorScheme.onBackground.withOpacity(0.7),
+                            ),
+                          ),
                         ),
                       ),
                     ),
