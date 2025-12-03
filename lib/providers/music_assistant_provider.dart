@@ -1287,20 +1287,38 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Check connection and reconnect if needed (called when app resumes)
   Future<void> checkAndReconnect() async {
-    if (_api == null || _serverUrl == null) {
+    _logger.log('🔄 checkAndReconnect called - state: $_connectionState');
+
+    if (_serverUrl == null) {
+      _logger.log('🔄 No server URL saved, skipping reconnect');
       return;
     }
 
-    // Check if we're disconnected
+    // Check if we're disconnected or in error state
     if (_connectionState != MAConnectionState.connected) {
+      _logger.log('🔄 Not connected, attempting reconnect to $_serverUrl');
       try {
         await connectToServer(_serverUrl!);
+        _logger.log('🔄 Reconnection successful');
       } catch (e) {
+        _logger.log('🔄 Reconnection failed: $e');
         // Reconnection failed, will try again later
       }
     } else {
-      // Even if connected, refresh player state
-      await refreshPlayers();
+      // We think we're connected - verify by refreshing players
+      _logger.log('🔄 Already connected, verifying connection...');
+      try {
+        await refreshPlayers();
+        _logger.log('🔄 Connection verified, players refreshed');
+      } catch (e) {
+        _logger.log('🔄 Connection verification failed, reconnecting: $e');
+        // Connection might be stale, try reconnecting
+        try {
+          await connectToServer(_serverUrl!);
+        } catch (reconnectError) {
+          _logger.log('🔄 Reconnection failed: $reconnectError');
+        }
+      }
     }
   }
 

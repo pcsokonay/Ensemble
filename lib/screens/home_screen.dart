@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/theme_provider.dart';
 import '../widgets/global_player_overlay.dart';
@@ -23,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Press back again to exit'),
+        content: const Text('Press back again to minimize'),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
@@ -65,12 +66,13 @@ class _HomeScreenState extends State<HomeScreen> {
           return;
         }
 
-        // On home tab - check for double press to exit
+        // On home tab - check for double press to minimize
         final now = DateTime.now();
         if (_lastBackPress != null &&
             now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
-          // Double press detected, allow exit
-          Navigator.of(context).pop();
+          // Double press detected - minimize app (move to background)
+          // This keeps the app running and connection alive
+          SystemNavigator.pop();
         } else {
           // First press, show message
           _lastBackPress = now;
