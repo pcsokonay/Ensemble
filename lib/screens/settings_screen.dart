@@ -3,9 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/music_assistant_api.dart';
 import '../services/settings_service.dart';
-import '../services/debug_logger.dart';
 import '../theme/theme_provider.dart';
 import 'debug_log_screen.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -15,14 +15,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _serverUrlController = TextEditingController();
-  final _portController = TextEditingController(text: '8095');
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _lastFmApiKeyController = TextEditingController();
   final _audioDbApiKeyController = TextEditingController();
-  final _logger = DebugLogger();
-  bool _isConnecting = false;
 
   @override
   void initState() {
@@ -31,24 +25,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final provider = context.read<MusicAssistantProvider>();
-    _serverUrlController.text = provider.serverUrl ?? '';
-
-    final port = await SettingsService.getWebSocketPort();
-    if (port != null) {
-      _portController.text = port.toString();
-    }
-
-    final username = await SettingsService.getUsername();
-    if (username != null) {
-      _usernameController.text = username;
-    }
-
-    final password = await SettingsService.getPassword();
-    if (password != null) {
-      _passwordController.text = password;
-    }
-
     final lastFmKey = await SettingsService.getLastFmApiKey();
     if (lastFmKey != null) {
       _lastFmApiKeyController.text = lastFmKey;
@@ -62,121 +38,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    _serverUrlController.dispose();
-    _portController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
     _lastFmApiKeyController.dispose();
     _audioDbApiKeyController.dispose();
     super.dispose();
   }
 
-  Future<void> _connect() async {
-    if (_serverUrlController.text.isEmpty) {
-      _showError('Please enter a server URL');
-      return;
-    }
-
-    final port = _portController.text.trim();
-    if (port.isEmpty) {
-      _showError('Please enter a port number');
-      return;
-    }
-
-    final portNum = int.tryParse(port);
-    if (portNum == null || portNum < 1 || portNum > 65535) {
-      _showError('Please enter a valid port number (1-65535)');
-      return;
-    }
-
-    await SettingsService.setWebSocketPort(portNum);
-
-    setState(() {
-      _isConnecting = true;
-    });
-
+  Future<void> _disconnect() async {
     final provider = context.read<MusicAssistantProvider>();
+    await provider.disconnect();
 
-    try {
-      if (_usernameController.text.trim().isNotEmpty &&
-          _passwordController.text.trim().isNotEmpty) {
-        _logger.log('🔐 Attempting login with credentials...');
+    // Clear saved server URL so login screen shows
+    await SettingsService.setServerUrl(null);
 
-        // Detect auth strategy first
-        final strategy = await provider.authManager.detectAuthStrategy(
-          _serverUrlController.text,
-        );
-
-        if (strategy == null) {
-          _showError('Could not detect authentication method for server.');
-          setState(() {
-            _isConnecting = false;
-          });
-          return;
-        }
-
-        // Get auth server URL if configured (for Authelia on separate domain)
-        final authServerUrl = await SettingsService.getAuthServerUrl();
-
-        // Use the provider's authManager so credentials are available for WebSocket
-        final success = await provider.authManager.login(
-          _serverUrlController.text,
-          _usernameController.text.trim(),
-          _passwordController.text.trim(),
-          strategy,
-          authServerUrl: authServerUrl,
-        );
-
-        if (success) {
-          await SettingsService.setUsername(_usernameController.text.trim());
-          await SettingsService.setPassword(_passwordController.text.trim());
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✓ Authentication successful!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        } else {
-          _showError('Authentication failed. Please check your credentials.');
-          setState(() {
-            _isConnecting = false;
-          });
-          return;
-        }
-      }
-
-      await provider.connectToServer(_serverUrlController.text);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Connected successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      _showError('Connection failed: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isConnecting = false;
-        });
-      }
+    if (mounted) {
+      // Navigate to login screen and clear the navigation stack
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
     }
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
 
   @override
@@ -222,8 +102,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Logo
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24.0),
+              child: Image.asset(
+                'assets/images/ensemble_icon_transparent.png',
+                height: 120,
+                fit: BoxFit.contain,
+              ),
+            ),
+
+            // Connection status bar
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -256,6 +147,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (provider.serverUrl != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            provider.serverUrl!,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -263,153 +164,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            const SizedBox(height: 32),
-
-            Text(
-              'Music Assistant Server',
-              style: textTheme.titleMedium?.copyWith(
-                color: colorScheme.onBackground,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Enter your Music Assistant server URL or IP address',
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onBackground.withOpacity(0.6),
-              ),
-            ),
             const SizedBox(height: 16),
 
-            TextField(
-              controller: _serverUrlController,
-              style: TextStyle(color: colorScheme.onSurface),
-              decoration: InputDecoration(
-                hintText: 'e.g., music.example.com or 192.168.1.100',
-                hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.38)),
-                filled: true,
-                fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                prefixIcon: Icon(
-                  Icons.dns_rounded,
-                  color: colorScheme.onSurface.withOpacity(0.54),
-                ),
-              ),
-              enabled: !_isConnecting,
-            ),
-
-            const SizedBox(height: 24),
-
-            Text(
-              'Port',
-              style: textTheme.titleMedium?.copyWith(
-                color: colorScheme.onBackground,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Music Assistant WebSocket port (usually 8095)',
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onBackground.withOpacity(0.6),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _portController,
-              style: TextStyle(color: colorScheme.onSurface),
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                hintText: '8095',
-                hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.38)),
-                filled: true,
-                fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                prefixIcon: Icon(
-                  Icons.settings_ethernet_rounded,
-                  color: colorScheme.onSurface.withOpacity(0.54),
-                ),
-              ),
-              enabled: !_isConnecting,
-            ),
-
-            const SizedBox(height: 32),
-
+            // Disconnect button
             SizedBox(
               width: double.infinity,
               height: 50,
-              child: ElevatedButton(
-                onPressed: _isConnecting ? null : _connect,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  disabledBackgroundColor: colorScheme.primary.withOpacity(0.38),
+              child: OutlinedButton.icon(
+                onPressed: _disconnect,
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text(
+                  'Disconnect',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colorScheme.error,
+                  side: BorderSide(color: colorScheme.error.withOpacity(0.5)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: _isConnecting
-                    ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colorScheme.onPrimary,
-                        ),
-                      )
-                    : const Text(
-                        'Connect',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
               ),
             ),
 
-            if (provider.isConnected) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton(
-                  onPressed: () async {
-                    await provider.disconnect();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Disconnected from server'),
-                        ),
-                      );
-                    }
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: colorScheme.error,
-                    side: BorderSide(color: colorScheme.error.withOpacity(0.5)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Disconnect',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-
             const SizedBox(height: 32),
 
+            // Theme section
             Text(
               'Theme',
               style: textTheme.titleMedium?.copyWith(
@@ -660,52 +443,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
 
             const SizedBox(height: 32),
-
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceVariant.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: colorScheme.outline.withOpacity(0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        color: colorScheme.onSurfaceVariant,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Connection Info',
-                        style: textTheme.titleSmall?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '• Default ports: 443 for HTTPS, 8095 for HTTP\n'
-                    '• You can override the port in the WebSocket Port field\n'
-                    '• Use domain name or IP address for server\n'
-                    '• Make sure your device can reach the server\n'
-                    '• Check debug logs if connection fails',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -750,5 +487,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return 'Disconnected';
     }
   }
-
 }

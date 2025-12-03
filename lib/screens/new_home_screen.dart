@@ -42,11 +42,21 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         elevation: 0,
         title: Padding(
           padding: const EdgeInsets.only(left: 16.0),
-          child: Image.asset(
-            'assets/images/ensemble_logo.png',
-            height: 40,
-            fit: BoxFit.contain,
-            alignment: Alignment.centerLeft,
+          child: ColorFiltered(
+            colorFilter: Theme.of(context).brightness == Brightness.light
+                ? const ColorFilter.matrix(<double>[
+                    -1,  0,  0, 0, 255,
+                     0, -1,  0, 0, 255,
+                     0,  0, -1, 0, 255,
+                     0,  0,  0, 1,   0,
+                  ])
+                : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+            child: Image.asset(
+              'assets/images/ensemble_logo.png',
+              height: 40,
+              fit: BoxFit.contain,
+              alignment: Alignment.centerLeft,
+            ),
           ),
         ),
         titleSpacing: 0,
