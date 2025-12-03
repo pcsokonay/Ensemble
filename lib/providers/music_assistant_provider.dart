@@ -793,6 +793,13 @@ class MusicAssistantProvider with ChangeNotifier {
   Future<void> playTracks(String playerId, List<Track> tracks, {int? startIndex, bool clearQueue = true}) async {
     try {
       await _api?.playTracks(playerId, tracks, startIndex: startIndex, clearQueue: clearQueue);
+
+      // Optimistically set current track so mini player appears immediately
+      final trackIndex = startIndex ?? 0;
+      if (tracks.isNotEmpty && trackIndex < tracks.length) {
+        _currentTrack = tracks[trackIndex];
+        notifyListeners();
+      }
     } catch (e) {
       final errorInfo = ErrorHandler.handleError(e, context: 'Play tracks');
       _error = errorInfo.userMessage;
