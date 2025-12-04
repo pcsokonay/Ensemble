@@ -52,8 +52,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   double? _seekPosition;
 
   // Dimensions
-  static const double _collapsedHeight = 68.0; // Added 4px bottom padding
-  static const double _collapsedMargin = 8.0;
+  static const double _collapsedHeight = 64.0;
+  static const double _collapsedMargin = 12.0; // Increased from 8 to 12 (4px more gap above nav bar)
   static const double _collapsedBorderRadius = 16.0;
   static const double _collapsedArtSize = 64.0;
   static const double _bottomNavHeight = 56.0;
@@ -392,7 +392,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final expandedTitleLeft = contentPadding;
     final titleLeft = _lerpDouble(collapsedTitleLeft, expandedTitleLeft, t);
 
-    final collapsedTitleTop = (_collapsedHeight - 32) / 2 - 4; // Raised up by 8px (was centered, now 4px higher accounting for 4px bottom padding)
+    final collapsedTitleTop = (_collapsedHeight - 36) / 2; // Centered vertically (adjusted for increased track/artist gap)
     final expandedTitleTop = expandedArtTop + expandedArtSize + 28;
     final titleTop = _lerpDouble(collapsedTitleTop, expandedTitleTop, t);
 
