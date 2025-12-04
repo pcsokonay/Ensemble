@@ -225,18 +225,27 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                   const SizedBox(height: 60),
                   Hero(
                     tag: HeroTags.artistImage + (widget.artist.uri ?? widget.artist.itemId) + _heroTagSuffix,
-                    child: CircleAvatar(
-                      radius: 100,
-                      backgroundColor: colorScheme.surfaceVariant,
-                      backgroundImage:
-                          imageUrl != null ? NetworkImage(imageUrl) : null,
-                      child: imageUrl == null
-                          ? Icon(
-                              Icons.person_rounded,
-                              size: 100,
-                              color: colorScheme.onSurfaceVariant,
-                            )
-                          : null,
+                    child: ClipOval(
+                      child: Container(
+                        width: 200,
+                        height: 200,
+                        color: colorScheme.surfaceVariant,
+                        child: imageUrl != null
+                            ? Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Icon(
+                                  Icons.person_rounded,
+                                  size: 100,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person_rounded,
+                                size: 100,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                      ),
                     ),
                   ),
                 ],
