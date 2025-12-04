@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../screens/artist_details_screen.dart';
-import '../utils/page_transitions.dart';
+import '../constants/hero_tags.dart';
 
 class ArtistCard extends StatelessWidget {
   final Artist artist;
@@ -24,13 +24,15 @@ class ArtistCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    final suffix = heroTagSuffix != null ? '_$heroTagSuffix' : '';
+
     return RepaintBoundary(
       child: GestureDetector(
         onTap: onTap ?? () {
           Navigator.push(
             context,
-            FadeSlidePageRoute(
-              child: ArtistDetailsScreen(
+            MaterialPageRoute(
+              builder: (context) => ArtistDetailsScreen(
                 artist: artist,
                 heroTagSuffix: heroTagSuffix,
               ),
@@ -41,36 +43,45 @@ class ArtistCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Artist image - circular
-            ClipOval(
-              child: Container(
-                width: 110,
-                height: 110,
-                color: colorScheme.surfaceVariant,
-                child: imageUrl != null
-                    ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        cacheWidth: 256,
-                        cacheHeight: 256,
-                        errorBuilder: (_, __, ___) => Icon(
-                          Icons.person_rounded,
-                          size: 60,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      )
-                    : Icon(Icons.person_rounded, size: 60, color: colorScheme.onSurfaceVariant),
+            Hero(
+              tag: HeroTags.artistImage + (artist.uri ?? artist.itemId) + suffix,
+              child: ClipOval(
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  color: colorScheme.surfaceVariant,
+                  child: imageUrl != null
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          cacheWidth: 256,
+                          cacheHeight: 256,
+                          errorBuilder: (_, __, ___) => Icon(
+                            Icons.person_rounded,
+                            size: 60,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        )
+                      : Icon(Icons.person_rounded, size: 60, color: colorScheme.onSurfaceVariant),
+                ),
               ),
             ),
           const SizedBox(height: 12),
           // Artist name
-          Text(
-            artist.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: textTheme.titleSmall?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w500,
+          Hero(
+            tag: HeroTags.artistName + (artist.uri ?? artist.itemId) + suffix,
+            child: Material(
+              color: Colors.transparent,
+              child: Text(
+                artist.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: textTheme.titleSmall?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ),
           ],
