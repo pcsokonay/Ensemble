@@ -386,13 +386,17 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
     final imageUrl = provider.getImageUrl(album, size: 256);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    const String heroSuffix = 'artist_albums';
 
     return InkWell(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => AlbumDetailsScreen(album: album),
+            builder: (context) => AlbumDetailsScreen(
+              album: album,
+              heroTagSuffix: heroSuffix,
+            ),
           ),
         );
       },
@@ -400,45 +404,66 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceVariant,
+            child: Hero(
+              tag: HeroTags.albumCover + (album.uri ?? album.itemId) + '_$heroSuffix',
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                image: imageUrl != null
-                    ? DecorationImage(
-                        image: NetworkImage(imageUrl),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
+                child: Container(
+                  color: colorScheme.surfaceVariant,
+                  child: imageUrl != null
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Icon(
+                              Icons.album_rounded,
+                              size: 64,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Icon(
+                            Icons.album_rounded,
+                            size: 64,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                ),
               ),
-              child: imageUrl == null
-                  ? Center(
-                      child: Icon(
-                        Icons.album_rounded,
-                        size: 64,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    )
-                  : null,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            album.name,
-            style: textTheme.titleSmall?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w500,
+          Hero(
+            tag: HeroTags.albumTitle + (album.uri ?? album.itemId) + '_$heroSuffix',
+            child: Material(
+              color: Colors.transparent,
+              child: Text(
+                album.name,
+                style: textTheme.titleSmall?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          Text(
-            album.artistsString,
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.7),
+          Hero(
+            tag: HeroTags.artistName + (album.uri ?? album.itemId) + '_$heroSuffix',
+            child: Material(
+              color: Colors.transparent,
+              child: Text(
+                album.artistsString,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
