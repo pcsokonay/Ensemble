@@ -114,48 +114,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            // Connection status bar - edge to edge
-            Transform.translate(
-              offset: const Offset(-24, 0), // Compensate for parent padding
-              child: Container(
-                width: MediaQuery.of(context).size.width,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceVariant.withOpacity(0.3),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _getStatusIcon(provider.connectionState),
-                          color: _getStatusColor(provider.connectionState, colorScheme),
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _getStatusText(provider.connectionState),
-                          style: textTheme.titleMedium?.copyWith(
-                            color: _getStatusColor(provider.connectionState, colorScheme),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (provider.serverUrl != null) ...[
-                      const SizedBox(height: 4),
+            // Connection status box - centered with border radius like theme boxes
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceVariant.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _getStatusIcon(provider.connectionState),
+                        color: _getStatusColor(provider.connectionState, colorScheme),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
                       Text(
-                        provider.serverUrl!,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                        _getStatusText(provider.connectionState),
+                        style: textTheme.titleMedium?.copyWith(
+                          color: _getStatusColor(provider.connectionState, colorScheme),
+                          fontWeight: FontWeight.bold,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
                       ),
                     ],
+                  ),
+                  if (provider.serverUrl != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      provider.serverUrl!,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
 
