@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
+import '../widgets/global_player_overlay.dart';
 
 class PlaylistDetailsScreen extends StatefulWidget {
   final Playlist playlist;
@@ -100,9 +101,18 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
     final maProvider = context.watch<MusicAssistantProvider>();
     final imageUrl = maProvider.api?.getImageUrl(widget.playlist, size: 400);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF1a1a1a),
-      body: CustomScrollView(
+    return PopScope(
+      canPop: !GlobalPlayerOverlay.isPlayerExpanded,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // If player is expanded, collapse it instead of popping
+        if (GlobalPlayerOverlay.isPlayerExpanded) {
+          GlobalPlayerOverlay.collapsePlayer();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF1a1a1a),
+        body: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 300,
@@ -247,6 +257,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
             padding: EdgeInsets.only(bottom: 80), // Space for mini player
           ),
         ],
+        ),
       ),
     );
   }

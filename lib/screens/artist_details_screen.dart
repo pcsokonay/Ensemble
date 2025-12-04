@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
+import '../widgets/global_player_overlay.dart';
 import 'album_details_screen.dart';
 import '../constants/hero_tags.dart';
 import '../theme/palette_helper.dart';
@@ -159,10 +160,15 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return PopScope(
-      canPop: true,
+      canPop: !GlobalPlayerOverlay.isPlayerExpanded,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
           clearAdaptiveColorsOnBack(context);
+          return;
+        }
+        // If player is expanded, collapse it instead of popping
+        if (GlobalPlayerOverlay.isPlayerExpanded) {
+          GlobalPlayerOverlay.collapsePlayer();
         }
       },
       child: Scaffold(
