@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
@@ -53,7 +54,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
     try {
       final colorSchemes = await PaletteHelper.extractColorSchemes(
-        NetworkImage(imageUrl),
+        CachedNetworkImageProvider(imageUrl),
       );
 
       if (colorSchemes != null && mounted) {

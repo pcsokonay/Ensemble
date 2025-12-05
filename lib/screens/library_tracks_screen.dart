@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
 
@@ -109,7 +110,7 @@ class LibraryTracksScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           image: imageUrl != null
               ? DecorationImage(
-                  image: NetworkImage(imageUrl),
+                  image: CachedNetworkImageProvider(imageUrl),
                   fit: BoxFit.cover,
                 )
               : null,

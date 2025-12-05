@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../services/settings_service.dart';
 import 'palette_helper.dart';
 
@@ -9,7 +10,7 @@ Future<void> updateAdaptiveColorsFromImage(BuildContext context, String? imageUr
   if (imageUrl == null || imageUrl.isEmpty) return;
 
   try {
-    final colorSchemes = await PaletteHelper.extractColorSchemes(NetworkImage(imageUrl));
+    final colorSchemes = await PaletteHelper.extractColorSchemes(CachedNetworkImageProvider(imageUrl));
     if (colorSchemes != null && context.mounted) {
       final themeProvider = context.read<ThemeProvider>();
       themeProvider.updateAdaptiveColors(colorSchemes.$1, colorSchemes.$2);

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/timings.dart';
 import '../providers/music_assistant_provider.dart';
 import '../models/player.dart';
@@ -200,7 +201,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
     try {
       final colorSchemes = await PaletteHelper.extractColorSchemes(
-        NetworkImage(imageUrl),
+        CachedNetworkImageProvider(imageUrl),
       );
 
       if (colorSchemes != null && mounted) {

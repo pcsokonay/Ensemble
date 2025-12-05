@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/timings.dart';
 import '../providers/music_assistant_provider.dart';
 import 'global_player_overlay.dart'; // For isPlayerExpanded and collapsePlayer
@@ -240,7 +241,7 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                               borderRadius: BorderRadius.circular(8),
                                               image: albumArtUrl != null
                                                   ? DecorationImage(
-                                                      image: NetworkImage(albumArtUrl),
+                                                      image: CachedNetworkImageProvider(albumArtUrl),
                                                       fit: BoxFit.cover,
                                                     )
                                                   : null,

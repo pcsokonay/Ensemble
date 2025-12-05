@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../constants/hero_tags.dart';
@@ -54,7 +55,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
 
     try {
       final colorSchemes = await PaletteHelper.extractColorSchemes(
-        NetworkImage(imageUrl),
+        CachedNetworkImageProvider(imageUrl),
       );
 
       if (colorSchemes != null && mounted) {
@@ -375,7 +376,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                         ],
                         image: imageUrl != null
                             ? DecorationImage(
-                                image: NetworkImage(imageUrl),
+                                image: CachedNetworkImageProvider(imageUrl),
                                 fit: BoxFit.cover,
                               )
                             : null,

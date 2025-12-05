@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/timings.dart';
 import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
@@ -362,7 +363,7 @@ class SearchScreenState extends State<SearchScreen> {
       leading: CircleAvatar(
         radius: 24,
         backgroundColor: colorScheme.surfaceVariant,
-        backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
+        backgroundImage: imageUrl != null ? CachedNetworkImageProvider(imageUrl) : null,
         child: imageUrl == null
             ? Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant)
             : null,
@@ -405,7 +406,7 @@ class SearchScreenState extends State<SearchScreen> {
           borderRadius: BorderRadius.circular(8),
           image: imageUrl != null
               ? DecorationImage(
-                  image: NetworkImage(imageUrl),
+                  image: CachedNetworkImageProvider(imageUrl),
                   fit: BoxFit.cover,
                 )
               : null,
@@ -456,7 +457,7 @@ class SearchScreenState extends State<SearchScreen> {
           borderRadius: BorderRadius.circular(8),
           image: imageUrl != null
               ? DecorationImage(
-                  image: NetworkImage(imageUrl),
+                  image: CachedNetworkImageProvider(imageUrl),
                   fit: BoxFit.cover,
                 )
               : null,

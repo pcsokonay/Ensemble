@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../screens/album_details_screen.dart';
@@ -56,12 +57,14 @@ class AlbumCard extends StatelessWidget {
                   child: Container(
                     color: colorScheme.surfaceVariant,
                     child: imageUrl != null
-                        ? Image.network(
-                            imageUrl,
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
                             fit: BoxFit.cover,
-                            cacheWidth: 256,
-                            cacheHeight: 256,
-                            errorBuilder: (_, __, ___) => Icon(
+                            memCacheWidth: 256,
+                            memCacheHeight: 256,
+                            fadeInDuration: const Duration(milliseconds: 150),
+                            placeholder: (context, url) => const SizedBox(),
+                            errorWidget: (context, url, error) => Icon(
                               Icons.album_rounded,
                               size: 64,
                               color: colorScheme.onSurfaceVariant,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
 import '../widgets/global_player_overlay.dart';
@@ -20,21 +21,46 @@ class NewLibraryScreen extends StatefulWidget {
 }
 
 class _NewLibraryScreenState extends State<NewLibraryScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RestorationMixin {
   late TabController _tabController;
   List<Playlist> _playlists = [];
   bool _isLoadingPlaylists = true;
+
+  // Restoration: Remember selected tab across app restarts
+  final RestorableInt _selectedTabIndex = RestorableInt(0);
+
+  @override
+  String? get restorationId => 'new_library_screen';
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
+    registerForRestoration(_selectedTabIndex, 'selected_tab_index');
+    // Apply restored tab index after TabController is created
+    if (_tabController.index != _selectedTabIndex.value) {
+      _tabController.index = _selectedTabIndex.value;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // Listen to tab changes to persist selection
+    _tabController.addListener(_onTabChanged);
     _loadPlaylists();
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      _selectedTabIndex.value = _tabController.index;
+    }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
+    _selectedTabIndex.dispose();
     super.dispose();
   }
 
@@ -238,7 +264,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         child: CircleAvatar(
           radius: 24,
           backgroundColor: colorScheme.surfaceVariant,
-          backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
+          backgroundImage: imageUrl != null ? CachedNetworkImageProvider(imageUrl) : null,
           child: imageUrl == null
               ? Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant)
               : null,
@@ -375,7 +401,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           color: colorScheme.surfaceVariant,
           borderRadius: BorderRadius.circular(8),
           image: imageUrl != null
-              ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
+              ? DecorationImage(image: CachedNetworkImageProvider(imageUrl), fit: BoxFit.cover)
               : null,
         ),
         child: imageUrl == null
