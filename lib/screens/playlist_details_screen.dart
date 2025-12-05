@@ -35,17 +35,14 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
     });
 
     final maProvider = context.read<MusicAssistantProvider>();
-    if (maProvider.api != null) {
-      final tracks = await maProvider.api!.getPlaylistTracks(
-        widget.provider,
-        widget.itemId,
-      );
+    final tracks = await maProvider.getPlaylistTracksWithCache(
+      widget.provider,
+      widget.itemId,
+    );
+
+    if (mounted) {
       setState(() {
         _tracks = tracks;
-        _isLoading = false;
-      });
-    } else {
-      setState(() {
         _isLoading = false;
       });
     }

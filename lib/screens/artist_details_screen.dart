@@ -88,60 +88,24 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   Future<void> _loadArtistAlbums() async {
     final provider = context.read<MusicAssistantProvider>();
 
-    if (provider.api != null) {
-      // 1. Get Library Albums
-      final allAlbums = await provider.api!.getAlbums();
-      
-      var libraryAlbums = allAlbums.where((album) {
-        if (album.artists == null) return false;
-        return album.artists!.any((artist) =>
-          artist.itemId == widget.artist.itemId || 
-          artist.name == widget.artist.name
-        );
-      }).toList();
+    // Use cached artist albums method
+    final allAlbums = await provider.getArtistAlbumsWithCache(widget.artist.name);
 
-      List<Album> providerAlbums = [];
+    if (mounted) {
+      // Split into library albums (in provider's library) and provider-only albums
+      final libraryAlbums = allAlbums.where((album) =>
+        album.inLibrary == true
+      ).toList();
 
-      // 2. Get Provider Albums (via search)
-      if (widget.artist.name.isNotEmpty) {
-        try {
-          final searchResults = await provider.search(widget.artist.name);
-          final searchAlbums = (searchResults['albums'] as List<dynamic>?)
-              ?.map((item) => item as Album)
-              .toList() ?? [];
-          
-          // Filter: Must match artist name
-          providerAlbums = searchAlbums.where((album) {
-             return album.artists?.any((a) => 
-               a.name.toLowerCase() == widget.artist.name.toLowerCase()
-             ) ?? false;
-          }).toList();
+      final providerAlbums = allAlbums.where((album) =>
+        album.inLibrary != true
+      ).toList();
 
-          // Filter: Must NOT be in libraryAlbums
-          final libraryAlbumNames = libraryAlbums.map((a) => a.name.toLowerCase()).toSet();
-          
-          providerAlbums = providerAlbums.where((a) => 
-            !libraryAlbumNames.contains(a.name.toLowerCase())
-          ).toList();
-
-        } catch (e) {
-          _logger.log('Error searching provider albums: $e');
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _albums = libraryAlbums;
-          _providerAlbums = providerAlbums;
-          _isLoading = false;
-        });
-      }
-    } else {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _albums = libraryAlbums.isNotEmpty ? libraryAlbums : allAlbums;
+        _providerAlbums = libraryAlbums.isNotEmpty ? providerAlbums : [];
+        _isLoading = false;
+      });
     }
   }
   

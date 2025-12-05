@@ -83,7 +83,7 @@ class SearchScreenState extends State<SearchScreen> {
 
     try {
       final provider = context.read<MusicAssistantProvider>();
-      final results = await provider.search(query);
+      final results = await provider.searchWithCache(query);
 
       if (mounted) {
         setState(() {

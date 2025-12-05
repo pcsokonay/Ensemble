@@ -56,6 +56,18 @@ class MusicAssistantProvider with ChangeNotifier {
   DateTime? _discoverArtistsLastFetched;
   DateTime? _discoverAlbumsLastFetched;
 
+  // Detail screen caching
+  final Map<String, List<Track>> _albumTracksCache = {};
+  final Map<String, DateTime> _albumTracksCacheTime = {};
+  final Map<String, List<Track>> _playlistTracksCache = {};
+  final Map<String, DateTime> _playlistTracksCacheTime = {};
+  final Map<String, List<Album>> _artistAlbumsCache = {};
+  final Map<String, DateTime> _artistAlbumsCacheTime = {};
+
+  // Search results caching
+  final Map<String, Map<String, List<MediaItem>>> _searchCache = {};
+  final Map<String, DateTime> _searchCacheTime = {};
+
   MAConnectionState get connectionState => _connectionState;
   String? get serverUrl => _serverUrl;
   List<Artist> get artists => _artists;
@@ -192,6 +204,197 @@ class MusicAssistantProvider with ChangeNotifier {
 
   // ============================================================================
   // END HOME SCREEN ROW CACHING
+  // ============================================================================
+
+  // ============================================================================
+  // DETAIL SCREEN CACHING
+  // ============================================================================
+
+  /// Get album tracks with caching (5 min TTL)
+  Future<List<Track>> getAlbumTracksWithCache(String provider, String itemId, {bool forceRefresh = false}) async {
+    final cacheKey = '${provider}_$itemId';
+    final now = DateTime.now();
+    final cacheTime = _albumTracksCacheTime[cacheKey];
+    final cacheValid = !forceRefresh &&
+        _albumTracksCache.containsKey(cacheKey) &&
+        cacheTime != null &&
+        now.difference(cacheTime) < const Duration(minutes: 5);
+
+    if (cacheValid) {
+      _logger.log('📦 Using cached album tracks for $cacheKey (${_albumTracksCache[cacheKey]!.length} tracks)');
+      return _albumTracksCache[cacheKey]!;
+    }
+
+    if (_api == null) return _albumTracksCache[cacheKey] ?? [];
+
+    try {
+      _logger.log('🔄 Fetching fresh album tracks for $cacheKey...');
+      final tracks = await _api!.getAlbumTracks(provider, itemId);
+      _albumTracksCache[cacheKey] = tracks;
+      _albumTracksCacheTime[cacheKey] = DateTime.now();
+      _logger.log('✅ Cached ${tracks.length} tracks for album $cacheKey');
+      return tracks;
+    } catch (e) {
+      _logger.log('❌ Failed to fetch album tracks: $e');
+      return _albumTracksCache[cacheKey] ?? [];
+    }
+  }
+
+  /// Get playlist tracks with caching (5 min TTL)
+  Future<List<Track>> getPlaylistTracksWithCache(String provider, String itemId, {bool forceRefresh = false}) async {
+    final cacheKey = '${provider}_$itemId';
+    final now = DateTime.now();
+    final cacheTime = _playlistTracksCacheTime[cacheKey];
+    final cacheValid = !forceRefresh &&
+        _playlistTracksCache.containsKey(cacheKey) &&
+        cacheTime != null &&
+        now.difference(cacheTime) < const Duration(minutes: 5);
+
+    if (cacheValid) {
+      _logger.log('📦 Using cached playlist tracks for $cacheKey (${_playlistTracksCache[cacheKey]!.length} tracks)');
+      return _playlistTracksCache[cacheKey]!;
+    }
+
+    if (_api == null) return _playlistTracksCache[cacheKey] ?? [];
+
+    try {
+      _logger.log('🔄 Fetching fresh playlist tracks for $cacheKey...');
+      final tracks = await _api!.getPlaylistTracks(provider, itemId);
+      _playlistTracksCache[cacheKey] = tracks;
+      _playlistTracksCacheTime[cacheKey] = DateTime.now();
+      _logger.log('✅ Cached ${tracks.length} tracks for playlist $cacheKey');
+      return tracks;
+    } catch (e) {
+      _logger.log('❌ Failed to fetch playlist tracks: $e');
+      return _playlistTracksCache[cacheKey] ?? [];
+    }
+  }
+
+  /// Get artist albums with caching (10 min TTL)
+  Future<List<Album>> getArtistAlbumsWithCache(String artistName, {bool forceRefresh = false}) async {
+    final cacheKey = artistName.toLowerCase();
+    final now = DateTime.now();
+    final cacheTime = _artistAlbumsCacheTime[cacheKey];
+    final cacheValid = !forceRefresh &&
+        _artistAlbumsCache.containsKey(cacheKey) &&
+        cacheTime != null &&
+        now.difference(cacheTime) < Timings.homeRowCacheDuration;
+
+    if (cacheValid) {
+      _logger.log('📦 Using cached artist albums for "$artistName" (${_artistAlbumsCache[cacheKey]!.length} albums)');
+      return _artistAlbumsCache[cacheKey]!;
+    }
+
+    if (_api == null) return _artistAlbumsCache[cacheKey] ?? [];
+
+    try {
+      _logger.log('🔄 Fetching albums for artist "$artistName"...');
+
+      // Get library albums
+      final libraryAlbums = await _api!.getAlbums();
+      final artistAlbums = libraryAlbums.where((album) {
+        final albumArtists = album.artists;
+        if (albumArtists.isEmpty) return false;
+        return albumArtists.any((a) =>
+          a.name.toLowerCase() == artistName.toLowerCase());
+      }).toList();
+
+      // Also search provider for more albums
+      final searchResults = await _api!.search(artistName, mediaTypes: ['album'], limit: 20);
+      final providerAlbums = searchResults['albums'] as List<Album>? ?? [];
+
+      // Merge and deduplicate
+      final allAlbums = <Album>[];
+      final seenNames = <String>{};
+
+      for (final album in [...artistAlbums, ...providerAlbums]) {
+        final key = '${album.name.toLowerCase()}_${album.year ?? 0}';
+        if (!seenNames.contains(key)) {
+          seenNames.add(key);
+          allAlbums.add(album);
+        }
+      }
+
+      _artistAlbumsCache[cacheKey] = allAlbums;
+      _artistAlbumsCacheTime[cacheKey] = DateTime.now();
+      _logger.log('✅ Cached ${allAlbums.length} albums for artist "$artistName"');
+      return allAlbums;
+    } catch (e) {
+      _logger.log('❌ Failed to fetch artist albums: $e');
+      return _artistAlbumsCache[cacheKey] ?? [];
+    }
+  }
+
+  /// Invalidate album tracks cache (call after playing/modifying)
+  void invalidateAlbumTracksCache(String albumId) {
+    _albumTracksCache.remove(albumId);
+    _albumTracksCacheTime.remove(albumId);
+  }
+
+  /// Invalidate playlist tracks cache
+  void invalidatePlaylistTracksCache(String playlistId) {
+    _playlistTracksCache.remove(playlistId);
+    _playlistTracksCacheTime.remove(playlistId);
+  }
+
+  // ============================================================================
+  // SEARCH CACHING
+  // ============================================================================
+
+  /// Search with caching (10 min TTL per query)
+  Future<Map<String, List<MediaItem>>> searchWithCache(String query, {bool forceRefresh = false}) async {
+    final cacheKey = query.toLowerCase().trim();
+    if (cacheKey.isEmpty) return {'artists': [], 'albums': [], 'tracks': []};
+
+    final now = DateTime.now();
+    final cacheTime = _searchCacheTime[cacheKey];
+    final cacheValid = !forceRefresh &&
+        _searchCache.containsKey(cacheKey) &&
+        cacheTime != null &&
+        now.difference(cacheTime) < Timings.homeRowCacheDuration;
+
+    if (cacheValid) {
+      _logger.log('📦 Using cached search results for "$query"');
+      return _searchCache[cacheKey]!;
+    }
+
+    if (_api == null) return _searchCache[cacheKey] ?? {'artists': [], 'albums': [], 'tracks': []};
+
+    try {
+      _logger.log('🔄 Searching for "$query"...');
+      final results = await _api!.search(query, limit: 25);
+
+      final cachedResults = <String, List<MediaItem>>{
+        'artists': results['artists'] as List<MediaItem>? ?? [],
+        'albums': results['albums'] as List<MediaItem>? ?? [],
+        'tracks': results['tracks'] as List<MediaItem>? ?? [],
+      };
+
+      _searchCache[cacheKey] = cachedResults;
+      _searchCacheTime[cacheKey] = DateTime.now();
+      _logger.log('✅ Cached search results for "$query"');
+      return cachedResults;
+    } catch (e) {
+      _logger.log('❌ Search failed: $e');
+      return _searchCache[cacheKey] ?? {'artists': [], 'albums': [], 'tracks': []};
+    }
+  }
+
+  /// Clear all detail caches (call on disconnect/reconnect)
+  void clearAllDetailCaches() {
+    _albumTracksCache.clear();
+    _albumTracksCacheTime.clear();
+    _playlistTracksCache.clear();
+    _playlistTracksCacheTime.clear();
+    _artistAlbumsCache.clear();
+    _artistAlbumsCacheTime.clear();
+    _searchCache.clear();
+    _searchCacheTime.clear();
+    _logger.log('🗑️ All detail caches cleared');
+  }
+
+  // ============================================================================
+  // END DETAIL SCREEN CACHING
   // ============================================================================
 
   // Player selection getters

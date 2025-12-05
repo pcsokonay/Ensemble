@@ -101,15 +101,17 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
 
   Future<void> _loadTracks() async {
     final provider = context.read<MusicAssistantProvider>();
-    final tracks = await provider.getAlbumTracks(
+    final tracks = await provider.getAlbumTracksWithCache(
       widget.album.provider,
       widget.album.itemId,
     );
 
-    setState(() {
-      _tracks = tracks;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _tracks = tracks;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _playAlbum() async {
