@@ -22,7 +22,7 @@ class PlayerSelector extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 8.0),
         decoration: BoxDecoration(
           color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -35,7 +35,7 @@ class PlayerSelector extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: () => _showPlayerSelector(context, maProvider, availablePlayers),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
               child: Row(
