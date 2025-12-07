@@ -195,6 +195,8 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                               final isOn = player.available && player.powered;
                               final isPlaying = player.state == 'playing';
                               final isPaused = player.state == 'paused';
+                              // DEBUG: Log actual state values
+                              debugPrint('Player ${player.name}: state="${player.state}", available=${player.available}, powered=${player.powered}');
 
                               // Get track info - use current track for selected player, cache for others
                               final playerTrack = isSelected
