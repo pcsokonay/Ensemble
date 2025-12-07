@@ -1731,10 +1731,36 @@ class MusicAssistantProvider with ChangeNotifier {
     try {
       // Create an ImageStreamCompleter that downloads the image
       final imageProvider = NetworkImage(url);
-      final completer = imageProvider.resolve(const ImageConfiguration());
+      final imageStream = imageProvider.resolve(const ImageConfiguration());
 
-      // Wait for the image to actually load into memory
-      await completer.stream.first;
+      // Use a Completer to wait for the image to load
+      final completer = Completer<void>();
+      late ImageStreamListener listener;
+
+      listener = ImageStreamListener(
+        (ImageInfo info, bool synchronousCall) {
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
+          imageStream.removeListener(listener);
+        },
+        onError: (exception, stackTrace) {
+          if (!completer.isCompleted) {
+            completer.completeError(exception);
+          }
+          imageStream.removeListener(listener);
+        },
+      );
+
+      imageStream.addListener(listener);
+
+      // Wait for image to load with a timeout
+      await completer.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          imageStream.removeListener(listener);
+        },
+      );
     } catch (e) {
       // Ignore errors - this is just a cache warm-up
       _logger.log('Image precache failed for $url: $e');
