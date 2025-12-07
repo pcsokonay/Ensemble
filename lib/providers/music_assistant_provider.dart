@@ -1710,18 +1710,24 @@ class MusicAssistantProvider with ChangeNotifier {
     if (_api == null) return;
 
     try {
+      _logger.log('🔍 Preload ${player.name}: state=${player.state}, available=${player.available}, powered=${player.powered}');
+
       // Fetch track info for players that are playing, paused, or idle
       // MA uses 'idle' for paused cast-based players, but they still have queue info
       // Only skip if player is explicitly off/unavailable
       if (!player.available || !player.powered) {
+        _logger.log('🔍 Preload ${player.name}: SKIPPED - not available or powered');
         _playerTrackCache[player.playerId] = null;
         return;
       }
 
       final queue = await getQueue(player.playerId);
+      _logger.log('🔍 Preload ${player.name}: queue=${queue != null}, currentItem=${queue?.currentItem != null}, items=${queue?.items.length ?? 0}');
+
       if (queue != null && queue.currentItem != null) {
         final track = queue.currentItem!.track;
         _playerTrackCache[player.playerId] = track;
+        _logger.log('🔍 Preload ${player.name}: CACHED track "${track.name}"');
 
         // Preload the artwork into image cache at both sizes used in UI
         final artworkUrl512 = getImageUrl(track, size: 512);
@@ -1729,6 +1735,7 @@ class MusicAssistantProvider with ChangeNotifier {
           await _precacheImage(artworkUrl512);
         }
       } else {
+        _logger.log('🔍 Preload ${player.name}: NO TRACK - queue empty or no current item');
         _playerTrackCache[player.playerId] = null;
       }
     } catch (e) {
