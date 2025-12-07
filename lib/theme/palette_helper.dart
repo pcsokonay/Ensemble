@@ -56,10 +56,21 @@ class PaletteHelper {
                          const Color(0xFF604CEC);
 
     // Ensure primary has enough saturation to be visually distinct
+    // AND enough lightness for white text to be readable on it
     final HSLColor hslPrimary = HSLColor.fromColor(primary);
-    final Color adjustedPrimary = hslPrimary.saturation < 0.3
-        ? hslPrimary.withSaturation(0.5).toColor()
-        : primary;
+    Color adjustedPrimary = primary;
+
+    // Adjust saturation if too low
+    if (hslPrimary.saturation < 0.3) {
+      adjustedPrimary = hslPrimary.withSaturation(0.5).toColor();
+    }
+
+    // Ensure minimum lightness for contrast with white text
+    // If primary is too dark (luminance < 0.15), lighten it
+    if (adjustedPrimary.computeLuminance() < 0.15) {
+      final hsl = HSLColor.fromColor(adjustedPrimary);
+      adjustedPrimary = hsl.withLightness((hsl.lightness + 0.25).clamp(0.3, 0.6)).toColor();
+    }
 
     if (isDark) {
       // Dark mode: use dark muted colors for background
