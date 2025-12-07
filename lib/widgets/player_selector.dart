@@ -195,15 +195,21 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                               final isOn = player.available && player.powered;
                               final isPlaying = player.state == 'playing';
                               final isPaused = player.state == 'paused';
+                              // MA uses 'idle' for players that were paused (especially cast-based)
+                              // but still have track info - treat as "has content" for display
+                              final isIdle = player.state == 'idle';
 
                               // Get track info - use current track for selected player, cache for others
                               final playerTrack = isSelected
                                   ? currentTrack
                                   : maProvider.getCachedTrackForPlayer(player.playerId);
 
-                              // Get album art for any playing/paused player
+                              // Player has content if playing, paused, or idle with cached track
+                              final hasContent = isPlaying || isPaused || (isIdle && playerTrack != null);
+
+                              // Get album art for any player with content
                               String? albumArtUrl;
-                              if (playerTrack != null && isOn && (isPlaying || isPaused)) {
+                              if (playerTrack != null && isOn && hasContent) {
                                 albumArtUrl = maProvider.getImageUrl(
                                   playerTrack.album ?? playerTrack,
                                   size: 128,
@@ -289,8 +295,8 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                                               ? colorScheme.onSurface.withOpacity(0.3)
                                                               : isPlaying
                                                                   ? Colors.green
-                                                                  : isPaused
-                                                                      ? Colors.orange
+                                                                  : hasContent
+                                                                      ? Colors.orange // paused or idle with content
                                                                       : colorScheme.onSurfaceVariant.withOpacity(0.5),
                                                     ),
                                                   ),
@@ -301,7 +307,7 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                                           ? 'Unavailable'
                                                           : !isOn
                                                               ? 'Off'
-                                                              : (isPlaying || isPaused) && playerTrack != null
+                                                              : hasContent && playerTrack != null
                                                                   ? playerTrack.name
                                                                   : 'Idle',
                                                       style: TextStyle(

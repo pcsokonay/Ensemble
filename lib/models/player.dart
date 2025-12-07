@@ -60,11 +60,12 @@ class Player {
     double? elapsedTime;
     double? elapsedTimeLastUpdated;
 
-    // IMPORTANT: Check top-level fields FIRST - they have the most current data
-    elapsedTime = (json['elapsed_time'] as num?)?.toDouble();
-    elapsedTimeLastUpdated = (json['elapsed_time_last_updated'] as num?)?.toDouble();
+    // Get top-level elapsed time values
+    final topLevelElapsedTime = (json['elapsed_time'] as num?)?.toDouble();
+    final topLevelLastUpdated = (json['elapsed_time_last_updated'] as num?)?.toDouble();
 
-    // Extract current_item_id from current_media
+    // Extract current_item_id and elapsed time from current_media
+    // current_media often has the more accurate position after seeks
     if (json.containsKey('current_media')) {
       final currentMedia = json['current_media'] as Map<String, dynamic>?;
       if (currentMedia != null) {
@@ -73,15 +74,18 @@ class Player {
         final currentMediaElapsedTime = (currentMedia['elapsed_time'] as num?)?.toDouble();
         final currentMediaLastUpdated = (currentMedia['elapsed_time_last_updated'] as num?)?.toDouble();
 
-        // Use current_media elapsed_time if:
-        // 1. We don't have top-level elapsed_time, OR
-        // 2. Top-level is 0 but current_media has a real value
-        if (elapsedTime == null || (elapsedTime == 0 && currentMediaElapsedTime != null && currentMediaElapsedTime > 0)) {
+        // Prefer current_media elapsed_time when available - it reflects actual playback position
+        // after seek operations, while top-level elapsed_time may lag behind
+        if (currentMediaElapsedTime != null) {
           elapsedTime = currentMediaElapsedTime;
-          elapsedTimeLastUpdated = currentMediaLastUpdated;
+          elapsedTimeLastUpdated = currentMediaLastUpdated ?? topLevelLastUpdated;
         }
       }
     }
+
+    // Fall back to top-level values if current_media didn't have elapsed time
+    elapsedTime ??= topLevelElapsedTime;
+    elapsedTimeLastUpdated ??= topLevelLastUpdated;
 
     return Player(
       playerId: json['player_id'] as String,
@@ -89,7 +93,7 @@ class Player {
       provider: json['provider'] as String?,
       available: json['available'] as bool? ?? false,
       powered: json['powered'] as bool? ?? false,
-      state: json['state'] as String? ?? 'idle',
+      state: json['playback_state'] as String? ?? json['state'] as String? ?? 'idle',
       currentItemId: currentItemId,
       volumeLevel: json['volume_level'] as int?,
       volumeMuted: json['volume_muted'] as bool?,

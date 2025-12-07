@@ -1014,19 +1014,54 @@ class MusicAssistantProvider with ChangeNotifier {
     }
   }
 
-  /// Handle player_updated events to capture track metadata for notifications
+  /// Handle player_updated events to capture track metadata and update UI
   Future<void> _handlePlayerUpdatedEvent(Map<String, dynamic> event) async {
     try {
-      // Get our builtin player ID
+      final playerId = event['player_id'] as String?;
+      if (playerId == null) return;
+
+      // If this update is for the selected player, trigger a state update
+      // This ensures UI updates immediately when track changes or after seeks
+      if (_selectedPlayer != null && playerId == _selectedPlayer!.playerId) {
+        _updatePlayerState();
+      }
+
+      // Cache track info from current_media for ALL players
+      // MA sends current_media even for idle players that have paused content
+      final currentMedia = event['current_media'] as Map<String, dynamic>?;
+      final playerName = event['name'] as String? ?? playerId;
+
+      if (currentMedia != null) {
+        final mediaType = currentMedia['media_type'] as String?;
+        if (mediaType != 'flow_stream') {
+          // Create a Track object from current_media for the cache
+          final durationSecs = currentMedia['duration'] as int?;
+          final albumName = currentMedia['album'] as String?;
+          final trackFromEvent = Track(
+            itemId: currentMedia['queue_item_id'] as String? ?? '',
+            provider: 'library',
+            name: currentMedia['title'] as String? ?? 'Unknown Track',
+            uri: currentMedia['uri'] as String?,
+            duration: durationSecs != null ? Duration(seconds: durationSecs) : null,
+            artists: [Artist(itemId: '', provider: 'library', name: currentMedia['artist'] as String? ?? 'Unknown Artist')],
+            album: albumName != null
+                ? Album(itemId: '', provider: 'library', name: albumName)
+                : null,
+          );
+          _playerTrackCache[playerId] = trackFromEvent;
+          _logger.log('📋 Cached track for $playerName from player_updated: ${trackFromEvent.name}');
+          notifyListeners(); // Update UI with new track info
+        }
+      }
+
+      // Get our builtin player ID for notification handling
       final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
       if (builtinPlayerId == null) return;
 
-      // Check if this update is for our player
-      final playerId = event['player_id'] as String?;
+      // Check if this update is for our local player (for notification metadata)
       if (playerId != builtinPlayerId) return;
 
-      // Extract current_media metadata
-      final currentMedia = event['current_media'] as Map<String, dynamic>?;
+      // Process notification metadata (currentMedia already extracted above)
       if (currentMedia == null) {
         // Don't clear pending metadata when current_media is null
         // This happens during stop/transition and we want to keep the last known metadata
@@ -1702,16 +1737,24 @@ class MusicAssistantProvider with ChangeNotifier {
     if (_api == null) return;
 
     try {
-      // Only fetch if player is playing or paused
-      if (player.state != 'playing' && player.state != 'paused') {
+      _logger.log('🔍 Preload ${player.name}: state=${player.state}, available=${player.available}, powered=${player.powered}');
+
+      // Fetch track info for players that are playing, paused, or idle
+      // MA uses 'idle' for paused cast-based players, but they still have queue info
+      // Only skip if player is explicitly off/unavailable
+      if (!player.available || !player.powered) {
+        _logger.log('🔍 Preload ${player.name}: SKIPPED - not available or powered');
         _playerTrackCache[player.playerId] = null;
         return;
       }
 
       final queue = await getQueue(player.playerId);
+      _logger.log('🔍 Preload ${player.name}: queue=${queue != null}, currentItem=${queue?.currentItem != null}, items=${queue?.items.length ?? 0}');
+
       if (queue != null && queue.currentItem != null) {
         final track = queue.currentItem!.track;
         _playerTrackCache[player.playerId] = track;
+        _logger.log('🔍 Preload ${player.name}: CACHED track "${track.name}"');
 
         // Preload the artwork into image cache at both sizes used in UI
         final artworkUrl512 = getImageUrl(track, size: 512);
@@ -1719,6 +1762,7 @@ class MusicAssistantProvider with ChangeNotifier {
           await _precacheImage(artworkUrl512);
         }
       } else {
+        _logger.log('🔍 Preload ${player.name}: NO TRACK - queue empty or no current item');
         _playerTrackCache[player.playerId] = null;
       }
     } catch (e) {
@@ -1812,21 +1856,19 @@ class MusicAssistantProvider with ChangeNotifier {
         orElse: () => _selectedPlayer!,
       );
 
-      // Check if player state actually changed
-      if (updatedPlayer.state != _selectedPlayer!.state ||
-          updatedPlayer.volumeLevel != _selectedPlayer!.volumeLevel ||
-          updatedPlayer.volumeMuted != _selectedPlayer!.volumeMuted ||
-          updatedPlayer.available != _selectedPlayer!.available) {
-        _selectedPlayer = updatedPlayer;
-        stateChanged = true;
-      }
+      // Always update the player to get fresh elapsed time
+      // This is critical for seek operations where only elapsed_time changes
+      _selectedPlayer = updatedPlayer;
+      stateChanged = true;
 
-      // Only show tracks if player is available and not idle
-      final shouldShowTrack = _selectedPlayer!.available &&
-                             (_selectedPlayer!.state == 'playing' || _selectedPlayer!.state == 'paused');
+      // Show tracks if player is available and has content (playing, paused, or idle with queue)
+      // MA uses 'idle' for paused cast-based players but they still have queue content
+      final isPlayingOrPaused = _selectedPlayer!.state == 'playing' || _selectedPlayer!.state == 'paused';
+      final isIdleWithContent = _selectedPlayer!.state == 'idle' && _selectedPlayer!.powered;
+      final shouldShowTrack = _selectedPlayer!.available && (isPlayingOrPaused || isIdleWithContent);
 
       if (!shouldShowTrack) {
-        // Clear track if player is unavailable or idle
+        // Clear track if player is unavailable or truly off
         if (_currentTrack != null) {
           _currentTrack = null;
           stateChanged = true;
@@ -1973,7 +2015,8 @@ class MusicAssistantProvider with ChangeNotifier {
       _logger.log('🔄 Already connected, verifying connection...');
       try {
         await refreshPlayers();
-        _logger.log('🔄 Connection verified, players refreshed');
+        await _updatePlayerState();
+        _logger.log('🔄 Connection verified, players and state refreshed');
       } catch (e) {
         _logger.log('🔄 Connection verification failed, reconnecting: $e');
         // Connection might be stale, try reconnecting
