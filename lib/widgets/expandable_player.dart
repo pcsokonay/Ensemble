@@ -432,16 +432,6 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       });
     }
 
-    void animateFromOpposite() {
-      if (!mounted) return;
-      final curvedValue = Curves.easeOutCubic.transform(_slideController.value);
-      // Start from opposite side and animate to center
-      final fromOffset = -targetOffset;
-      setState(() {
-        _slideOffset = fromOffset * (1.0 - curvedValue);
-      });
-    }
-
     _slideController.addListener(animateToTarget);
     _slideController.duration = const Duration(milliseconds: 150);
 
@@ -450,24 +440,17 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
       _slideController.removeListener(animateToTarget);
 
-      // Switch the player
+      // Switch the player - new content appears immediately at center
       onSwitch();
 
-      // Animate new content in from opposite side
-      _slideOffset = -targetOffset;
-      _slideController.reset();
-      _slideController.addListener(animateFromOpposite);
-      _slideController.duration = const Duration(milliseconds: 200);
-
-      _slideController.forward().then((_) {
-        if (!mounted) return;
-        _slideController.removeListener(animateFromOpposite);
-        setState(() {
-          _slideOffset = 0.0;
-          _isSliding = false;
-        });
-        _slideController.duration = const Duration(milliseconds: 250); // Reset default
+      // Reset to center instantly - the peek content is now the main content
+      setState(() {
+        _slideOffset = 0.0;
+        _isSliding = false;
+        _peekPlayer = null;
+        _peekImageUrl = null;
       });
+      _slideController.duration = const Duration(milliseconds: 250); // Reset default
     });
   }
 
