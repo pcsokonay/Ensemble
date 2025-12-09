@@ -368,9 +368,8 @@ class MusicAssistantProvider with ChangeNotifier {
       previousTrackSelectedPlayer();
     };
 
-    if (isConnected) {
-      await _registerLocalPlayer();
-    }
+    // Player registration is now handled in _initializeAfterConnection()
+    // which runs after authentication completes (when auth is required)
   }
 
   Future<bool> _tryAdoptGhostPlayer() async {
