@@ -9,6 +9,7 @@ import 'services/settings_service.dart';
 import 'services/audio/massiv_audio_handler.dart';
 import 'services/auth/auth_manager.dart';
 import 'services/debug_logger.dart';
+import 'services/music_assistant_api.dart' show MAConnectionState;
 import 'theme/theme_provider.dart';
 import 'theme/app_theme.dart';
 import 'theme/system_theme_helper.dart';
@@ -267,26 +268,26 @@ class _AppStartupState extends State<AppStartup> {
 
       final provider = context.read<MusicAssistantProvider>();
 
-      // Only attempt connection if not already connected
-      if (!provider.isConnected) {
-        _logger.log('🚀 AppStartup: Auto-connecting to saved server: $serverUrl');
-        try {
-          // Restore auth credentials before connecting (critical for Authelia)
-          final savedCredentials = await SettingsService.getAuthCredentials();
-          if (savedCredentials != null) {
-            _logger.log('🚀 AppStartup: Restoring saved auth credentials');
-            provider.authManager.deserializeCredentials(savedCredentials);
-          }
+      // Connection is handled by MusicAssistantProvider._initialize()
+      // Just wait for it to complete or timeout
+      _logger.log('🚀 AppStartup: Waiting for provider auto-connection to $serverUrl');
 
-          await provider.connectToServer(serverUrl);
-          _logger.log('🚀 AppStartup: Auto-connection successful');
-        } catch (e) {
-          _logger.log('🚀 AppStartup: Auto-connection failed: $e');
-          // Connection failed, but still show home screen
-          // User can manually reconnect from there
+      // Give the provider time to connect (it restores credentials and connects in _initialize)
+      // Check connection state periodically
+      for (var i = 0; i < 20; i++) {
+        await Future.delayed(const Duration(milliseconds: 250));
+        if (provider.isConnected) {
+          _logger.log('🚀 AppStartup: Connection established');
+          break;
         }
-      } else {
-        _logger.log('🚀 AppStartup: Already connected');
+        if (provider.connectionState == MAConnectionState.error) {
+          _logger.log('🚀 AppStartup: Connection failed with error');
+          break;
+        }
+      }
+
+      if (!provider.isConnected) {
+        _logger.log('🚀 AppStartup: Connection still pending or failed');
       }
 
       if (mounted) {
