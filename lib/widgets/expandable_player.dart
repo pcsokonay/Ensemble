@@ -68,10 +68,15 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   // Track horizontal drag start position
   double? _horizontalDragStartX;
 
-  // Slide animation for device switching
+  // Slide animation for device switching - now supports finger-following
   late AnimationController _slideController;
   double _slideOffset = 0.0; // -1 to 1, negative = sliding left, positive = sliding right
   bool _isSliding = false;
+  bool _isDragging = false; // True while finger is actively dragging
+
+  // For peek preview - track which player we'd switch to
+  dynamic _peekPlayer; // The player that would be selected if swipe commits
+  String? _peekImageUrl; // Image URL for peek player's current track
 
   @override
   void initState() {
@@ -100,9 +105,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       reverseCurve: Curves.easeInCubic,
     );
 
-    // Slide animation for device switching
+    // Slide animation for device switching - used for snap/spring animations
     _slideController = AnimationController(
-      duration: const Duration(milliseconds: 75),
+      duration: const Duration(milliseconds: 250),
       vsync: this,
     );
 
@@ -281,6 +286,45 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     return maProvider.availablePlayers.where((p) => p.available).toList();
   }
 
+  /// Get the next or previous player relative to current selection
+  dynamic _getAdjacentPlayer(MusicAssistantProvider maProvider, {required bool next}) {
+    final players = _getAvailablePlayersSorted(maProvider);
+    if (players.length <= 1) return null;
+
+    final selectedPlayerId = maProvider.selectedPlayer?.playerId;
+    final currentIndex = players.indexWhere((p) => p.playerId == selectedPlayerId);
+
+    if (currentIndex == -1) return players[0];
+
+    int adjacentIndex;
+    if (next) {
+      adjacentIndex = currentIndex >= players.length - 1 ? 0 : currentIndex + 1;
+    } else {
+      adjacentIndex = currentIndex <= 0 ? players.length - 1 : currentIndex - 1;
+    }
+
+    return players[adjacentIndex];
+  }
+
+  /// Update peek player based on current drag direction
+  void _updatePeekPlayer(MusicAssistantProvider maProvider, double dragDirection) {
+    // dragDirection < 0 means swiping left (next player)
+    // dragDirection > 0 means swiping right (previous player)
+    final isNext = dragDirection < 0;
+    final newPeekPlayer = _getAdjacentPlayer(maProvider, next: isNext);
+
+    if (newPeekPlayer?.playerId != _peekPlayer?.playerId) {
+      _peekPlayer = newPeekPlayer;
+      // Get the peek player's current track image if available
+      if (_peekPlayer != null) {
+        final peekTrack = maProvider.getCachedTrackForPlayer(_peekPlayer.playerId);
+        _peekImageUrl = peekTrack != null ? maProvider.getImageUrl(peekTrack, size: 512) : null;
+      } else {
+        _peekImageUrl = null;
+      }
+    }
+  }
+
   /// Cycle to the next available player (for swipe gesture)
   void _cycleToNextPlayer(MusicAssistantProvider maProvider, {bool reverse = false}) {
     final players = _getAvailablePlayersSorted(maProvider);
@@ -312,64 +356,156 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     });
   }
 
-  /// Animate the slide transition when switching devices
-  /// direction: -1 = swipe left (content exits left, new enters from right)
-  ///             1 = swipe right (content exits right, new enters from left)
-  void _animateSlide(int direction, VoidCallback onComplete) {
+  /// Handle real-time drag updates for finger-following swipe
+  void _handleHorizontalDragUpdate(DragUpdateDetails details, MusicAssistantProvider maProvider, double containerWidth) {
+    if (_isSliding) return;
+
+    // Start tracking if not already
+    if (!_isDragging) {
+      _isDragging = true;
+      _peekPlayer = null;
+      _peekImageUrl = null;
+    }
+
+    // Calculate normalized offset (-1 to 1 range)
+    // Negative = dragging left (showing next player from right)
+    // Positive = dragging right (showing previous player from left)
+    final delta = details.primaryDelta ?? 0;
+    final normalizedDelta = delta / containerWidth;
+
+    setState(() {
+      _slideOffset = (_slideOffset + normalizedDelta).clamp(-1.0, 1.0);
+    });
+
+    // Update peek player based on drag direction
+    if (_slideOffset != 0) {
+      _updatePeekPlayer(maProvider, _slideOffset);
+    }
+  }
+
+  /// Handle drag end - either commit to next player or snap back
+  void _handleHorizontalDragEnd(DragEndDetails details, MusicAssistantProvider maProvider) {
+    if (!_isDragging || _isSliding) {
+      _isDragging = false;
+      return;
+    }
+
+    _isDragging = false;
+    final velocity = details.primaryVelocity ?? 0;
+
+    // Thresholds for committing the swipe
+    const commitThreshold = 0.3; // 30% of width
+    const velocityThreshold = 500.0; // px/s
+
+    final shouldCommit = _slideOffset.abs() > commitThreshold || velocity.abs() > velocityThreshold;
+    final direction = _slideOffset != 0 ? _slideOffset.sign : (velocity != 0 ? -velocity.sign : 0);
+
+    if (shouldCommit && _peekPlayer != null && direction != 0) {
+      // Commit: animate to full slide, switch player, then reset
+      _animateCommit(direction.toInt(), () {
+        HapticFeedback.mediumImpact();
+        maProvider.selectPlayer(_peekPlayer);
+        _peekPlayer = null;
+        _peekImageUrl = null;
+      });
+    } else {
+      // Cancel: spring back to center
+      _animateSnapBack();
+    }
+  }
+
+  /// Animate committing to the next/previous player
+  void _animateCommit(int direction, VoidCallback onSwitch) {
     if (_isSliding) return;
     _isSliding = true;
 
-    final slideOutTarget = direction.toDouble(); // Where current content goes
-    final slideInStart = -direction.toDouble(); // Where new content comes from
+    final startOffset = _slideOffset;
+    final targetOffset = direction < 0 ? -1.0 : 1.0;
 
-    // Use easing curves for smoother feel
-    const outCurve = Curves.easeInCubic; // Accelerate out
-    const inCurve = Curves.easeOutCubic; // Decelerate in
-
-    // Phase 1: Slide out current content
-    _slideOffset = 0.0;
     _slideController.reset();
 
-    void animateOut() {
+    void animateToTarget() {
       if (!mounted) return;
-      final curvedValue = outCurve.transform(_slideController.value);
+      final curvedValue = Curves.easeOutCubic.transform(_slideController.value);
       setState(() {
-        _slideOffset = slideOutTarget * curvedValue;
+        _slideOffset = startOffset + (targetOffset - startOffset) * curvedValue;
       });
     }
 
-    void animateIn() {
+    void animateFromOpposite() {
       if (!mounted) return;
-      final curvedValue = inCurve.transform(_slideController.value);
+      final curvedValue = Curves.easeOutCubic.transform(_slideController.value);
+      // Start from opposite side and animate to center
+      final fromOffset = -targetOffset;
       setState(() {
-        _slideOffset = slideInStart * (1.0 - curvedValue);
+        _slideOffset = fromOffset * (1.0 - curvedValue);
       });
     }
 
-    _slideController.addListener(animateOut);
+    _slideController.addListener(animateToTarget);
+    _slideController.duration = const Duration(milliseconds: 150);
 
     _slideController.forward().then((_) {
       if (!mounted) return;
 
-      _slideController.removeListener(animateOut);
+      _slideController.removeListener(animateToTarget);
 
-      // Switch the data
-      onComplete();
+      // Switch the player
+      onSwitch();
 
-      // Phase 2: Slide in new content
-      _slideOffset = slideInStart;
+      // Animate new content in from opposite side
+      _slideOffset = -targetOffset;
       _slideController.reset();
-      _slideController.addListener(animateIn);
+      _slideController.addListener(animateFromOpposite);
+      _slideController.duration = const Duration(milliseconds: 200);
 
       _slideController.forward().then((_) {
         if (!mounted) return;
-        _slideController.removeListener(animateIn);
+        _slideController.removeListener(animateFromOpposite);
         setState(() {
           _slideOffset = 0.0;
           _isSliding = false;
         });
+        _slideController.duration = const Duration(milliseconds: 250); // Reset default
       });
     });
+  }
+
+  /// Animate snapping back to center (cancelled swipe)
+  void _animateSnapBack() {
+    if (_isSliding) return;
+    _isSliding = true;
+
+    final startOffset = _slideOffset;
+    _slideController.reset();
+
+    void animateBack() {
+      if (!mounted) return;
+      final curvedValue = Curves.easeOutBack.transform(_slideController.value);
+      setState(() {
+        _slideOffset = startOffset * (1.0 - curvedValue);
+      });
+    }
+
+    _slideController.addListener(animateBack);
+    _slideController.duration = const Duration(milliseconds: 300);
+
+    _slideController.forward().then((_) {
+      if (!mounted) return;
+      _slideController.removeListener(animateBack);
+      setState(() {
+        _slideOffset = 0.0;
+        _isSliding = false;
+        _peekPlayer = null;
+        _peekImageUrl = null;
+      });
+      _slideController.duration = const Duration(milliseconds: 250); // Reset default
+    });
+  }
+
+  /// Legacy method - now calls new commit animation
+  void _animateSlide(int direction, VoidCallback onComplete) {
+    _animateCommit(direction, onComplete);
   }
 
   @override
@@ -457,6 +593,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       bottom: adjustedBottomOffset,
       child: DeviceSelectorBar(
         selectedPlayer: selectedPlayer,
+        peekPlayer: _peekPlayer,
         hasMultiplePlayers: hasMultiplePlayers,
         backgroundColor: backgroundColor,
         textColor: textColor,
@@ -464,14 +601,30 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         height: _collapsedHeight,
         borderRadius: _collapsedBorderRadius,
         slideOffset: _slideOffset,
+        onHorizontalDragStart: (details) {
+          _horizontalDragStartX = details.globalPosition.dx;
+        },
+        onHorizontalDragUpdate: (details) {
+          // Check for edge dead zone
+          final screenWidth = MediaQuery.of(context).size.width;
+          final startedInDeadZone = _horizontalDragStartX != null &&
+              (_horizontalDragStartX! > screenWidth - _edgeDeadZone ||
+               _horizontalDragStartX! < _edgeDeadZone);
+          if (startedInDeadZone) return;
+
+          _handleHorizontalDragUpdate(details, maProvider, width);
+        },
         onHorizontalDragEnd: (details) {
-          if (details.primaryVelocity != null) {
-            if (details.primaryVelocity! < -300) {
-              _cycleToNextPlayer(maProvider);
-            } else if (details.primaryVelocity! > 300) {
-              _cycleToNextPlayer(maProvider, reverse: true);
-            }
-          }
+          // Check for edge dead zone
+          final screenWidth = MediaQuery.of(context).size.width;
+          final startedInDeadZone = _horizontalDragStartX != null &&
+              (_horizontalDragStartX! > screenWidth - _edgeDeadZone ||
+               _horizontalDragStartX! < _edgeDeadZone);
+          _horizontalDragStartX = null;
+
+          if (startedInDeadZone) return;
+
+          _handleHorizontalDragEnd(details, maProvider);
         },
       ),
     );
@@ -661,31 +814,41 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         onHorizontalDragStart: (details) {
           _horizontalDragStartX = details.globalPosition.dx;
         },
-        onHorizontalDragEnd: (details) {
-          // Ignore swipes that started near the right edge (Android back gesture zone)
+        onHorizontalDragUpdate: (details) {
+          // Only handle in collapsed mode with multiple players
+          if (isExpanded || !hasMultiplePlayers) return;
+
+          // Ignore drags that started in the edge dead zone
           final screenWidth = MediaQuery.of(context).size.width;
           final startedInDeadZone = _horizontalDragStartX != null &&
-              _horizontalDragStartX! > screenWidth - _edgeDeadZone;
+              (_horizontalDragStartX! > screenWidth - _edgeDeadZone ||
+               _horizontalDragStartX! < _edgeDeadZone);
+          if (startedInDeadZone) return;
+
+          _handleHorizontalDragUpdate(details, maProvider, collapsedWidth);
+        },
+        onHorizontalDragEnd: (details) {
+          // Ignore swipes that started near the edges (Android back gesture zone)
+          final screenWidth = MediaQuery.of(context).size.width;
+          final startedInDeadZone = _horizontalDragStartX != null &&
+              (_horizontalDragStartX! > screenWidth - _edgeDeadZone ||
+               _horizontalDragStartX! < _edgeDeadZone);
           _horizontalDragStartX = null;
 
           if (startedInDeadZone) return;
 
-          if (details.primaryVelocity != null) {
-            if (isExpanded) {
-              // Expanded mode: swipe to open/close queue
+          if (isExpanded) {
+            // Expanded mode: swipe to open/close queue
+            if (details.primaryVelocity != null) {
               if (details.primaryVelocity! < -300 && !isQueuePanelOpen) {
                 _toggleQueuePanel();
               } else if (details.primaryVelocity! > 300 && isQueuePanelOpen) {
                 _toggleQueuePanel();
               }
-            } else if (hasMultiplePlayers) {
-              // Collapsed mode: swipe to switch devices
-              if (details.primaryVelocity! < -300) {
-                _cycleToNextPlayer(maProvider);
-              } else if (details.primaryVelocity! > 300) {
-                _cycleToNextPlayer(maProvider, reverse: true);
-              }
             }
+          } else if (hasMultiplePlayers) {
+            // Collapsed mode: use finger-following handler
+            _handleHorizontalDragEnd(details, maProvider);
           }
         },
         child: Material(
@@ -700,6 +863,25 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
             child: Stack(
               clipBehavior: Clip.none,
               children: [
+                // Peek player content (shows when dragging in collapsed mode)
+                if (t < 0.1 && _slideOffset.abs() > 0.01 && _peekPlayer != null)
+                  _buildPeekContent(
+                    maProvider: maProvider,
+                    peekPlayer: _peekPlayer,
+                    peekImageUrl: _peekImageUrl,
+                    slideOffset: _slideOffset,
+                    containerWidth: collapsedWidth,
+                    artSize: _collapsedArtSize,
+                    titleLeft: collapsedTitleLeft,
+                    titleTop: collapsedTitleTop,
+                    titleWidth: collapsedTitleWidth,
+                    artistTop: collapsedArtistTop,
+                    titleFontSize: 16.0,
+                    artistFontSize: 14.0,
+                    textColor: textColor,
+                    colorScheme: colorScheme,
+                  ),
+
                 // Album art - with slide animation when collapsed
                 Positioned(
                   left: artLeft + miniPlayerSlideOffset,
@@ -1052,6 +1234,125 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Build the peek player content that slides in from the edge during drag
+  Widget _buildPeekContent({
+    required MusicAssistantProvider maProvider,
+    required dynamic peekPlayer,
+    required String? peekImageUrl,
+    required double slideOffset,
+    required double containerWidth,
+    required double artSize,
+    required double titleLeft,
+    required double titleTop,
+    required double titleWidth,
+    required double artistTop,
+    required double titleFontSize,
+    required double artistFontSize,
+    required Color textColor,
+    required ColorScheme colorScheme,
+  }) {
+    // Calculate where the peek content should be positioned
+    // When sliding left (negative offset), peek comes from right
+    // When sliding right (positive offset), peek comes from left
+    final isFromRight = slideOffset < 0;
+
+    // The peek content starts off-screen and slides in as the main content slides out
+    // peekOffset: 0 = fully off-screen, 1 = fully on-screen
+    final peekProgress = slideOffset.abs();
+
+    // Position calculation:
+    // From right: starts at containerWidth (off right edge), moves to 0 as progress increases
+    // From left: starts at -containerWidth (off left edge), moves to 0 as progress increases
+    final peekBaseOffset = isFromRight
+        ? containerWidth * (1 - peekProgress)  // Slides in from right
+        : -containerWidth * (1 - peekProgress); // Slides in from left
+
+    // Get peek player track info
+    final peekTrack = maProvider.getCachedTrackForPlayer(peekPlayer.playerId);
+    final peekTrackName = peekTrack?.name ?? 'No track';
+    final peekArtistName = peekTrack?.artistsString ?? peekPlayer.name;
+
+    return Stack(
+      children: [
+        // Peek album art
+        Positioned(
+          left: peekBaseOffset,
+          top: 0,
+          child: Container(
+            width: artSize,
+            height: artSize,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+            ),
+            child: peekImageUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: peekImageUrl,
+                    fit: BoxFit.cover,
+                    memCacheWidth: 256,
+                    memCacheHeight: 256,
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                    placeholderFadeInDuration: Duration.zero,
+                    placeholder: (_, __) => _buildMiniPlaceholderArt(colorScheme),
+                    errorWidget: (_, __, ___) => _buildMiniPlaceholderArt(colorScheme),
+                  )
+                : _buildMiniPlaceholderArt(colorScheme),
+          ),
+        ),
+
+        // Peek track title
+        Positioned(
+          left: titleLeft + peekBaseOffset,
+          top: titleTop,
+          child: SizedBox(
+            width: titleWidth,
+            child: Text(
+              peekTrackName,
+              style: TextStyle(
+                color: textColor,
+                fontSize: titleFontSize,
+                fontWeight: FontWeight.w500,
+                height: 1.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+
+        // Peek artist name
+        Positioned(
+          left: titleLeft + peekBaseOffset,
+          top: artistTop,
+          child: SizedBox(
+            width: titleWidth,
+            child: Text(
+              peekArtistName,
+              style: TextStyle(
+                color: textColor.withOpacity(0.6),
+                fontSize: artistFontSize,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Simplified placeholder for mini player peek
+  Widget _buildMiniPlaceholderArt(ColorScheme colorScheme) {
+    return Container(
+      color: colorScheme.surfaceContainerHighest,
+      child: Icon(
+        Icons.music_note_rounded,
+        color: colorScheme.onSurfaceVariant,
+        size: 24,
       ),
     );
   }

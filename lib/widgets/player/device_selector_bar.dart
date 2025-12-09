@@ -4,6 +4,7 @@ import '../../theme/design_tokens.dart';
 /// A compact device selector bar shown when no track is playing
 class DeviceSelectorBar extends StatelessWidget {
   final dynamic selectedPlayer;
+  final dynamic peekPlayer;
   final bool hasMultiplePlayers;
   final Color backgroundColor;
   final Color textColor;
@@ -11,11 +12,14 @@ class DeviceSelectorBar extends StatelessWidget {
   final double height;
   final double borderRadius;
   final double slideOffset;
+  final GestureDragStartCallback? onHorizontalDragStart;
+  final GestureDragUpdateCallback? onHorizontalDragUpdate;
   final GestureDragEndCallback? onHorizontalDragEnd;
 
   const DeviceSelectorBar({
     super.key,
     required this.selectedPlayer,
+    this.peekPlayer,
     required this.hasMultiplePlayers,
     required this.backgroundColor,
     required this.textColor,
@@ -23,12 +27,16 @@ class DeviceSelectorBar extends StatelessWidget {
     required this.height,
     required this.borderRadius,
     required this.slideOffset,
+    this.onHorizontalDragStart,
+    this.onHorizontalDragUpdate,
     this.onHorizontalDragEnd,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onHorizontalDragStart: hasMultiplePlayers ? onHorizontalDragStart : null,
+      onHorizontalDragUpdate: hasMultiplePlayers ? onHorizontalDragUpdate : null,
       onHorizontalDragEnd: hasMultiplePlayers ? onHorizontalDragEnd : null,
       child: Material(
         color: backgroundColor,
@@ -40,49 +48,112 @@ class DeviceSelectorBar extends StatelessWidget {
           width: width,
           height: height,
           child: ClipRect(
-            child: Transform.translate(
-              offset: Offset(slideOffset * width, 0),
-              child: Padding(
-                padding: Spacing.paddingH16,
-                child: Row(
-                  children: [
-                    Icon(
-                      _getPlayerIcon(selectedPlayer.name),
-                      color: textColor,
-                      size: IconSizes.md,
-                    ),
-                    Spacing.hGap12,
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            selectedPlayer.name,
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (hasMultiplePlayers)
-                            Text(
-                              'Swipe to switch device',
-                              style: TextStyle(
-                                color: textColor.withOpacity(0.6),
-                                fontSize: 12,
+            child: Stack(
+              children: [
+                // Peek player content (shows when dragging)
+                if (slideOffset.abs() > 0.01 && peekPlayer != null)
+                  _buildPeekContent(),
+
+                // Current player content
+                Transform.translate(
+                  offset: Offset(slideOffset * width, 0),
+                  child: Padding(
+                    padding: Spacing.paddingH16,
+                    child: Row(
+                      children: [
+                        Icon(
+                          _getPlayerIcon(selectedPlayer.name),
+                          color: textColor,
+                          size: IconSizes.md,
+                        ),
+                        Spacing.hGap12,
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                selectedPlayer.name,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                        ],
-                      ),
+                              if (hasMultiplePlayers)
+                                Text(
+                                  'Swipe to switch device',
+                                  style: TextStyle(
+                                    color: textColor.withOpacity(0.6),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Build peek player content that slides in from the edge
+  Widget _buildPeekContent() {
+    final isFromRight = slideOffset < 0;
+    final peekProgress = slideOffset.abs();
+
+    // Calculate peek position - slides in as main content slides out
+    final peekBaseOffset = isFromRight
+        ? width * (1 - peekProgress)
+        : -width * (1 - peekProgress);
+
+    return Transform.translate(
+      offset: Offset(peekBaseOffset, 0),
+      child: Padding(
+        padding: Spacing.paddingH16,
+        child: Row(
+          children: [
+            Icon(
+              _getPlayerIcon(peekPlayer.name),
+              color: textColor,
+              size: IconSizes.md,
+            ),
+            Spacing.hGap12,
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    peekPlayer.name,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (hasMultiplePlayers)
+                    Text(
+                      'Swipe to switch device',
+                      style: TextStyle(
+                        color: textColor.withOpacity(0.6),
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
