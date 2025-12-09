@@ -78,6 +78,11 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   dynamic _peekPlayer; // The player that would be selected if swipe commits
   String? _peekImageUrl; // Image URL for peek player's current track
 
+  // Temporary cache for smooth transition - holds incoming player's track info
+  // until the provider updates with the new selection
+  dynamic _transitionTrack;
+  String? _transitionImageUrl;
+
   @override
   void initState() {
     super.initState();
@@ -306,6 +311,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     return players[adjacentIndex];
   }
 
+  // Cache for peek track data
+  dynamic _peekTrack;
+
   /// Update peek player based on current drag direction
   void _updatePeekPlayer(MusicAssistantProvider maProvider, double dragDirection) {
     // dragDirection < 0 means swiping left (next player)
@@ -317,9 +325,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       _peekPlayer = newPeekPlayer;
       // Get the peek player's current track image if available
       if (_peekPlayer != null) {
-        final peekTrack = maProvider.getCachedTrackForPlayer(_peekPlayer.playerId);
-        _peekImageUrl = peekTrack != null ? maProvider.getImageUrl(peekTrack, size: 512) : null;
+        _peekTrack = maProvider.getCachedTrackForPlayer(_peekPlayer.playerId);
+        _peekImageUrl = _peekTrack != null ? maProvider.getImageUrl(_peekTrack, size: 512) : null;
       } else {
+        _peekTrack = null;
         _peekImageUrl = null;
       }
     }
@@ -440,6 +449,11 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
       _slideController.removeListener(animateToTarget);
 
+      // Save the peek track/image as transition cache before switching
+      // This prevents the brief flash of empty content while provider updates
+      _transitionTrack = _peekTrack;
+      _transitionImageUrl = _peekImageUrl;
+
       // Switch the player - new content appears immediately at center
       onSwitch();
 
@@ -448,6 +462,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         _slideOffset = 0.0;
         _isSliding = false;
         _peekPlayer = null;
+        _peekTrack = null;
         _peekImageUrl = null;
       });
       _slideController.duration = const Duration(milliseconds: 250); // Reset default
@@ -505,9 +520,27 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           return const SizedBox.shrink();
         }
 
-        final imageUrl = currentTrack != null
-            ? maProvider.getImageUrl(currentTrack, size: 512)
+        // Use transition cache as fallback when provider hasn't updated yet
+        // This prevents the brief flash of empty content during player switch
+        final effectiveTrack = currentTrack ?? _transitionTrack;
+        final imageUrl = effectiveTrack != null
+            ? (currentTrack != null
+                ? maProvider.getImageUrl(currentTrack, size: 512)
+                : _transitionImageUrl)
             : null;
+
+        // Clear transition cache once provider has caught up
+        if (currentTrack != null && _transitionTrack != null) {
+          // Use post-frame callback to avoid setState during build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _transitionTrack = null;
+                _transitionImageUrl = null;
+              });
+            }
+          });
+        }
 
         // Extract colors for adaptive theme
         if (themeProvider.adaptiveTheme && imageUrl != null) {
@@ -517,15 +550,15 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         return AnimatedBuilder(
           animation: Listenable.merge([_expandAnimation, _queuePanelAnimation]),
           builder: (context, _) {
-            // If no track is playing, show a compact device selector bar
-            if (currentTrack == null) {
+            // If no track is playing (and no transition cache), show device selector bar
+            if (effectiveTrack == null) {
               return _buildDeviceSelectorBar(context, maProvider, selectedPlayer, themeProvider);
             }
             return _buildMorphingPlayer(
               context,
               maProvider,
               selectedPlayer,
-              currentTrack,
+              effectiveTrack,
               imageUrl,
               themeProvider,
             );
