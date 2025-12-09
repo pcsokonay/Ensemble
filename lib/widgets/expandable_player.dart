@@ -83,6 +83,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   dynamic _transitionTrack;
   String? _transitionImageUrl;
 
+  // Flag to indicate we're in the middle of a player switch transition
+  // When true, we show the peek content at center instead of the main content
+  bool _inTransition = false;
+
   @override
   void initState() {
     super.initState();
@@ -449,22 +453,37 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
       _slideController.removeListener(animateToTarget);
 
-      // Save the peek track/image as transition cache before switching
-      // This prevents the brief flash of empty content while provider updates
+      // Save the peek data as transition cache before switching
       _transitionTrack = _peekTrack;
       _transitionImageUrl = _peekImageUrl;
 
-      // Switch the player - new content appears immediately at center
+      // Enter transition mode - this keeps showing peek content at center
+      // while hiding the main content that hasn't updated yet
+      setState(() {
+        _inTransition = true;
+        _slideOffset = 0.0; // Reset slide so peek appears at center
+        _isSliding = false;
+      });
+
+      // Switch the player
       onSwitch();
 
-      // Reset to center instantly - the peek content is now the main content
-      setState(() {
-        _slideOffset = 0.0;
-        _isSliding = false;
-        _peekPlayer = null;
-        _peekTrack = null;
-        _peekImageUrl = null;
+      // Wait a couple frames for the provider to update, then exit transition
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _inTransition = false;
+            _peekPlayer = null;
+            _peekTrack = null;
+            _peekImageUrl = null;
+            _transitionTrack = null;
+            _transitionImageUrl = null;
+          });
+        });
       });
+
       _slideController.duration = const Duration(milliseconds: 250); // Reset default
     });
   }
@@ -520,27 +539,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           return const SizedBox.shrink();
         }
 
-        // Use transition cache as fallback when provider hasn't updated yet
-        // This prevents the brief flash of empty content during player switch
-        final effectiveTrack = currentTrack ?? _transitionTrack;
-        final imageUrl = effectiveTrack != null
-            ? (currentTrack != null
-                ? maProvider.getImageUrl(currentTrack, size: 512)
-                : _transitionImageUrl)
+        // Get image URL for current track
+        final imageUrl = currentTrack != null
+            ? maProvider.getImageUrl(currentTrack, size: 512)
             : null;
-
-        // Clear transition cache once provider has caught up
-        if (currentTrack != null && _transitionTrack != null) {
-          // Use post-frame callback to avoid setState during build
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              setState(() {
-                _transitionTrack = null;
-                _transitionImageUrl = null;
-              });
-            }
-          });
-        }
 
         // Extract colors for adaptive theme
         if (themeProvider.adaptiveTheme && imageUrl != null) {
@@ -550,15 +552,15 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         return AnimatedBuilder(
           animation: Listenable.merge([_expandAnimation, _queuePanelAnimation]),
           builder: (context, _) {
-            // If no track is playing (and no transition cache), show device selector bar
-            if (effectiveTrack == null) {
+            // If no track is playing, show device selector bar
+            if (currentTrack == null) {
               return _buildDeviceSelectorBar(context, maProvider, selectedPlayer, themeProvider);
             }
             return _buildMorphingPlayer(
               context,
               maProvider,
               selectedPlayer,
-              effectiveTrack,
+              currentTrack,
               imageUrl,
               themeProvider,
             );
@@ -879,8 +881,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                // Peek player content (shows when dragging in collapsed mode)
-                if (t < 0.1 && _slideOffset.abs() > 0.01 && _peekPlayer != null)
+                // Peek player content (shows when dragging OR during transition)
+                if (t < 0.1 && ((_slideOffset.abs() > 0.01 && _peekPlayer != null) || _inTransition))
                   _buildPeekContent(
                     maProvider: maProvider,
                     peekPlayer: _peekPlayer,
@@ -899,81 +901,93 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                   ),
 
                 // Album art - with slide animation when collapsed
+                // Hidden during transition to prevent flash (peek content shows instead)
                 Positioned(
                   left: artLeft + miniPlayerSlideOffset,
                   top: artTop,
-                  child: Container(
-                    width: artSize,
-                    height: artSize,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(artBorderRadius),
-                      boxShadow: t > 0.3
-                          ? [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3 * t),
-                                blurRadius: 24 * t,
-                                offset: Offset(0, 8 * t),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(artBorderRadius),
-                      child: imageUrl != null
-                          ? CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              fit: BoxFit.cover,
-                              memCacheWidth: t > 0.5 ? 1024 : 256,
-                              memCacheHeight: t > 0.5 ? 1024 : 256,
-                              fadeInDuration: Duration.zero,
-                              fadeOutDuration: Duration.zero,
-                              placeholderFadeInDuration: Duration.zero,
-                              placeholder: (_, __) => _buildPlaceholderArt(colorScheme, t),
-                              errorWidget: (_, __, ___) => _buildPlaceholderArt(colorScheme, t),
-                            )
-                          : _buildPlaceholderArt(colorScheme, t),
+                  child: Opacity(
+                    opacity: _inTransition && t < 0.1 ? 0.0 : 1.0,
+                    child: Container(
+                      width: artSize,
+                      height: artSize,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(artBorderRadius),
+                        boxShadow: t > 0.3
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3 * t),
+                                  blurRadius: 24 * t,
+                                  offset: Offset(0, 8 * t),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(artBorderRadius),
+                        child: imageUrl != null
+                            ? CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                memCacheWidth: t > 0.5 ? 1024 : 256,
+                                memCacheHeight: t > 0.5 ? 1024 : 256,
+                                fadeInDuration: Duration.zero,
+                                fadeOutDuration: Duration.zero,
+                                placeholderFadeInDuration: Duration.zero,
+                                placeholder: (_, __) => _buildPlaceholderArt(colorScheme, t),
+                                errorWidget: (_, __, ___) => _buildPlaceholderArt(colorScheme, t),
+                              )
+                            : _buildPlaceholderArt(colorScheme, t),
+                      ),
                     ),
                   ),
                 ),
 
                 // Track title - with slide animation when collapsed
+                // Hidden during transition to prevent flash
                 Positioned(
                   left: titleLeft + miniPlayerSlideOffset,
                   top: titleTop,
-                  child: SizedBox(
-                    width: titleWidth,
-                    child: Text(
-                      currentTrack.name,
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: titleFontSize,
-                        fontWeight: t > 0.5 ? FontWeight.w600 : FontWeight.w500,
-                        letterSpacing: t > 0.5 ? -0.5 : 0,
-                        height: 1.2,
+                  child: Opacity(
+                    opacity: _inTransition && t < 0.1 ? 0.0 : 1.0,
+                    child: SizedBox(
+                      width: titleWidth,
+                      child: Text(
+                        currentTrack.name,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: titleFontSize,
+                          fontWeight: t > 0.5 ? FontWeight.w600 : FontWeight.w500,
+                          letterSpacing: t > 0.5 ? -0.5 : 0,
+                          height: 1.2,
+                        ),
+                        textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
+                        maxLines: t > 0.5 ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
-                      maxLines: t > 0.5 ? 2 : 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
 
                 // Artist name - with slide animation when collapsed
+                // Hidden during transition to prevent flash
                 Positioned(
                   left: titleLeft + miniPlayerSlideOffset,
                   top: artistTop,
-                  child: SizedBox(
-                    width: titleWidth,
-                    child: Text(
-                      currentTrack.artistsString,
-                      style: TextStyle(
-                        color: textColor.withOpacity(t > 0.5 ? 0.7 : 0.6),
-                        fontSize: artistFontSize,
-                        fontWeight: t > 0.5 ? FontWeight.w400 : FontWeight.normal,
+                  child: Opacity(
+                    opacity: _inTransition && t < 0.1 ? 0.0 : 1.0,
+                    child: SizedBox(
+                      width: titleWidth,
+                      child: Text(
+                        currentTrack.artistsString,
+                        style: TextStyle(
+                          color: textColor.withOpacity(t > 0.5 ? 0.7 : 0.6),
+                          fontSize: artistFontSize,
+                          fontWeight: t > 0.5 ? FontWeight.w400 : FontWeight.normal,
+                        ),
+                        textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
@@ -1271,7 +1285,80 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     required Color textColor,
     required ColorScheme colorScheme,
   }) {
-    // Calculate where the peek content should be positioned
+    // During transition, show at center with cached data
+    if (_inTransition) {
+      final transitionTrackName = _transitionTrack?.name ?? 'No track';
+      final transitionArtistName = _transitionTrack?.artistsString ?? '';
+      final transitionImage = _transitionImageUrl;
+
+      return Stack(
+        children: [
+          // Transition album art at center
+          Positioned(
+            left: 0,
+            top: 0,
+            child: Container(
+              width: artSize,
+              height: artSize,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+              ),
+              child: transitionImage != null
+                  ? CachedNetworkImage(
+                      imageUrl: transitionImage,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 256,
+                      memCacheHeight: 256,
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
+                      placeholderFadeInDuration: Duration.zero,
+                      placeholder: (_, __) => _buildMiniPlaceholderArt(colorScheme),
+                      errorWidget: (_, __, ___) => _buildMiniPlaceholderArt(colorScheme),
+                    )
+                  : _buildMiniPlaceholderArt(colorScheme),
+            ),
+          ),
+          // Transition track title
+          Positioned(
+            left: titleLeft,
+            top: titleTop,
+            child: SizedBox(
+              width: titleWidth,
+              child: Text(
+                transitionTrackName,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.w500,
+                  height: 1.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          // Transition artist name
+          Positioned(
+            left: titleLeft,
+            top: artistTop,
+            child: SizedBox(
+              width: titleWidth,
+              child: Text(
+                transitionArtistName,
+                style: TextStyle(
+                  color: textColor.withOpacity(0.6),
+                  fontSize: artistFontSize,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Normal peek mode - calculate sliding position
     // When sliding left (negative offset), peek comes from right
     // When sliding right (positive offset), peek comes from left
     final isFromRight = slideOffset < 0;
@@ -1288,9 +1375,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         : -containerWidth * (1 - peekProgress); // Slides in from left
 
     // Get peek player track info
-    final peekTrack = maProvider.getCachedTrackForPlayer(peekPlayer.playerId);
+    final peekTrack = peekPlayer != null ? maProvider.getCachedTrackForPlayer(peekPlayer.playerId) : null;
     final peekTrackName = peekTrack?.name ?? 'No track';
-    final peekArtistName = peekTrack?.artistsString ?? peekPlayer.name;
+    final peekArtistName = peekTrack?.artistsString ?? (peekPlayer?.name ?? '');
 
     return Stack(
       children: [
