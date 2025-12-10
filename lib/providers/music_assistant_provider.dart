@@ -12,6 +12,7 @@ import '../services/auth/auth_manager.dart';
 import '../services/device_id_service.dart';
 import '../services/cache_service.dart';
 import '../services/local_player_service.dart';
+import '../services/metadata_service.dart';
 import '../constants/timings.dart';
 import '../main.dart' show audioHandler;
 
@@ -1498,6 +1499,19 @@ class MusicAssistantProvider with ChangeNotifier {
 
   String? getImageUrl(MediaItem item, {int size = 256}) {
     return _api?.getImageUrl(item, size: size);
+  }
+
+  /// Get artist image URL with fallback to external sources (Deezer, Fanart.tv)
+  /// Returns a Future since fallback requires async API calls
+  Future<String?> getArtistImageUrlWithFallback(Artist artist, {int size = 256}) async {
+    // Try Music Assistant first
+    final maUrl = _api?.getImageUrl(artist, size: size);
+    if (maUrl != null) {
+      return maUrl;
+    }
+
+    // Fall back to external sources (Deezer, Fanart.tv, etc.)
+    return MetadataService.getArtistImageUrl(artist.name);
   }
 
   // ============================================================================

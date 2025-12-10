@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
 import '../utils/page_transitions.dart';
 import '../widgets/common/empty_state.dart';
+import '../widgets/artist_avatar.dart';
 import 'artist_details_screen.dart';
 
 class LibraryArtistsScreen extends StatelessWidget {
@@ -88,8 +88,6 @@ class LibraryArtistsScreen extends StatelessWidget {
     Artist artist, {
     Key? key,
   }) {
-    final provider = context.read<MusicAssistantProvider>();
-    final imageUrl = provider.getImageUrl(artist, size: 128);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -97,14 +95,11 @@ class LibraryArtistsScreen extends StatelessWidget {
     return RepaintBoundary(
       child: ListTile(
         key: key,
-        leading: CircleAvatar(
-        radius: 24,
-        backgroundColor: colorScheme.surfaceVariant,
-        backgroundImage: imageUrl != null ? CachedNetworkImageProvider(imageUrl) : null,
-        child: imageUrl == null
-            ? Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant)
-            : null,
-      ),
+        leading: ArtistAvatar(
+          artist: artist,
+          radius: 24,
+          imageSize: 128,
+        ),
       title: Text(
         artist.name,
         style: textTheme.titleMedium?.copyWith(

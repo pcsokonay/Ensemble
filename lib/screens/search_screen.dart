@@ -9,6 +9,7 @@ import '../services/debug_logger.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/common/empty_state.dart';
 import '../widgets/common/disconnected_state.dart';
+import '../widgets/artist_avatar.dart';
 import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
 
@@ -389,18 +390,13 @@ class SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildArtistTile(Artist artist) {
-    final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.getImageUrl(artist, size: 128);
     final colorScheme = Theme.of(context).colorScheme;
 
     return ListTile(
-      leading: CircleAvatar(
+      leading: ArtistAvatar(
+        artist: artist,
         radius: 24,
-        backgroundColor: colorScheme.surfaceVariant,
-        backgroundImage: imageUrl != null ? CachedNetworkImageProvider(imageUrl) : null,
-        child: imageUrl == null
-            ? Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant)
-            : null,
+        imageSize: 128,
       ),
       title: Text(
         artist.name,

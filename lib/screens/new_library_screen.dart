@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/player_selector.dart';
 import '../widgets/album_card.dart';
+import '../widgets/artist_avatar.dart';
 import '../utils/page_transitions.dart';
 import '../constants/hero_tags.dart';
 import '../theme/theme_provider.dart';
@@ -208,8 +208,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     Artist artist, {
     Key? key,
   }) {
-    final provider = context.read<MusicAssistantProvider>();
-    final imageUrl = provider.getImageUrl(artist, size: 128);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final suffix = '_library';
@@ -217,17 +215,15 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     return RepaintBoundary(
       child: ListTile(
         key: key,
-        leading: Hero(
-        tag: HeroTags.artistImage + (artist.uri ?? artist.itemId) + suffix,
-        child: CircleAvatar(
+        leading: ArtistAvatar(
+          artist: artist,
           radius: 24,
-          backgroundColor: colorScheme.surfaceVariant,
-          backgroundImage: imageUrl != null ? CachedNetworkImageProvider(imageUrl) : null,
-          child: imageUrl == null
-              ? Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant)
-              : null,
+          imageSize: 128,
+          heroTag: HeroTags.artistImage + (artist.uri ?? artist.itemId) + suffix,
+          onImageLoaded: (imageUrl) {
+            // Store for adaptive colors on tap
+          },
         ),
-      ),
       title: Hero(
         tag: HeroTags.artistName + (artist.uri ?? artist.itemId) + suffix,
         child: Material(
@@ -244,8 +240,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         ),
       ),
         onTap: () {
-          // Update adaptive colors immediately on tap
-          updateAdaptiveColorsFromImage(context, imageUrl);
           Navigator.push(
             context,
             FadeSlidePageRoute(

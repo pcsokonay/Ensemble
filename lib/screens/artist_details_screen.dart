@@ -35,6 +35,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   ColorScheme? _darkColorScheme;
   bool _isDescriptionExpanded = false;
   String? _artistDescription;
+  String? _artistImageUrl;
 
   String get _heroTagSuffix => widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
 
@@ -42,16 +43,26 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   void initState() {
     super.initState();
     _loadArtistAlbums();
-    _extractColors();
+    _loadArtistImage();
     _loadArtistDescription();
   }
 
-  Future<void> _extractColors() async {
+  Future<void> _loadArtistImage() async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.getImageUrl(widget.artist, size: 512);
 
-    if (imageUrl == null) return;
+    // Get image URL with fallback to Deezer/Fanart.tv
+    final imageUrl = await maProvider.getArtistImageUrlWithFallback(widget.artist, size: 512);
 
+    if (mounted && imageUrl != null) {
+      setState(() {
+        _artistImageUrl = imageUrl;
+      });
+      // Extract colors after we have the image
+      _extractColors(imageUrl);
+    }
+  }
+
+  Future<void> _extractColors(String imageUrl) async {
     try {
       final colorSchemes = await PaletteHelper.extractColorSchemes(
         CachedNetworkImageProvider(imageUrl),
@@ -104,7 +115,8 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   Widget build(BuildContext context) {
     final maProvider = context.watch<MusicAssistantProvider>();
     final themeProvider = context.watch<ThemeProvider>();
-    final imageUrl = maProvider.getImageUrl(widget.artist, size: 512);
+    // Use the loaded image URL (with fallback) instead of directly from MA
+    final imageUrl = _artistImageUrl;
 
     final useAdaptiveTheme = themeProvider.adaptiveTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
