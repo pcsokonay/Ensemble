@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:audio_service/audio_service.dart';
 import 'providers/music_assistant_provider.dart';
+import 'providers/navigation_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/settings_service.dart';
@@ -86,6 +87,18 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
   }
 
   @override
+  Future<bool> didPopRoute() async {
+    // Intercept back button at app level - runs BEFORE Navigator processes it
+    // If player is expanded, collapse it and consume the back gesture
+    if (GlobalPlayerOverlay.isPlayerExpanded) {
+      GlobalPlayerOverlay.collapsePlayer();
+      return true; // We handled it, don't let Navigator process it
+    }
+    // Let Navigator handle the back gesture normally
+    return super.didPopRoute();
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
@@ -134,6 +147,7 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
                 lightColorScheme: lightColorScheme,
                 darkColorScheme: darkColorScheme,
                 child: MaterialApp(
+                  navigatorKey: navigationProvider.navigatorKey,
                   title: 'Ensemble',
                   debugShowCheckedModeBanner: false,
                   themeMode: themeProvider.themeMode,
