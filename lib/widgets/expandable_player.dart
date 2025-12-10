@@ -1084,22 +1084,23 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
                 // Album art - with slide animation when collapsed
                 // Hidden during transition to prevent flash (peek content shows instead)
-                Positioned(
-                  left: artLeft + miniPlayerSlideOffset,
-                  top: artTop,
-                  child: Opacity(
-                    opacity: _inTransition && t < 0.1 ? 0.0 : 1.0,
+                // GPU PERF: Use conditional instead of Opacity to avoid saveLayer
+                if (!(_inTransition && t < 0.1))
+                  Positioned(
+                    left: artLeft + miniPlayerSlideOffset,
+                    top: artTop,
                     child: Container(
                       width: artSize,
                       height: artSize,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(artBorderRadius),
+                        // GPU PERF: Fixed blur/offset, only animate shadow opacity
                         boxShadow: t > 0.3
                             ? [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.3 * t),
-                                  blurRadius: 24 * t,
-                                  offset: Offset(0, 8 * t),
+                                  color: Colors.black.withOpacity(0.25 * ((t - 0.3) / 0.7).clamp(0.0, 1.0)),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
                                 ),
                               ]
                             : null,
@@ -1126,15 +1127,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                       ),
                     ),
                   ),
-                ),
 
                 // Track title - with slide animation when collapsed
                 // Hidden during transition to prevent flash
-                Positioned(
-                  left: titleLeft + miniPlayerSlideOffset,
-                  top: titleTop,
-                  child: Opacity(
-                    opacity: _inTransition && t < 0.1 ? 0.0 : 1.0,
+                // GPU PERF: Use conditional instead of Opacity to avoid saveLayer
+                if (!(_inTransition && t < 0.1))
+                  Positioned(
+                    left: titleLeft + miniPlayerSlideOffset,
+                    top: titleTop,
                     child: SizedBox(
                       width: titleWidth,
                       child: Text(
@@ -1152,15 +1152,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                       ),
                     ),
                   ),
-                ),
 
                 // Artist name - with slide animation when collapsed
                 // Hidden during transition to prevent flash
-                Positioned(
-                  left: titleLeft + miniPlayerSlideOffset,
-                  top: artistTop,
-                  child: Opacity(
-                    opacity: _inTransition && t < 0.1 ? 0.0 : 1.0,
+                // GPU PERF: Use conditional instead of Opacity to avoid saveLayer
+                if (!(_inTransition && t < 0.1))
+                  Positioned(
+                    left: titleLeft + miniPlayerSlideOffset,
+                    top: artistTop,
                     child: SizedBox(
                       width: titleWidth,
                       child: Text(
@@ -1176,38 +1175,40 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                       ),
                     ),
                   ),
-                ),
 
                 // Album name (expanded only)
+                // GPU PERF: Use color alpha instead of Opacity widget
                 if (currentTrack.album != null && t > 0.3)
                   Positioned(
                     left: contentPadding,
                     right: contentPadding,
                     top: _lerpDouble(artistTop + 24, expandedAlbumTop, t),
-                    child: Opacity(
-                      opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0),
-                      child: Text(
-                        currentTrack.album!.name,
-                        style: TextStyle(
-                          color: textColor.withOpacity(0.45),
-                          fontSize: 15, // Increased from 13 to 15
-                          fontWeight: FontWeight.w300,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    child: Text(
+                      currentTrack.album!.name,
+                      style: TextStyle(
+                        color: textColor.withOpacity(0.45 * ((t - 0.3) / 0.7).clamp(0.0, 1.0)),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w300,
                       ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
 
                 // Progress bar (expanded only)
+                // GPU PERF: Use FadeTransition instead of Opacity
                 if (t > 0.5 && currentTrack.duration != null)
                   Positioned(
                     left: contentPadding,
                     right: contentPadding,
                     top: expandedProgressTop,
-                    child: Opacity(
-                      opacity: expandedElementsOpacity,
+                    child: FadeTransition(
+                      opacity: _expandAnimation.drive(
+                        Tween(begin: 0.0, end: 1.0).chain(
+                          CurveTween(curve: const Interval(0.5, 1.0, curve: Curves.easeIn)),
+                        ),
+                      ),
                       child: ValueListenableBuilder<int>(
                         valueListenable: _progressNotifier,
                         builder: (context, elapsedTime, child) {
@@ -1298,14 +1299,13 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     mainAxisAlignment: t > 0.5 ? MainAxisAlignment.center : MainAxisAlignment.end,
                     children: [
                       // Shuffle (expanded only)
-                      if (t > 0.5)
-                        Opacity(
-                          opacity: expandedElementsOpacity,
-                          child: _buildSecondaryButton(
-                            icon: Icons.shuffle_rounded,
-                            color: _queue?.shuffle == true ? primaryColor : textColor.withOpacity(0.5),
-                            onPressed: _isLoadingQueue ? null : _toggleShuffle,
-                          ),
+                      // GPU PERF: Use color alpha instead of Opacity
+                      if (t > 0.5 && expandedElementsOpacity > 0.1)
+                        _buildSecondaryButton(
+                          icon: Icons.shuffle_rounded,
+                          color: (_queue?.shuffle == true ? primaryColor : textColor.withOpacity(0.5))
+                              .withOpacity(expandedElementsOpacity),
+                          onPressed: _isLoadingQueue ? null : _toggleShuffle,
                         ),
                       if (t > 0.5) SizedBox(width: _lerpDouble(0, 20, t)),
 
@@ -1343,104 +1343,109 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                       ),
 
                       // Repeat (expanded only)
+                      // GPU PERF: Use color alpha instead of Opacity
                       if (t > 0.5) SizedBox(width: _lerpDouble(0, 20, t)),
-                      if (t > 0.5)
-                        Opacity(
-                          opacity: expandedElementsOpacity,
-                          child: _buildSecondaryButton(
-                            icon: _queue?.repeatMode == 'one' ? Icons.repeat_one_rounded : Icons.repeat_rounded,
-                            color: _queue?.repeatMode != null && _queue!.repeatMode != 'off'
-                                ? primaryColor
-                                : textColor.withOpacity(0.5),
-                            onPressed: _isLoadingQueue ? null : _cycleRepeat,
-                          ),
+                      if (t > 0.5 && expandedElementsOpacity > 0.1)
+                        _buildSecondaryButton(
+                          icon: _queue?.repeatMode == 'one' ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+                          color: (_queue?.repeatMode != null && _queue!.repeatMode != 'off'
+                                  ? primaryColor
+                                  : textColor.withOpacity(0.5))
+                              .withOpacity(expandedElementsOpacity),
+                          onPressed: _isLoadingQueue ? null : _cycleRepeat,
                         ),
                     ],
                   ),
                 ),
 
                 // Volume control (expanded only)
+                // GPU PERF: Use FadeTransition instead of Opacity
                 if (t > 0.5)
                   Positioned(
                     left: 48,
                     right: 48,
                     top: volumeTop,
-                    child: Opacity(
-                      opacity: expandedElementsOpacity,
+                    child: FadeTransition(
+                      opacity: _expandAnimation.drive(
+                        Tween(begin: 0.0, end: 1.0).chain(
+                          CurveTween(curve: const Interval(0.5, 1.0, curve: Curves.easeIn)),
+                        ),
+                      ),
                       child: const VolumeControl(compact: false),
                     ),
                   ),
 
                 // Collapse button (expanded only)
+                // GPU PERF: Use icon color alpha instead of Opacity
                 if (t > 0.3)
                   Positioned(
                     top: topPadding + 4,
                     left: 4,
-                    child: Opacity(
-                      opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0),
-                      child: IconButton(
-                        icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor, size: 28),
-                        onPressed: collapse,
-                        padding: const EdgeInsets.all(12),
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: textColor.withOpacity(((t - 0.3) / 0.7).clamp(0.0, 1.0)),
+                        size: 28,
                       ),
+                      onPressed: collapse,
+                      padding: const EdgeInsets.all(12),
                     ),
                   ),
 
                 // Favorite button (expanded only) - hide when queue panel is open
+                // GPU PERF: Use icon color alpha instead of Opacity
                 if (t > 0.3 && queueT < 0.5)
                   Positioned(
                     top: topPadding + 4,
                     right: 52,
-                    child: Opacity(
-                      opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0) * (1 - queueT * 2).clamp(0.0, 1.0),
-                      child: IconButton(
-                        icon: Icon(
-                          _isCurrentTrackFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: _isCurrentTrackFavorite ? Colors.red : textColor,
-                          size: 24,
-                        ),
-                        onPressed: () => _toggleCurrentTrackFavorite(currentTrack),
-                        padding: const EdgeInsets.all(12),
+                    child: IconButton(
+                      icon: Icon(
+                        _isCurrentTrackFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: (_isCurrentTrackFavorite ? Colors.red : textColor)
+                            .withOpacity(((t - 0.3) / 0.7).clamp(0.0, 1.0) * (1 - queueT * 2).clamp(0.0, 1.0)),
+                        size: 24,
                       ),
+                      onPressed: () => _toggleCurrentTrackFavorite(currentTrack),
+                      padding: const EdgeInsets.all(12),
                     ),
                   ),
 
                 // Queue button (expanded only) - hide when queue panel is open
+                // GPU PERF: Use icon color alpha instead of Opacity
                 if (t > 0.3 && queueT < 0.5)
                   Positioned(
                     top: topPadding + 4,
                     right: 4,
-                    child: Opacity(
-                      opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0) * (1 - queueT * 2).clamp(0.0, 1.0),
-                      child: IconButton(
-                        icon: Icon(Icons.queue_music_rounded, color: textColor, size: 24),
-                        onPressed: _toggleQueuePanel,
-                        padding: const EdgeInsets.all(12),
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.queue_music_rounded,
+                        color: textColor.withOpacity(((t - 0.3) / 0.7).clamp(0.0, 1.0) * (1 - queueT * 2).clamp(0.0, 1.0)),
+                        size: 24,
                       ),
+                      onPressed: _toggleQueuePanel,
+                      padding: const EdgeInsets.all(12),
                     ),
                   ),
 
                 // Player name (expanded only)
+                // GPU PERF: Use text color alpha instead of Opacity
                 if (t > 0.5)
                   Positioned(
                     top: topPadding + 12,
                     left: 56,
                     right: 56,
                     child: IgnorePointer(
-                      child: Opacity(
-                        opacity: ((t - 0.5) / 0.5).clamp(0.0, 1.0),
-                        child: Text(
-                          selectedPlayer.name,
-                          style: TextStyle(
-                            color: textColor.withOpacity(0.6),
-                            fontSize: 15, // Increased from 13 to 15
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.2,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      child: Text(
+                        selectedPlayer.name,
+                        style: TextStyle(
+                          color: textColor.withOpacity(0.6 * ((t - 0.5) / 0.5).clamp(0.0, 1.0)),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.2,
                         ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
