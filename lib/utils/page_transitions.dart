@@ -7,11 +7,9 @@ import '../services/animation_debugger.dart';
 /// On back navigation: quick fade out + slide down
 class FadeSlidePageRoute<T> extends PageRouteBuilder<T> {
   final Widget child;
-  final String? debugLabel;
 
   FadeSlidePageRoute({
     required this.child,
-    this.debugLabel,
   }) : super(
           pageBuilder: (context, animation, secondaryAnimation) => child,
           transitionDuration: const Duration(milliseconds: 300),
