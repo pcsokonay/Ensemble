@@ -843,10 +843,17 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final trackInfoBlockHeight = expandedTitleHeight + titleToArtistGap + artistHeight +
         (currentTrack.album != null ? artistToAlbumGap + albumHeight : 0.0);
 
-    // Define where progress bar should be (fixed position from bottom of expanded area)
-    // Need space for: progress bar (~70) + controls (~70) + volume (~50) + padding (~30) = ~220
-    // Plus some extra room = 290 from bottom
-    final expandedProgressTop = screenSize.height - 290;
+    // Controls section heights (from bottom up):
+    // - Volume slider: 48px
+    // - Gap: 40px (was 88-48=40 from volumeTop calculation)
+    // - Controls row: ~70px (centered at expandedControlsTop)
+    // - Gap: 64px (from expandedControlsTop = expandedProgressTop + 64)
+    // - Progress bar + times: ~70px
+    // Total from bottom edge: ~48 + 40 + 70 + 64 = 222, plus safe area padding
+    // Position progress bar so controls section is anchored at bottom
+    final bottomSafeArea = MediaQuery.of(context).padding.bottom;
+    final controlsSectionHeight = 222.0; // Total height of progress + controls + volume
+    final expandedProgressTop = screenSize.height - bottomSafeArea - controlsSectionHeight - 24; // 24px extra padding
 
     // Calculate available space between art bottom and progress bar
     final artBottom = expandedArtTop + expandedArtSize;
