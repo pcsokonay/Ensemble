@@ -7,6 +7,7 @@ import '../constants/hero_tags.dart';
 import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
 import '../services/metadata_service.dart';
+import '../services/debug_logger.dart';
 
 class ArtistCard extends StatefulWidget {
   final Artist artist;
@@ -25,6 +26,7 @@ class ArtistCard extends StatefulWidget {
 }
 
 class _ArtistCardState extends State<ArtistCard> {
+  static final _logger = DebugLogger();
   String? _fallbackImageUrl;
   bool _triedFallback = false;
 
@@ -43,10 +45,8 @@ class _ArtistCardState extends State<ArtistCard> {
     // Try to fetch fallback image if MA doesn't have one and we haven't tried yet
     if (maImageUrl == null && !_triedFallback) {
       _triedFallback = true;
-      print('🎨 No MA image for "${widget.artist.name}", trying fallback...');
+      _logger.debug('No MA image for "${widget.artist.name}", trying fallback', context: 'ArtistCard');
       _fetchFallbackImage();
-    } else if (maImageUrl != null && !_triedFallback) {
-      print('🎨 MA has image for "${widget.artist.name}": $maImageUrl');
     }
 
     return RepaintBoundary(
@@ -117,8 +117,8 @@ class _ArtistCardState extends State<ArtistCard> {
 
   Future<void> _fetchFallbackImage() async {
     final fallbackUrl = await MetadataService.getArtistImageUrl(widget.artist.name);
-    print('🎨 Fallback result for "${widget.artist.name}": $fallbackUrl');
     if (fallbackUrl != null && mounted) {
+      _logger.debug('Found fallback image for "${widget.artist.name}"', context: 'ArtistCard');
       setState(() {
         _fallbackImageUrl = fallbackUrl;
       });

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import '../services/debug_logger.dart';
+
+final _systemThemeLogger = DebugLogger();
 
 class SystemThemeHelper {
   /// Attempts to get system color schemes from the device (Android 12+)
@@ -35,7 +38,7 @@ class SystemThemeHelper {
         }
       }
     } catch (e) {
-      print('⚠️ Failed to get system colors: $e');
+      _systemThemeLogger.warning('Failed to get system colors: $e', context: 'Theme');
     }
 
     return null;

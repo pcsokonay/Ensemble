@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'debug_logger.dart';
 import 'settings_service.dart';
 
 class MetadataService {
+  static final _logger = DebugLogger();
   // Cache to avoid repeated API calls for the same artist/album
   static final Map<String, String> _cache = {};
 
@@ -152,7 +154,7 @@ class MetadataService {
         }
       }
     } catch (e) {
-      print('⚠️ Last.fm API error: $e');
+      _logger.warning('Last.fm API error: $e', context: 'Metadata');
     }
     return null;
   }
@@ -185,7 +187,7 @@ class MetadataService {
         }
       }
     } catch (e) {
-      print('⚠️ TheAudioDB API error: $e');
+      _logger.warning('TheAudioDB API error: $e', context: 'Metadata');
     }
     return null;
   }
@@ -241,7 +243,7 @@ class MetadataService {
         }
       }
     } catch (e) {
-      print('⚠️ Deezer artist image error: $e');
+      _logger.warning('Deezer artist image error: $e', context: 'Metadata');
     }
 
     // Cache the null result to avoid repeated failed lookups

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
+import '../services/debug_logger.dart';
+
+final _playlistLogger = DebugLogger();
 
 class PlaylistDetailsScreen extends StatefulWidget {
   final Playlist playlist;
@@ -61,11 +64,11 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
         return;
       }
 
-      print('🎵 Queueing playlist on ${player.name}: ${player.playerId}');
+      _playlistLogger.info('Queueing playlist on ${player.name}', context: 'Playlist');
 
       // Queue all tracks via Music Assistant
       await maProvider.playTracks(player.playerId, _tracks, startIndex: 0);
-      print('✓ Playlist queued on ${player.name}');
+      _playlistLogger.info('Playlist queued successfully', context: 'Playlist');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -76,7 +79,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
         );
       }
     } catch (e) {
-      print('Error playing playlist: $e');
+      _playlistLogger.error('Error playing playlist', context: 'Playlist', error: e);
       _showError('Error playing playlist: $e');
     }
   }

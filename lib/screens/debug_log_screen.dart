@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/debug_logger.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
@@ -15,6 +16,8 @@ class DebugLogScreen extends StatefulWidget {
 class _DebugLogScreenState extends State<DebugLogScreen> {
   final _logger = DebugLogger();
   final _scrollController = ScrollController();
+  LogLevel _filterLevel = LogLevel.debug; // Show all by default
+  bool _isGeneratingReport = false;
 
   @override
   void initState() {
@@ -33,15 +36,35 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
     super.dispose();
   }
 
+  List<LogEntry> get _filteredEntries =>
+      _logger.entries.where((e) => e.level.index >= _filterLevel.index).toList();
+
   void _copyLogs() {
     Clipboard.setData(ClipboardData(text: _logger.getAllLogs()));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Logs copied to clipboard!'),
+        content: Text('Logs copied to clipboard'),
         backgroundColor: Colors.green,
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _shareBugReport() async {
+    setState(() => _isGeneratingReport = true);
+
+    try {
+      final report = await _logger.generateBugReport();
+
+      await Share.share(
+        report,
+        subject: 'Ensemble Bug Report',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingReport = false);
+      }
+    }
   }
 
   void _clearLogs() {
@@ -216,16 +239,39 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
         ),
         centerTitle: true,
         actions: [
+          // Share bug report button
+          _isGeneratingReport
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.share_rounded),
+                  onPressed: _shareBugReport,
+                  color: Colors.white,
+                  tooltip: 'Share bug report',
+                ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
-            tooltip: 'Player tools',
+            tooltip: 'More options',
             onSelected: (value) async {
               switch (value) {
                 case 'show_players':
                   _showAllPlayers();
                   break;
-                // NOTE: Ghost cleanup and repair options removed - MA APIs don't work
-                // reliably and caused corrupt entries. See PLAYER_LIFECYCLE_GUIDE.md
+                case 'copy_logs':
+                  _copyLogs();
+                  break;
+                case 'clear_logs':
+                  _clearLogs();
+                  break;
               }
             },
             itemBuilder: (context) => [
@@ -237,49 +283,61 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
                   dense: true,
                 ),
               ),
+              const PopupMenuItem(
+                value: 'copy_logs',
+                child: ListTile(
+                  leading: Icon(Icons.copy_rounded),
+                  title: Text('Copy Logs'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'clear_logs',
+                child: ListTile(
+                  leading: Icon(Icons.delete_rounded),
+                  title: Text('Clear Logs'),
+                  dense: true,
+                ),
+              ),
             ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.copy_rounded),
-            onPressed: _copyLogs,
-            color: Colors.white,
-            tooltip: 'Copy logs',
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_rounded),
-            onPressed: _clearLogs,
-            color: Colors.white,
-            tooltip: 'Clear logs',
           ),
         ],
       ),
       body: Column(
         children: [
+          // Filter chips and stats
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: Colors.white.withOpacity(0.05),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
-                  Icons.info_outline_rounded,
-                  color: Colors.white70,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Last ${_logger.logs.length} log entries',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                // Level filter chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip('All', LogLevel.debug),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Info+', LogLevel.info),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Warnings', LogLevel.warning),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Errors', LogLevel.error),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 8),
+                // Stats
+                Text(
+                  'Showing ${_filteredEntries.length} of ${_logger.entries.length} entries',
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
                 ),
               ],
             ),
           ),
           Expanded(
-            child: _logger.logs.isEmpty
+            child: _filteredEntries.isEmpty
                 ? const Center(
                     child: Text(
                       'No logs yet',
@@ -291,43 +349,11 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
                   )
                 : ListView.builder(
                     controller: _scrollController,
-                    padding: EdgeInsets.fromLTRB(8, 8, 8, BottomSpacing.navBarOnly + 56), // Extra space for FAB
-                    itemCount: _logger.logs.length,
+                    padding: EdgeInsets.fromLTRB(8, 8, 8, BottomSpacing.navBarOnly + 56),
+                    itemCount: _filteredEntries.length,
                     itemBuilder: (context, index) {
-                      final log = _logger.logs[index];
-                      final isError = log.contains('Error') ||
-                          log.contains('error') ||
-                          log.contains('ERROR') ||
-                          log.contains('failed') ||
-                          log.contains('Failed');
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isError
-                              ? Colors.red.withOpacity(0.1)
-                              : Colors.white.withOpacity(0.03),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: isError
-                                ? Colors.red.withOpacity(0.3)
-                                : Colors.white.withOpacity(0.1),
-                          ),
-                        ),
-                        child: Text(
-                          log,
-                          style: TextStyle(
-                            color: isError ? Colors.red[300] : Colors.white70,
-                            fontSize: 11,
-                            fontFamily: 'monospace',
-                            height: 1.4,
-                          ),
-                        ),
-                      );
+                      final entry = _filteredEntries[index];
+                      return _buildLogEntry(entry);
                     },
                   ),
           ),
@@ -352,5 +378,69 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildFilterChip(String label, LogLevel level) {
+    final isSelected = _filterLevel == level;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      showCheckmark: false,
+      onSelected: (_) {
+        setState(() {
+          _filterLevel = level;
+        });
+      },
+      backgroundColor: Colors.white.withOpacity(0.1),
+      selectedColor: _getLevelColor(level).withOpacity(0.3),
+      labelStyle: TextStyle(
+        color: isSelected ? _getLevelColor(level) : Colors.white70,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 12,
+      ),
+      side: BorderSide(
+        color: isSelected ? _getLevelColor(level) : Colors.transparent,
+      ),
+    );
+  }
+
+  Widget _buildLogEntry(LogEntry entry) {
+    final color = _getLevelColor(entry.level);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        entry.formatted,
+        style: TextStyle(
+          color: entry.level == LogLevel.error
+              ? Colors.red[300]
+              : entry.level == LogLevel.warning
+                  ? Colors.orange[300]
+                  : Colors.white70,
+          fontSize: 11,
+          fontFamily: 'monospace',
+          height: 1.4,
+        ),
+      ),
+    );
+  }
+
+  Color _getLevelColor(LogLevel level) {
+    switch (level) {
+      case LogLevel.debug:
+        return Colors.grey;
+      case LogLevel.info:
+        return Colors.blue;
+      case LogLevel.warning:
+        return Colors.orange;
+      case LogLevel.error:
+        return Colors.red;
+    }
   }
 }

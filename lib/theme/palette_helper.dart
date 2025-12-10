@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:palette_generator/palette_generator.dart';
+import '../services/debug_logger.dart';
+
+final _logger = DebugLogger();
 
 /// Extracted adaptive colors from album art
 class AdaptiveColors {
@@ -40,7 +43,7 @@ class PaletteHelper {
       );
       return palette;
     } catch (e) {
-      print('⚠️ Failed to extract palette: $e');
+      _logger.warning('Failed to extract palette: $e', context: 'Palette');
       return null;
     }
   }

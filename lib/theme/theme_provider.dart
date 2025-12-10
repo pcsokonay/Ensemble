@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/settings_service.dart';
+import '../services/debug_logger.dart';
 import 'palette_helper.dart';
+
+final _themeLogger = DebugLogger();
 
 /// Global function to update adaptive colors from an image URL
 /// This can be called from anywhere in the app (e.g., when tapping an album/artist)
@@ -17,7 +20,7 @@ Future<void> updateAdaptiveColorsFromImage(BuildContext context, String? imageUr
     }
   } catch (e) {
     // Silently fail - colors will update when track plays
-    print('Failed to extract colors on tap: $e');
+    _themeLogger.debug('Failed to extract colors on tap: $e', context: 'Theme');
   }
 }
 

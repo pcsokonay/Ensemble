@@ -28,6 +28,9 @@ dependencies:
 
   # Utilities
   uuid: ^4.2.1
+  package_info_plus: ^8.0.0
+  device_info_plus: ^10.1.0
+  share_plus: ^9.0.0
 
   # Audio - Local Playback
   just_audio: ^0.9.36
