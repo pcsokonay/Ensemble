@@ -81,6 +81,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   // When true, we hide main content and show peek content at center
   bool _inTransition = false;
 
+  // Track favorite state for current track
+  bool _isCurrentTrackFavorite = false;
+  String? _lastTrackUri; // Track which track we last checked favorite status for
+
   @override
   void initState() {
     super.initState();
@@ -282,6 +286,64 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   }
 
   bool get isQueuePanelOpen => _queuePanelController.value > 0.5;
+
+  /// Update favorite status when track changes
+  void _updateFavoriteStatus(dynamic currentTrack) {
+    if (currentTrack == null) {
+      _isCurrentTrackFavorite = false;
+      _lastTrackUri = null;
+      return;
+    }
+
+    final trackUri = currentTrack.uri as String?;
+    if (trackUri != _lastTrackUri) {
+      _lastTrackUri = trackUri;
+      _isCurrentTrackFavorite = currentTrack.favorite == true;
+    }
+  }
+
+  /// Toggle favorite status for current track
+  Future<void> _toggleCurrentTrackFavorite(dynamic currentTrack) async {
+    if (currentTrack == null) return;
+
+    final maProvider = context.read<MusicAssistantProvider>();
+    if (maProvider.api == null) return;
+
+    try {
+      if (_isCurrentTrackFavorite) {
+        // Remove from favorites
+        final libraryItemId = currentTrack.itemId;
+        if (libraryItemId is int) {
+          await maProvider.api!.removeFromFavorites('track', libraryItemId);
+        } else if (libraryItemId is String) {
+          final parsed = int.tryParse(libraryItemId);
+          if (parsed != null) {
+            await maProvider.api!.removeFromFavorites('track', parsed);
+          }
+        }
+      } else {
+        // Add to favorites
+        final provider = currentTrack.provider as String? ?? 'library';
+        final itemId = currentTrack.itemId?.toString() ?? '';
+        await maProvider.api!.addToFavorites('track', itemId, provider);
+      }
+
+      // Toggle local state
+      setState(() {
+        _isCurrentTrackFavorite = !_isCurrentTrackFavorite;
+      });
+    } catch (e) {
+      // Show error feedback
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update favorite: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
 
   /// Get available players sorted alphabetically (consistent with device selector)
   List<dynamic> _getAvailablePlayersSorted(MusicAssistantProvider maProvider) {
@@ -611,6 +673,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         if (themeProvider.adaptiveTheme && imageUrl != null) {
           _extractColors(imageUrl);
         }
+
+        // Update favorite status when track changes
+        _updateFavoriteStatus(currentTrack);
 
         return AnimatedBuilder(
           animation: Listenable.merge([_expandAnimation, _queuePanelAnimation]),
@@ -1285,6 +1350,25 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                       child: IconButton(
                         icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor, size: 28),
                         onPressed: collapse,
+                        padding: const EdgeInsets.all(12),
+                      ),
+                    ),
+                  ),
+
+                // Favorite button (expanded only) - hide when queue panel is open
+                if (t > 0.3 && queueT < 0.5)
+                  Positioned(
+                    top: topPadding + 4,
+                    right: 52,
+                    child: Opacity(
+                      opacity: ((t - 0.3) / 0.7).clamp(0.0, 1.0) * (1 - queueT * 2).clamp(0.0, 1.0),
+                      child: IconButton(
+                        icon: Icon(
+                          _isCurrentTrackFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: _isCurrentTrackFavorite ? Colors.red : textColor,
+                          size: 24,
+                        ),
+                        onPressed: () => _toggleCurrentTrackFavorite(currentTrack),
                         padding: const EdgeInsets.all(12),
                       ),
                     ),

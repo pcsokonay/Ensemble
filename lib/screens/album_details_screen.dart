@@ -178,6 +178,94 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
     }
   }
 
+  Future<void> _toggleTrackFavorite(int trackIndex) async {
+    if (trackIndex < 0 || trackIndex >= _tracks.length) return;
+
+    final track = _tracks[trackIndex];
+    final maProvider = context.read<MusicAssistantProvider>();
+    if (maProvider.api == null) return;
+
+    final currentFavorite = track.favorite ?? false;
+
+    try {
+      if (currentFavorite) {
+        // Remove from favorites - need library_item_id
+        int? libraryItemId;
+        if (track.provider == 'library') {
+          libraryItemId = int.tryParse(track.itemId);
+        } else if (track.providerMappings != null) {
+          final libraryMapping = track.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => track.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.api!.removeFromFavorites('track', libraryItemId);
+        }
+      } else {
+        // Add to favorites
+        String actualProvider = track.provider;
+        String actualItemId = track.itemId;
+
+        if (track.providerMappings != null && track.providerMappings!.isNotEmpty) {
+          final mapping = track.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => track.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => track.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerInstance;
+          actualItemId = mapping.itemId;
+        }
+
+        await maProvider.api!.addToFavorites('track', actualItemId, actualProvider);
+      }
+
+      // Update local state - create new track with toggled favorite
+      setState(() {
+        _tracks[trackIndex] = Track(
+          itemId: track.itemId,
+          provider: track.provider,
+          name: track.name,
+          uri: track.uri,
+          favorite: !currentFavorite,
+          artists: track.artists,
+          album: track.album,
+          duration: track.duration,
+          trackNumber: track.trackNumber,
+          discNumber: track.discNumber,
+          providerMappings: track.providerMappings,
+        );
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              !currentFavorite ? 'Added to favorites' : 'Removed from favorites',
+            ),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling track favorite: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update favorite: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _loadTracks() async {
     final provider = context.read<MusicAssistantProvider>();
     final tracks = await provider.getAlbumTracksWithCache(
@@ -775,41 +863,36 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                         curve: Curves.easeInOut,
                         child: isExpanded
                             ? Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                padding: const EdgeInsets.only(right: 12.0, bottom: 8.0, top: 4.0),
                                 child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
-                                    Expanded(
-                                      child: SizedBox(
-                                        height: 48,
-                                        child: FilledButton.tonal(
-                                          onPressed: () => _showPlayRadioMenu(context, index),
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: colorScheme.tertiaryContainer,
-                                            foregroundColor: colorScheme.onTertiaryContainer,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                          ),
-                                          child: const Text('Start radio'),
-                                        ),
+                                    // Radio button
+                                    IconButton(
+                                      onPressed: () => _showPlayRadioMenu(context, index),
+                                      icon: Icon(
+                                        Icons.radio_rounded,
+                                        color: colorScheme.tertiary,
                                       ),
+                                      tooltip: 'Start radio',
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: SizedBox(
-                                        height: 48,
-                                        child: FilledButton.tonal(
-                                          onPressed: () => _addTrackToQueue(context, index),
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: colorScheme.secondaryContainer,
-                                            foregroundColor: colorScheme.onSecondaryContainer,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                          ),
-                                          child: const Text('Add to queue'),
-                                        ),
+                                    // Add to queue button
+                                    IconButton(
+                                      onPressed: () => _addTrackToQueue(context, index),
+                                      icon: Icon(
+                                        Icons.playlist_add_rounded,
+                                        color: colorScheme.secondary,
                                       ),
+                                      tooltip: 'Add to queue',
+                                    ),
+                                    // Favorite button
+                                    IconButton(
+                                      onPressed: () => _toggleTrackFavorite(index),
+                                      icon: Icon(
+                                        track.favorite == true ? Icons.favorite : Icons.favorite_border,
+                                        color: track.favorite == true ? Colors.red : colorScheme.onSurface.withOpacity(0.6),
+                                      ),
+                                      tooltip: track.favorite == true ? 'Remove from favorites' : 'Add to favorites',
                                     ),
                                   ],
                                 ),
