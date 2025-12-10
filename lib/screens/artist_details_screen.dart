@@ -186,7 +186,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
   void _showPlayOnMenu(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
-    final players = maProvider.players.where((p) => p.available).toList();
+    final players = maProvider.availablePlayers;
     final colorScheme = Theme.of(context).colorScheme;
 
     showModalBottomSheet(

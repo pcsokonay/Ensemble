@@ -1111,7 +1111,7 @@ class MusicAssistantAPI {
       for (final providerPrefix in radioProviders) {
         final mapping = track.providerMappings!.firstWhere(
           (m) => m.available && m.providerInstance.toLowerCase().startsWith(providerPrefix),
-          orElse: () => ProviderMapping(providerInstance: '', itemId: '', available: false),
+          orElse: () => ProviderMapping(providerInstance: '', providerDomain: '', itemId: '', available: false),
         );
         if (mapping.providerInstance.isNotEmpty) {
           return '${mapping.providerInstance}://track/${mapping.itemId}';
@@ -1121,7 +1121,7 @@ class MusicAssistantAPI {
       // Fall back to any available provider (but not library)
       final nonLibraryMapping = track.providerMappings!.firstWhere(
         (m) => m.available && m.providerInstance != 'library',
-        orElse: () => ProviderMapping(providerInstance: '', itemId: '', available: false),
+        orElse: () => ProviderMapping(providerInstance: '', providerDomain: '', itemId: '', available: false),
       );
       if (nonLibraryMapping.providerInstance.isNotEmpty) {
         return '${nonLibraryMapping.providerInstance}://track/${nonLibraryMapping.itemId}';
@@ -1185,7 +1185,7 @@ class MusicAssistantAPI {
       for (final providerPrefix in radioProviders) {
         final mapping = artist.providerMappings!.firstWhere(
           (m) => m.available && m.providerInstance.toLowerCase().startsWith(providerPrefix),
-          orElse: () => ProviderMapping(providerInstance: '', itemId: '', available: false),
+          orElse: () => ProviderMapping(providerInstance: '', providerDomain: '', itemId: '', available: false),
         );
         if (mapping.providerInstance.isNotEmpty) {
           return '${mapping.providerInstance}://artist/${mapping.itemId}';
@@ -1194,7 +1194,7 @@ class MusicAssistantAPI {
 
       final nonLibraryMapping = artist.providerMappings!.firstWhere(
         (m) => m.available && m.providerInstance != 'library',
-        orElse: () => ProviderMapping(providerInstance: '', itemId: '', available: false),
+        orElse: () => ProviderMapping(providerInstance: '', providerDomain: '', itemId: '', available: false),
       );
       if (nonLibraryMapping.providerInstance.isNotEmpty) {
         return '${nonLibraryMapping.providerInstance}://artist/${nonLibraryMapping.itemId}';
