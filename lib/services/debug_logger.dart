@@ -49,7 +49,15 @@ class DebugLogger {
   /// Legacy getter for backward compatibility
   List<String> get logs => _entries.map((e) => e.formatted).toList();
 
+  // Set to true to only log perf entries (for FPS diagnosis)
+  static const bool _perfOnlyMode = true;
+
   void _addEntry(LogLevel level, String message, {String? context}) {
+    // In perf-only mode, skip all non-perf logs
+    if (_perfOnlyMode && level != LogLevel.perf) {
+      return;
+    }
+
     final entry = LogEntry(
       timestamp: DateTime.now(),
       level: level,
