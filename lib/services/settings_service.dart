@@ -21,6 +21,9 @@ class SettingsService {
   static const String _keyLocalPlayerName = 'local_player_name';
   static const String _keyOwnerName = 'owner_name';
   static const String _keyLastSelectedPlayerId = 'last_selected_player_id';
+  static const String _keyShowFavoriteAlbums = 'show_favorite_albums';
+  static const String _keyShowFavoriteArtists = 'show_favorite_artists';
+  static const String _keyShowFavoriteTracks = 'show_favorite_tracks';
 
   static Future<String?> getServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -312,5 +315,36 @@ class SettingsService {
   static Future<void> clearSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+  }
+
+  // Home Screen Favorites Settings
+  static Future<bool> getShowFavoriteAlbums() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyShowFavoriteAlbums) ?? false;
+  }
+
+  static Future<void> setShowFavoriteAlbums(bool show) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyShowFavoriteAlbums, show);
+  }
+
+  static Future<bool> getShowFavoriteArtists() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyShowFavoriteArtists) ?? false;
+  }
+
+  static Future<void> setShowFavoriteArtists(bool show) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyShowFavoriteArtists, show);
+  }
+
+  static Future<bool> getShowFavoriteTracks() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyShowFavoriteTracks) ?? false;
+  }
+
+  static Future<void> setShowFavoriteTracks(bool show) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyShowFavoriteTracks, show);
   }
 }

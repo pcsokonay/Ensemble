@@ -18,6 +18,9 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _lastFmApiKeyController = TextEditingController();
   final _audioDbApiKeyController = TextEditingController();
+  bool _showFavoriteAlbums = false;
+  bool _showFavoriteArtists = false;
+  bool _showFavoriteTracks = false;
 
   @override
   void initState() {
@@ -34,6 +37,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final audioDbKey = await SettingsService.getTheAudioDbApiKey();
     if (audioDbKey != null) {
       _audioDbApiKeyController.text = audioDbKey;
+    }
+
+    // Load home screen settings
+    final showFavAlbums = await SettingsService.getShowFavoriteAlbums();
+    final showFavArtists = await SettingsService.getShowFavoriteArtists();
+    final showFavTracks = await SettingsService.getShowFavoriteTracks();
+    if (mounted) {
+      setState(() {
+        _showFavoriteAlbums = showFavAlbums;
+        _showFavoriteArtists = showFavArtists;
+        _showFavoriteTracks = showFavTracks;
+      });
     }
   }
 
@@ -304,6 +319,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 );
               },
+            ),
+
+            const SizedBox(height: 32),
+
+            // Home Screen section
+            Text(
+              'Home Screen',
+              style: textTheme.titleMedium?.copyWith(
+                color: colorScheme.onBackground,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Show additional favorite rows below the main content',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onBackground.withOpacity(0.6),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceVariant.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    title: Text(
+                      'Favorite Albums',
+                      style: TextStyle(color: colorScheme.onSurface),
+                    ),
+                    subtitle: Text(
+                      'Show a row of your favorite albums',
+                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                    ),
+                    value: _showFavoriteAlbums,
+                    onChanged: (value) {
+                      setState(() => _showFavoriteAlbums = value);
+                      SettingsService.setShowFavoriteAlbums(value);
+                    },
+                    activeColor: colorScheme.primary,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  Divider(color: colorScheme.outline.withOpacity(0.2), height: 1),
+                  SwitchListTile(
+                    title: Text(
+                      'Favorite Artists',
+                      style: TextStyle(color: colorScheme.onSurface),
+                    ),
+                    subtitle: Text(
+                      'Show a row of your favorite artists',
+                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                    ),
+                    value: _showFavoriteArtists,
+                    onChanged: (value) {
+                      setState(() => _showFavoriteArtists = value);
+                      SettingsService.setShowFavoriteArtists(value);
+                    },
+                    activeColor: colorScheme.primary,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  Divider(color: colorScheme.outline.withOpacity(0.2), height: 1),
+                  SwitchListTile(
+                    title: Text(
+                      'Favorite Tracks',
+                      style: TextStyle(color: colorScheme.onSurface),
+                    ),
+                    subtitle: Text(
+                      'Show a row of your favorite tracks',
+                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                    ),
+                    value: _showFavoriteTracks,
+                    onChanged: (value) {
+                      setState(() => _showFavoriteTracks = value);
+                      SettingsService.setShowFavoriteTracks(value);
+                    },
+                    activeColor: colorScheme.primary,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
             ),
 
             const SizedBox(height: 32),

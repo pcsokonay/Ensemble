@@ -835,6 +835,28 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   // ============================================================================
+  // FAVORITES FOR HOME SCREEN
+  // ============================================================================
+
+  /// Get favorite albums from the library
+  Future<List<Album>> getFavoriteAlbums() async {
+    // Filter from loaded library - favorites are already loaded
+    return _albums.where((a) => a.favorite == true).toList();
+  }
+
+  /// Get favorite artists from the library
+  Future<List<Artist>> getFavoriteArtists() async {
+    // Filter from loaded library - favorites are already loaded
+    return _artists.where((a) => a.favorite == true).toList();
+  }
+
+  /// Get favorite tracks from the library
+  Future<List<Track>> getFavoriteTracks() async {
+    // Filter from loaded library - favorites are already loaded
+    return _tracks.where((t) => t.favorite == true).toList();
+  }
+
+  // ============================================================================
   // DETAIL SCREEN CACHING
   // ============================================================================
 

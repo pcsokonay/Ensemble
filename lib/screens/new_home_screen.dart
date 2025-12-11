@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/music_assistant_provider.dart';
+import '../services/settings_service.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/player_selector.dart';
 import '../widgets/album_row.dart';
 import '../widgets/artist_row.dart';
+import '../widgets/track_row.dart';
 import '../widgets/common/disconnected_state.dart';
 import 'settings_screen.dart';
 import 'search_screen.dart';
@@ -18,14 +20,39 @@ class NewHomeScreen extends StatefulWidget {
 
 class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveClientMixin {
   Key _refreshKey = UniqueKey();
+  bool _showFavoriteAlbums = false;
+  bool _showFavoriteArtists = false;
+  bool _showFavoriteTracks = false;
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final showAlbums = await SettingsService.getShowFavoriteAlbums();
+    final showArtists = await SettingsService.getShowFavoriteArtists();
+    final showTracks = await SettingsService.getShowFavoriteTracks();
+    if (mounted) {
+      setState(() {
+        _showFavoriteAlbums = showAlbums;
+        _showFavoriteArtists = showArtists;
+        _showFavoriteTracks = showTracks;
+      });
+    }
+  }
 
   Future<void> _onRefresh() async {
     // Invalidate cache to force fresh data on pull-to-refresh
     final provider = context.read<MusicAssistantProvider>();
     provider.invalidateHomeCache();
+
+    // Reload settings in case they changed
+    await _loadSettings();
 
     if (mounted) {
       setState(() {
@@ -153,6 +180,33 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
                 loadAlbums: () => provider.getDiscoverAlbumsWithCache(),
                 rowHeight: albumRowHeight,
               ),
+
+              // Optional favorites rows (fixed height, below scaled section)
+              if (_showFavoriteAlbums) ...[
+                const SizedBox(height: 16),
+                AlbumRow(
+                  key: const ValueKey('favorite-albums'),
+                  title: 'Favorite Albums',
+                  loadAlbums: () => provider.getFavoriteAlbums(),
+                ),
+              ],
+              if (_showFavoriteArtists) ...[
+                const SizedBox(height: 16),
+                ArtistRow(
+                  key: const ValueKey('favorite-artists'),
+                  title: 'Favorite Artists',
+                  loadArtists: () => provider.getFavoriteArtists(),
+                ),
+              ],
+              if (_showFavoriteTracks) ...[
+                const SizedBox(height: 16),
+                TrackRow(
+                  key: const ValueKey('favorite-tracks'),
+                  title: 'Favorite Tracks',
+                  loadTracks: () => provider.getFavoriteTracks(),
+                ),
+              ],
+
               SizedBox(height: BottomSpacing.withMiniPlayer), // Space for bottom nav + mini player
             ],
             ),
