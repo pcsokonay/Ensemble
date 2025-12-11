@@ -76,6 +76,8 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
   final _hardwareVolumeService = HardwareVolumeService();
   StreamSubscription? _volumeUpSub;
   StreamSubscription? _volumeDownSub;
+  String? _lastSelectedPlayerId;
+  String? _builtinPlayerId;
 
   // Volume step size (percentage points per button press)
   static const int _volumeStep = 5;
@@ -87,15 +89,21 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
     _themeProvider = ThemeProvider();
     WidgetsBinding.instance.addObserver(this);
     _initHardwareVolumeControl();
+    // Listen to player selection changes to toggle volume interception
+    _musicProvider.addListener(_onProviderChanged);
   }
 
   Future<void> _initHardwareVolumeControl() async {
     try {
-      _logger.log('🔊 [1/4] Starting hardware volume control initialization...');
+      _logger.log('🔊 [1/5] Starting hardware volume control initialization...');
 
-      _logger.log('🔊 [2/4] Calling HardwareVolumeService.init()...');
+      // Get builtin player ID for detecting when to disable interception
+      _builtinPlayerId = await SettingsService.getBuiltinPlayerId();
+      _logger.log('🔊 [2/5] Builtin player ID: $_builtinPlayerId');
+
+      _logger.log('🔊 [3/5] Calling HardwareVolumeService.init()...');
       await _hardwareVolumeService.init();
-      _logger.log('🔊 [3/4] HardwareVolumeService.init() completed, isListening=${_hardwareVolumeService.isListening}');
+      _logger.log('🔊 [4/5] HardwareVolumeService.init() completed, isListening=${_hardwareVolumeService.isListening}');
 
       _volumeUpSub = _hardwareVolumeService.onVolumeUp.listen((_) {
         _logger.log('🔊 Volume UP event received in main.dart');
@@ -107,9 +115,34 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
         _adjustVolume(-_volumeStep);
       });
 
-      _logger.log('🔊 [4/4] Hardware volume control fully initialized');
+      _logger.log('🔊 [5/5] Hardware volume control fully initialized');
     } catch (e, stack) {
       _logger.error('Hardware volume control initialization FAILED', context: 'VolumeInit', error: e, stackTrace: stack);
+    }
+  }
+
+  /// Called when provider state changes - check if selected player changed
+  void _onProviderChanged() {
+    final currentPlayerId = _musicProvider.selectedPlayer?.playerId;
+    if (currentPlayerId != _lastSelectedPlayerId) {
+      _lastSelectedPlayerId = currentPlayerId;
+      _updateVolumeInterception();
+    }
+  }
+
+  /// Enable/disable volume button interception based on selected player.
+  /// For builtin player: disable interception so native volume works
+  /// For MA players: enable interception to control player via API
+  Future<void> _updateVolumeInterception() async {
+    final isBuiltinPlayer = _builtinPlayerId != null &&
+        _musicProvider.selectedPlayer?.playerId == _builtinPlayerId;
+
+    if (isBuiltinPlayer) {
+      _logger.log('🔊 Builtin player selected - disabling volume interception');
+      await _hardwareVolumeService.setIntercepting(false);
+    } else {
+      _logger.log('🔊 MA player selected - enabling volume interception');
+      await _hardwareVolumeService.setIntercepting(true);
     }
   }
 
@@ -137,6 +170,7 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
 
   @override
   void dispose() {
+    _musicProvider.removeListener(_onProviderChanged);
     _volumeUpSub?.cancel();
     _volumeDownSub?.cancel();
     _hardwareVolumeService.dispose();

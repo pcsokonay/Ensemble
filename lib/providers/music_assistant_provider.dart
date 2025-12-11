@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import '../models/media_item.dart';
 import '../models/player.dart';
 import '../services/music_assistant_api.dart';
@@ -598,8 +599,9 @@ class MusicAssistantProvider with ChangeNotifier {
           final volume = event['volume_level'] as int? ?? event['volume'] as int?;
           if (volume != null) {
             _localPlayerVolume = volume; // Track MA volume
-            await _localPlayer.setVolume(volume / 100.0);
-            _logger.log('🔊 Builtin player local audio volume set to ${(volume / 100.0).toStringAsFixed(2)} from server event');
+            // Use device media volume (FlutterVolumeController), NOT just_audio software volume
+            await FlutterVolumeController.setVolume(volume / 100.0);
+            _logger.log('🔊 Builtin player DEVICE volume set to ${(volume / 100.0).toStringAsFixed(2)} from server event');
           }
           break;
 
@@ -1707,14 +1709,19 @@ class MusicAssistantProvider with ChangeNotifier {
 
   Future<void> setVolume(String playerId, int volumeLevel) async {
     try {
-      // Update tracked volume immediately for builtin player to prevent
-      // periodic state reporting from overwriting with stale volume
+      // Check if this is the builtin player
       final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
       if (builtinPlayerId != null && playerId == builtinPlayerId) {
+        // For builtin player, control device media volume directly
         _localPlayerVolume = volumeLevel;
-        _logger.log('🔊 Builtin player volume tracked: $_localPlayerVolume');
+        await FlutterVolumeController.setVolume(volumeLevel / 100.0);
+        _logger.log('🔊 Builtin player DEVICE volume set to $volumeLevel%');
+        // Also notify MA server about the volume change
+        await _api?.setVolume(playerId, volumeLevel);
+      } else {
+        // For MA players, just send to MA server
+        await _api?.setVolume(playerId, volumeLevel);
       }
-      await _api?.setVolume(playerId, volumeLevel);
     } catch (e) {
       ErrorHandler.logError('Set volume', e);
       rethrow;
