@@ -593,11 +593,13 @@ class MusicAssistantProvider with ChangeNotifier {
           break;
 
         case 'volume_set':
-          final volume = event['volume_level'] as int?;
+        case 'set_volume':
+          // MA sends 'set_volume' in event type but 'volume' in data
+          final volume = event['volume_level'] as int? ?? event['volume'] as int?;
           if (volume != null) {
             _localPlayerVolume = volume; // Track MA volume
             await _localPlayer.setVolume(volume / 100.0);
-            _logger.log('🔊 Builtin player volume set to $_localPlayerVolume from server event');
+            _logger.log('🔊 Builtin player local audio volume set to ${(volume / 100.0).toStringAsFixed(2)} from server event');
           }
           break;
 
