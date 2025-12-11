@@ -15,11 +15,13 @@ import '../utils/page_transitions.dart';
 class ArtistDetailsScreen extends StatefulWidget {
   final Artist artist;
   final String? heroTagSuffix;
+  final String? initialImageUrl;
 
   const ArtistDetailsScreen({
-    super.key, 
+    super.key,
     required this.artist,
     this.heroTagSuffix,
+    this.initialImageUrl,
   });
 
   @override
@@ -44,12 +46,14 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   void initState() {
     super.initState();
     _isFavorite = widget.artist.favorite ?? false;
+    // Use initial image URL immediately for smooth hero animation
+    _artistImageUrl = widget.initialImageUrl;
     _loadArtistAlbums();
     _loadArtistDescription();
     _refreshFavoriteStatus();
 
-    // CRITICAL FIX: Defer image loading and color extraction until after transition
-    // This prevents expensive operations during hero animation
+    // Defer higher-res image loading and color extraction until after transition
+    // But hero animation now works because we have initialImageUrl
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 350), () {
         if (mounted) {

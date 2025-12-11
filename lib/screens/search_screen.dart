@@ -404,6 +404,8 @@ class SearchScreenState extends State<SearchScreen> {
 
   Widget _buildArtistTile(Artist artist) {
     final colorScheme = Theme.of(context).colorScheme;
+    final maProvider = context.read<MusicAssistantProvider>();
+    final imageUrl = maProvider.getImageUrl(artist, size: 256);
 
     return ListTile(
       leading: ArtistAvatar(
@@ -428,7 +430,10 @@ class SearchScreenState extends State<SearchScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ArtistDetailsScreen(artist: artist),
+            builder: (context) => ArtistDetailsScreen(
+              artist: artist,
+              initialImageUrl: imageUrl,
+            ),
           ),
         );
       },

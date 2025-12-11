@@ -60,6 +60,7 @@ class _ArtistCardState extends State<ArtistCard> {
               child: ArtistDetailsScreen(
                 artist: widget.artist,
                 heroTagSuffix: widget.heroTagSuffix,
+                initialImageUrl: imageUrl,
               ),
             ),
           );

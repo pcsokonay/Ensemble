@@ -312,7 +312,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final maProvider = context.read<MusicAssistantProvider>();
     final suffix = '_library';
+    // Get image URL for hero animation
+    final imageUrl = maProvider.getImageUrl(artist, size: 256);
 
     return RepaintBoundary(
       child: ListTile(
@@ -322,9 +325,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           radius: 24,
           imageSize: 128,
           heroTag: HeroTags.artistImage + (artist.uri ?? artist.itemId) + suffix,
-          onImageLoaded: (imageUrl) {
-            // Store for adaptive colors on tap
-          },
         ),
       title: Hero(
         tag: HeroTags.artistName + (artist.uri ?? artist.itemId) + suffix,
@@ -348,6 +348,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               child: ArtistDetailsScreen(
                 artist: artist,
                 heroTagSuffix: 'library',
+                initialImageUrl: imageUrl,
               ),
             ),
           );

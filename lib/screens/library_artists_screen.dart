@@ -90,6 +90,9 @@ class LibraryArtistsScreen extends StatelessWidget {
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final maProvider = context.read<MusicAssistantProvider>();
+    // Get image URL for hero animation
+    final imageUrl = maProvider.getImageUrl(artist, size: 256);
 
     // RepaintBoundary isolates repaints to individual tiles
     return RepaintBoundary(
@@ -116,6 +119,7 @@ class LibraryArtistsScreen extends StatelessWidget {
               child: ArtistDetailsScreen(
                 artist: artist,
                 heroTagSuffix: 'library',
+                initialImageUrl: imageUrl,
               ),
             ),
           );

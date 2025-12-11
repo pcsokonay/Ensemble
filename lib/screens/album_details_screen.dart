@@ -500,10 +500,16 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
   void _navigateToArtist() {
     // Navigate to the first artist if available
     if (widget.album.artists != null && widget.album.artists!.isNotEmpty) {
+      final artist = widget.album.artists!.first;
+      final maProvider = context.read<MusicAssistantProvider>();
+      final imageUrl = maProvider.getImageUrl(artist, size: 256);
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ArtistDetailsScreen(artist: widget.album.artists!.first),
+          builder: (context) => ArtistDetailsScreen(
+            artist: artist,
+            initialImageUrl: imageUrl,
+          ),
         ),
       );
     }
