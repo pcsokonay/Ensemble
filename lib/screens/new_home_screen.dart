@@ -173,7 +173,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
 
         // Calculate spacing and heights based on enabled rows
         final numRows = totalEnabledRows > 0 ? totalEnabledRows : 1;
-        final totalSpacing = (numRows - 1) * 4.0; // 4px between each row (reduced from 8)
+        final totalSpacing = (numRows - 1) * 8.0; // 8px between each row
         const titleHeight = 44.0; // Height for title text + padding per row
 
         // Calculate height available for row content (excluding titles and spacing)
@@ -220,7 +220,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
                   loadAlbums: () => provider.getRecentAlbumsWithCache(),
                   rowHeight: albumRowHeight,
                 ),
-                if (_showDiscoverArtists || _showDiscoverAlbums) const SizedBox(height: 4),
+                if (_showDiscoverArtists || _showDiscoverAlbums) const SizedBox(height: 8),
               ],
 
               // Discover Artists (optional)
@@ -231,7 +231,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
                   loadArtists: () => provider.getDiscoverArtistsWithCache(),
                   rowHeight: artistRowHeight,
                 ),
-                if (_showDiscoverAlbums) const SizedBox(height: 4),
+                if (_showDiscoverAlbums) const SizedBox(height: 8),
               ],
 
               // Discover Albums (optional)
@@ -301,7 +301,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
 
     // Add widgets with spacing
     for (final entry in enabledFavorites) {
-      widgets.add(const SizedBox(height: 4));
+      widgets.add(const SizedBox(height: 8));
       widgets.add(entry.value);
     }
 
