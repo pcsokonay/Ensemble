@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +11,7 @@ import 'services/settings_service.dart';
 import 'services/audio/massiv_audio_handler.dart';
 import 'services/auth/auth_manager.dart';
 import 'services/debug_logger.dart';
+import 'services/hardware_volume_service.dart';
 import 'services/music_assistant_api.dart' show MAConnectionState;
 import 'theme/theme_provider.dart';
 import 'theme/app_theme.dart';
@@ -71,6 +73,12 @@ class MusicAssistantApp extends StatefulWidget {
 class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindingObserver {
   late MusicAssistantProvider _musicProvider;
   late ThemeProvider _themeProvider;
+  final _hardwareVolumeService = HardwareVolumeService();
+  StreamSubscription? _volumeUpSub;
+  StreamSubscription? _volumeDownSub;
+
+  // Volume step size (percentage points per button press)
+  static const int _volumeStep = 5;
 
   @override
   void initState() {
@@ -78,10 +86,41 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
     _musicProvider = MusicAssistantProvider();
     _themeProvider = ThemeProvider();
     WidgetsBinding.instance.addObserver(this);
+    _initHardwareVolumeControl();
+  }
+
+  Future<void> _initHardwareVolumeControl() async {
+    await _hardwareVolumeService.init();
+
+    _volumeUpSub = _hardwareVolumeService.onVolumeUp.listen((_) {
+      _adjustVolume(_volumeStep);
+    });
+
+    _volumeDownSub = _hardwareVolumeService.onVolumeDown.listen((_) {
+      _adjustVolume(-_volumeStep);
+    });
+  }
+
+  Future<void> _adjustVolume(int delta) async {
+    final player = _musicProvider.selectedPlayer;
+    if (player == null) return;
+
+    final newVolume = (player.volume + delta).clamp(0, 100);
+    if (newVolume != player.volume) {
+      try {
+        await _musicProvider.setVolume(player.playerId, newVolume);
+        _logger.debug('Hardware volume: ${player.volume} -> $newVolume', context: 'VolumeControl');
+      } catch (e) {
+        _logger.error('Hardware volume adjustment failed', context: 'VolumeControl', error: e);
+      }
+    }
   }
 
   @override
   void dispose() {
+    _volumeUpSub?.cancel();
+    _volumeDownSub?.cancel();
+    _hardwareVolumeService.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
