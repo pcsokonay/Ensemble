@@ -171,6 +171,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           behavior: const _StretchScrollBehavior(),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(bottom: BottomSpacing.withMiniPlayer),
             child: Column(
               key: _refreshKey,
               crossAxisAlignment: CrossAxisAlignment.start,

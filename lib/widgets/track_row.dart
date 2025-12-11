@@ -95,8 +95,11 @@ class _TrackRowState extends State<TrackRow> with AutomaticKeepAliveClientMixin 
                   );
                 }
 
-                // Scale card width based on content height
-                final cardWidth = contentHeight * 0.78;
+                // Card layout: square artwork + text below
+                // Text area: 8px gap + ~18px title + ~18px artist = ~44px
+                const textAreaHeight = 44.0;
+                final artworkSize = contentHeight - textAreaHeight;
+                final cardWidth = artworkSize; // Card width = artwork width (square)
                 final itemExtent = cardWidth + 12;
 
                 return ScrollConfiguration(
