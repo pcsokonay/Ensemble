@@ -107,19 +107,22 @@ class _ArtistCardState extends State<ArtistCard> {
               ),
             ),
           const SizedBox(height: 8),
-          // Artist name
-          Hero(
-            tag: HeroTags.artistName + (widget.artist.uri ?? widget.artist.itemId) + suffix,
-            child: Material(
-              color: Colors.transparent,
-              child: Text(
-                widget.artist.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: textTheme.titleSmall?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
+          // Artist name - fixed height container so image size is consistent
+          SizedBox(
+            height: 36, // Fixed height for 2 lines of text
+            child: Hero(
+              tag: HeroTags.artistName + (widget.artist.uri ?? widget.artist.itemId) + suffix,
+              child: Material(
+                color: Colors.transparent,
+                child: Text(
+                  widget.artist.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),

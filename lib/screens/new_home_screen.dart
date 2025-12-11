@@ -18,7 +18,7 @@ class NewHomeScreen extends StatefulWidget {
   State<NewHomeScreen> createState() => _NewHomeScreenState();
 }
 
-class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveClientMixin {
+class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   Key _refreshKey = UniqueKey();
   // Main rows (default on)
   bool _showRecentAlbums = true;
@@ -37,9 +37,24 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Generate random order for favorites rows (0, 1, 2 shuffled)
     _favoritesOrder = [0, 1, 2]..shuffle();
     _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Reload settings when app resumes (coming back from settings)
+    if (state == AppLifecycleState.resumed) {
+      _loadSettings();
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -79,6 +94,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
+    // Reload settings on each build to catch changes from Settings screen
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettings());
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -138,38 +155,40 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
 
   Widget _buildConnectedView(
       BuildContext context, MusicAssistantProvider provider) {
-    // Count enabled main rows for dynamic height calculation
-    final enabledMainRows = [_showRecentAlbums, _showDiscoverArtists, _showDiscoverAlbums]
-        .where((enabled) => enabled).length;
+    // Count ALL enabled rows (main + favorites) for height calculation
+    final enabledAlbumRows = (_showRecentAlbums ? 1 : 0) +
+                             (_showDiscoverAlbums ? 1 : 0) +
+                             (_showFavoriteAlbums ? 1 : 0) +
+                             (_showFavoriteTracks ? 1 : 0); // Track row uses album-like sizing
+    final enabledArtistRows = (_showDiscoverArtists ? 1 : 0) +
+                              (_showFavoriteArtists ? 1 : 0);
+    final totalEnabledRows = enabledAlbumRows + enabledArtistRows;
 
     // Use LayoutBuilder to adapt to available screen height
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Calculate available height for the main rows
+        // Calculate available height for all rows
         // Account for bottom nav + mini player space
         final availableHeight = constraints.maxHeight - BottomSpacing.withMiniPlayer;
 
         // Calculate spacing and heights based on enabled rows
-        final numRows = enabledMainRows > 0 ? enabledMainRows : 1;
-        final totalSpacing = (numRows - 1) * 8.0; // 8px between each row
-        const titleHeight = 44.0; // Height for title text + padding per row (increased for top padding)
+        final numRows = totalEnabledRows > 0 ? totalEnabledRows : 1;
+        final totalSpacing = (numRows - 1) * 4.0; // 4px between each row (reduced from 8)
+        const titleHeight = 44.0; // Height for title text + padding per row
 
         // Calculate height available for row content (excluding titles and spacing)
         final contentHeight = availableHeight - totalSpacing - (titleHeight * numRows);
 
         // Distribute height based on row types
-        // Album rows get slightly more space than artist rows (ratio 1.18:1)
+        // Album/track rows get slightly more space than artist rows (ratio 1.18:1)
         double albumRowHeight;
         double artistRowHeight;
 
-        if (enabledMainRows == 0) {
+        if (totalEnabledRows == 0) {
           albumRowHeight = 180.0;
           artistRowHeight = 160.0;
         } else {
-          // Count album vs artist rows for proportional distribution
-          final albumRows = (_showRecentAlbums ? 1 : 0) + (_showDiscoverAlbums ? 1 : 0);
-          final artistRows = _showDiscoverArtists ? 1 : 0;
-          final totalRatio = (albumRows * 1.18) + (artistRows * 1.0);
+          final totalRatio = (enabledAlbumRows * 1.18) + (enabledArtistRows * 1.0);
 
           if (totalRatio > 0) {
             final unitHeight = contentHeight / totalRatio;
@@ -181,8 +200,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           }
         }
 
-        // Build favorites rows in random order
-        final favoritesWidgets = _buildFavoritesRows(provider);
+        // Build favorites rows in random order with calculated heights
+        final favoritesWidgets = _buildFavoritesRows(provider, albumRowHeight, artistRowHeight);
 
         // Use Android 12+ stretch overscroll effect
         return ScrollConfiguration(
@@ -201,7 +220,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
                   loadAlbums: () => provider.getRecentAlbumsWithCache(),
                   rowHeight: albumRowHeight,
                 ),
-                if (_showDiscoverArtists || _showDiscoverAlbums) const SizedBox(height: 8),
+                if (_showDiscoverArtists || _showDiscoverAlbums) const SizedBox(height: 4),
               ],
 
               // Discover Artists (optional)
@@ -212,7 +231,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
                   loadArtists: () => provider.getDiscoverArtistsWithCache(),
                   rowHeight: artistRowHeight,
                 ),
-                if (_showDiscoverAlbums) const SizedBox(height: 8),
+                if (_showDiscoverAlbums) const SizedBox(height: 4),
               ],
 
               // Discover Albums (optional)
@@ -224,13 +243,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
                   rowHeight: albumRowHeight,
                 ),
 
-              // Favorites rows in random order
+              // Favorites rows in random order (with same calculated heights)
               ...favoritesWidgets,
-
-              // Only add bottom spacing if favorites are shown (they scroll below)
-              // The main rows are calculated to fit exactly without this
-              if (_showFavoriteAlbums || _showFavoriteArtists || _showFavoriteTracks)
-                SizedBox(height: BottomSpacing.withMiniPlayer),
             ],
             ),
           ),
@@ -240,7 +254,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   }
 
   /// Build favorites rows in random order (order set once per session)
-  List<Widget> _buildFavoritesRows(MusicAssistantProvider provider) {
+  List<Widget> _buildFavoritesRows(MusicAssistantProvider provider, double albumRowHeight, double artistRowHeight) {
     final widgets = <Widget>[];
 
     // Create list of enabled favorites with their order index
@@ -253,6 +267,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           key: const ValueKey('favorite-albums'),
           title: 'Favorite Albums',
           loadAlbums: () => provider.getFavoriteAlbums(),
+          rowHeight: albumRowHeight,
         ),
       ));
     }
@@ -264,6 +279,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           key: const ValueKey('favorite-artists'),
           title: 'Favorite Artists',
           loadArtists: () => provider.getFavoriteArtists(),
+          rowHeight: artistRowHeight,
         ),
       ));
     }
@@ -275,6 +291,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           key: const ValueKey('favorite-tracks'),
           title: 'Favorite Tracks',
           loadTracks: () => provider.getFavoriteTracks(),
+          rowHeight: albumRowHeight, // Track row uses album-like sizing
         ),
       ));
     }
@@ -284,7 +301,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
 
     // Add widgets with spacing
     for (final entry in enabledFavorites) {
-      widgets.add(const SizedBox(height: 16));
+      widgets.add(const SizedBox(height: 4));
       widgets.add(entry.value);
     }
 
