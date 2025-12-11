@@ -155,50 +155,35 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
 
   Widget _buildConnectedView(
       BuildContext context, MusicAssistantProvider provider) {
-    // Count ALL enabled rows (main + favorites) for height calculation
-    final enabledAlbumRows = (_showRecentAlbums ? 1 : 0) +
+    // Count enabled rows
+    final totalEnabledRows = (_showRecentAlbums ? 1 : 0) +
+                             (_showDiscoverArtists ? 1 : 0) +
                              (_showDiscoverAlbums ? 1 : 0) +
                              (_showFavoriteAlbums ? 1 : 0) +
-                             (_showFavoriteTracks ? 1 : 0); // Track row uses album-like sizing
-    final enabledArtistRows = (_showDiscoverArtists ? 1 : 0) +
-                              (_showFavoriteArtists ? 1 : 0);
-    final totalEnabledRows = enabledAlbumRows + enabledArtistRows;
+                             (_showFavoriteArtists ? 1 : 0) +
+                             (_showFavoriteTracks ? 1 : 0);
 
     // Use LayoutBuilder to adapt to available screen height
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Calculate available height for all rows
-        // Account for bottom nav + mini player space
+        // Always calculate heights based on fitting exactly 3 rows (2 album + 1 artist)
+        // This ensures consistent sizing regardless of how many rows are enabled
         final availableHeight = constraints.maxHeight - BottomSpacing.withMiniPlayer;
 
-        // Calculate spacing and heights based on enabled rows
-        final numRows = totalEnabledRows > 0 ? totalEnabledRows : 1;
-        final totalSpacing = (numRows - 1) * 8.0; // 8px between each row
+        // Fixed layout: 3 rows with 2 spacings of 8px each, 3 titles
+        const numRowsForCalc = 3;
+        const totalSpacing = (numRowsForCalc - 1) * 8.0; // 16px total spacing
         const titleHeight = 44.0; // Height for title text + padding per row
 
-        // Calculate height available for row content (excluding titles and spacing)
-        final contentHeight = availableHeight - totalSpacing - (titleHeight * numRows);
+        // Content height for 3 rows (2 album-type + 1 artist-type)
+        final contentHeight = availableHeight - totalSpacing - (titleHeight * numRowsForCalc);
 
-        // Distribute height based on row types
-        // Album/track rows get slightly more space than artist rows (ratio 1.18:1)
-        double albumRowHeight;
-        double artistRowHeight;
-
-        if (totalEnabledRows == 0) {
-          albumRowHeight = 180.0;
-          artistRowHeight = 160.0;
-        } else {
-          final totalRatio = (enabledAlbumRows * 1.18) + (enabledArtistRows * 1.0);
-
-          if (totalRatio > 0) {
-            final unitHeight = contentHeight / totalRatio;
-            artistRowHeight = unitHeight.clamp(120.0, 180.0);
-            albumRowHeight = (unitHeight * 1.18).clamp(140.0, 210.0);
-          } else {
-            albumRowHeight = 180.0;
-            artistRowHeight = 160.0;
-          }
-        }
+        // Distribute: 2 album rows + 1 artist row with ratio 1.18:1
+        // totalRatio = (2 * 1.18) + (1 * 1.0) = 3.36
+        const totalRatio = 3.36;
+        final unitHeight = contentHeight / totalRatio;
+        final artistRowHeight = unitHeight.clamp(120.0, 180.0);
+        final albumRowHeight = (unitHeight * 1.18).clamp(140.0, 210.0);
 
         // Build favorites rows in random order with calculated heights
         final favoritesWidgets = _buildFavoritesRows(provider, albumRowHeight, artistRowHeight);
