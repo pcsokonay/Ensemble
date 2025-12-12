@@ -1412,11 +1412,15 @@ class MusicAssistantProvider with ChangeNotifier {
 
         if (isBuiltinPlayer) {
           // Local playback - use local player notification
+          // Include player name in artist line: "Artist • Player Name"
+          final artistWithPlayer = track.artistsString.isNotEmpty
+              ? '${track.artistsString} • ${_selectedPlayer!.name}'
+              : _selectedPlayer!.name;
           if (trackChanged) {
             _localPlayer.updateNotification(
               id: track.uri ?? track.itemId,
               title: track.name,
-              artist: track.artistsString,
+              artist: artistWithPlayer,
               album: track.album?.name,
               artworkUrl: artworkUrl,
               duration: track.duration,

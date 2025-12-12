@@ -155,17 +155,12 @@ class MassivAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> stop() async {
-    if (_isRemoteMode) {
-      // In remote mode, stop action switches players
-      _logger.log('MassivAudioHandler: stop requested (remote mode) -> switching player');
-      if (onSwitchPlayer != null) {
-        onSwitchPlayer!();
-      }
-    } else {
-      await _player.stop();
-      // Don't call super.stop() which would end the service
-      // Just stop playback and let the notification remain for resuming
+    // Stop action is used for switching players (both local and remote modes)
+    _logger.log('MassivAudioHandler: stop requested -> switching player');
+    if (onSwitchPlayer != null) {
+      onSwitchPlayer!();
     }
+    // Note: We don't actually stop playback - this button is repurposed for player switching
   }
 
   @override
