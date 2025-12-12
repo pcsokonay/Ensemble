@@ -385,10 +385,6 @@ class MusicAssistantProvider with ChangeNotifier {
       _logger.log('🎵 Notification: Pause pressed');
       playPauseSelectedPlayer();
     };
-    audioHandler.onSwitchPlayer = () {
-      _logger.log('🎵 Notification: Switch player pressed');
-      selectNextPlayer();
-    };
 
     // Player registration is now handled in _initializeAfterConnection()
     // which runs after authentication completes (when auth is required)

@@ -20,17 +20,9 @@ class MassivAudioHandler extends BaseAudioHandler with SeekHandler {
   Function()? onSkipToPrevious;
   Function()? onPlay;
   Function()? onPause;
-  Function()? onSwitchPlayer;
 
   // Track whether we're in remote control mode (controlling MA player, not playing locally)
   bool _isRemoteMode = false;
-
-  // Custom action for switching players
-  static const switchPlayerAction = MediaControl(
-    androidIcon: 'drawable/ic_switch_player',
-    label: 'Switch Player',
-    action: MediaAction.custom0,
-  );
 
   MassivAudioHandler({required this.authManager}) {
     _init();
@@ -178,14 +170,6 @@ class MassivAudioHandler extends BaseAudioHandler with SeekHandler {
     }
   }
 
-  @override
-  Future<void> customAction(String name, [Map<String, dynamic>? extras]) async {
-    _logger.log('MassivAudioHandler: customAction requested: $name');
-    if (name == 'custom0' && onSwitchPlayer != null) {
-      onSwitchPlayer!();
-    }
-  }
-
   // --- Custom methods for Ensemble ---
 
   /// Play a URL with the given metadata
@@ -246,14 +230,12 @@ class MassivAudioHandler extends BaseAudioHandler with SeekHandler {
         MediaControl.skipToPrevious,
         if (playing) MediaControl.pause else MediaControl.play,
         MediaControl.skipToNext,
-        switchPlayerAction,
       ],
       systemActions: const {
         MediaAction.play,
         MediaAction.pause,
         MediaAction.skipToNext,
         MediaAction.skipToPrevious,
-        MediaAction.custom0,
       },
       androidCompactActionIndices: const [0, 1, 2],
       processingState: AudioProcessingState.ready,
