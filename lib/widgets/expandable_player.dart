@@ -51,8 +51,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   PlayerQueue? _queue;
   bool _isLoadingQueue = false;
 
-  // Progress timer for elapsed time updates
-  Timer? _progressTimer;
+  // Progress tracking - now uses PositionTracker stream instead of local timer
+  StreamSubscription<Duration>? _positionSubscription;
   double? _seekPosition;
   final ValueNotifier<int> _progressNotifier = ValueNotifier<int>(0);
   final ValueNotifier<double?> _seekPositionNotifier = ValueNotifier<double?>(null);
@@ -136,9 +136,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       }
     });
 
-    // Start progress timer immediately - it runs continuously to keep
-    // progress data fresh for when the player is expanded
-    _startProgressTimer();
+    // Subscribe to position tracker stream - single source of truth for playback position
+    _subscribeToPositionTracker();
 
     // Auto-refresh queue when panel is open
     _queuePanelController.addStatusListener((status) {
@@ -172,7 +171,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     _controller.dispose();
     _queuePanelController.dispose();
     _slideController.dispose();
-    _progressTimer?.cancel();
+    _positionSubscription?.cancel();
     _queueRefreshTimer?.cancel();
     _progressNotifier.dispose();
     _seekPositionNotifier.dispose();
@@ -214,19 +213,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     );
   }
 
-  void _startProgressTimer() {
-    _progressTimer?.cancel();
-    // Progress timer runs continuously (not just when expanded) to ensure
-    // the progress notifier always has fresh interpolated data.
-    // This prevents stale progress showing when the player first expands.
-    _progressTimer = Timer.periodic(Timings.localPlayerReportInterval, (_) {
+  void _subscribeToPositionTracker() {
+    _positionSubscription?.cancel();
+    // Subscribe to position tracker stream - single source of truth
+    // This eliminates race conditions between multiple timers
+    final maProvider = context.read<MusicAssistantProvider>();
+    _positionSubscription = maProvider.positionTracker.positionStream.listen((position) {
       if (!mounted) return;
-      final maProvider = context.read<MusicAssistantProvider>();
-      final selectedPlayer = maProvider.selectedPlayer;
-      if (selectedPlayer != null && selectedPlayer.isPlaying) {
-        // Only update when playing - no need to interpolate paused state
-        _progressNotifier.value = selectedPlayer.currentElapsedTime.toInt();
-      }
+      _progressNotifier.value = position.inSeconds;
     });
   }
 
@@ -699,19 +693,17 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         // Update favorite status when track changes
         _updateFavoriteStatus(currentTrack);
 
-        // Sync progress notifier immediately when player state changes
+        // Sync progress notifier with position tracker
         // This ensures the progress bar shows correct position on expand,
-        // after seek, or when switching players - without waiting for timer
-        if (selectedPlayer.elapsedTime != null) {
-          final newProgress = selectedPlayer.currentElapsedTime.toInt();
-          if (_progressNotifier.value != newProgress) {
-            // Use addPostFrameCallback to avoid updating during build
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                _progressNotifier.value = newProgress;
-              }
-            });
-          }
+        // after seek, or when switching players
+        final currentPosition = maProvider.positionTracker.currentPosition.inSeconds;
+        if (_progressNotifier.value != currentPosition) {
+          // Use addPostFrameCallback to avoid updating during build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _progressNotifier.value = currentPosition;
+            }
+          });
         }
 
         return AnimatedBuilder(

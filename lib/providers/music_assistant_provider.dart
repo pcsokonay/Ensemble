@@ -15,6 +15,7 @@ import '../services/device_id_service.dart';
 import '../services/cache_service.dart';
 import '../services/local_player_service.dart';
 import '../services/metadata_service.dart';
+import '../services/position_tracker.dart';
 import '../constants/timings.dart';
 import '../main.dart' show audioHandler;
 
@@ -33,6 +34,7 @@ class MusicAssistantProvider with ChangeNotifier {
   final AuthManager _authManager = AuthManager();
   final DebugLogger _logger = DebugLogger();
   final CacheService _cacheService = CacheService();
+  final PositionTracker _positionTracker = PositionTracker();
 
   MAConnectionState _connectionState = MAConnectionState.disconnected;
   String? _serverUrl;
@@ -97,6 +99,9 @@ class MusicAssistantProvider with ChangeNotifier {
 
   MusicAssistantAPI? get api => _api;
   AuthManager get authManager => _authManager;
+
+  /// Position tracker for playback progress - single source of truth
+  PositionTracker get positionTracker => _positionTracker;
 
   /// Get cached track for a player (used for smooth swipe transitions)
   Track? getCachedTrackForPlayer(String playerId) => _cacheService.getCachedTrackForPlayer(playerId);
@@ -319,6 +324,7 @@ class MusicAssistantProvider with ChangeNotifier {
     _localPlayerStateReportTimer?.cancel();
     _localPlayerEventSubscription?.cancel();
     _playerUpdatedEventSubscription?.cancel();
+    _positionTracker.clear();
     await _api?.disconnect();
     _connectionState = MAConnectionState.disconnected;
     _artists = [];
@@ -1164,6 +1170,16 @@ class MusicAssistantProvider with ChangeNotifier {
     // stale track info when switching to a non-playing player.
     _currentTrack = _cacheService.getCachedTrackForPlayer(player.playerId);
 
+    // Initialize position tracker for this player
+    _positionTracker.onPlayerSelected(player.playerId);
+    _positionTracker.updateFromServer(
+      playerId: player.playerId,
+      position: player.elapsedTime ?? 0.0,
+      isPlaying: player.state == 'playing',
+      duration: _currentTrack?.duration,
+      serverTimestamp: player.elapsedTimeLastUpdated,
+    );
+
     // Switch audio handler mode based on player type
     final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
     final isBuiltinPlayer = builtinPlayerId != null && player.playerId == builtinPlayerId;
@@ -1220,7 +1236,8 @@ class MusicAssistantProvider with ChangeNotifier {
           duration: track.duration,
           artUri: artworkUrl != null ? Uri.tryParse(artworkUrl) : null,
         );
-        final position = Duration(seconds: (player.currentElapsedTime ?? 0).round());
+        // Use position tracker for consistent position
+        final position = _positionTracker.currentPosition;
         audioHandler.setRemotePlaybackState(
           item: mediaItem,
           playing: player.state == 'playing',
@@ -1235,7 +1252,7 @@ class MusicAssistantProvider with ChangeNotifier {
           title: player.name,
           artist: 'Loading...',
         );
-        final position = Duration(seconds: (player.currentElapsedTime ?? 0).round());
+        final position = _positionTracker.currentPosition;
         audioHandler.setRemotePlaybackState(
           item: mediaItem,
           playing: player.state == 'playing',
@@ -1346,9 +1363,17 @@ class MusicAssistantProvider with ChangeNotifier {
       return;
     }
 
-    // Use interpolated position from player model
-    final position = Duration(seconds: (_selectedPlayer!.currentElapsedTime ?? 0).round());
+    // Use position tracker for consistent position (single source of truth)
+    final position = _positionTracker.currentPosition;
     final track = _currentTrack!;
+
+    // Check if track has ended (position reached duration)
+    if (_positionTracker.hasReachedEnd) {
+      _logger.log('PositionTracker: Track appears to have ended (position >= duration)');
+      // Don't update notification, let the next poll handle the state change
+      return;
+    }
+
     final artworkUrl = _api?.getImageUrl(track, size: 512);
     final artistWithPlayer = track.artistsString.isNotEmpty
         ? '${track.artistsString} • ${_selectedPlayer!.name}'
@@ -1519,6 +1544,15 @@ class MusicAssistantProvider with ChangeNotifier {
       _selectedPlayer = updatedPlayer;
       stateChanged = true;
 
+      // Feed position tracker with server data
+      _positionTracker.updateFromServer(
+        playerId: updatedPlayer.playerId,
+        position: updatedPlayer.elapsedTime ?? 0.0,
+        isPlaying: updatedPlayer.state == 'playing',
+        duration: _currentTrack?.duration,
+        serverTimestamp: updatedPlayer.elapsedTimeLastUpdated,
+      );
+
       final isPlayingOrPaused = _selectedPlayer!.state == 'playing' || _selectedPlayer!.state == 'paused';
       final isIdleWithContent = _selectedPlayer!.state == 'idle' && _selectedPlayer!.powered;
       final shouldShowTrack = _selectedPlayer!.available && (isPlayingOrPaused || isIdleWithContent);
@@ -1586,7 +1620,8 @@ class MusicAssistantProvider with ChangeNotifier {
             duration: track.duration,
             artUri: artworkUrl != null ? Uri.tryParse(artworkUrl) : null,
           );
-          final position = Duration(seconds: (_selectedPlayer!.currentElapsedTime ?? 0).round());
+          // Use position tracker for consistent position (single source of truth)
+          final position = _positionTracker.currentPosition;
           audioHandler.setRemotePlaybackState(
             item: mediaItem,
             playing: _selectedPlayer!.state == 'playing',
@@ -1618,7 +1653,7 @@ class MusicAssistantProvider with ChangeNotifier {
               playing: _selectedPlayer!.state == 'playing',
             );
           } else {
-            final position = Duration(seconds: (_selectedPlayer!.currentElapsedTime ?? 0).round());
+            final position = _positionTracker.currentPosition;
             audioHandler.setRemotePlaybackState(
               item: mediaItem,
               playing: _selectedPlayer!.state == 'playing',
@@ -1628,6 +1663,7 @@ class MusicAssistantProvider with ChangeNotifier {
           }
         } else {
           audioHandler.clearRemotePlaybackState();
+          _positionTracker.clear();
         }
       }
 
@@ -2015,6 +2051,8 @@ class MusicAssistantProvider with ChangeNotifier {
 
   Future<void> seek(String playerId, int position) async {
     try {
+      // Immediately update position tracker for responsive UI
+      _positionTracker.onSeek(position.toDouble());
       await _api?.seek(playerId, position);
     } catch (e) {
       ErrorHandler.logError('Seek', e);
@@ -2066,6 +2104,7 @@ class MusicAssistantProvider with ChangeNotifier {
     _localPlayerStateReportTimer?.cancel();
     _localPlayerEventSubscription?.cancel();
     _playerUpdatedEventSubscription?.cancel();
+    _positionTracker.dispose();
     _api?.dispose();
     super.dispose();
   }
