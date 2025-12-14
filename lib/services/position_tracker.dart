@@ -99,6 +99,7 @@ class PositionTracker {
 
     // Calculate the best anchor position
     double anchorPos = position;
+    bool hasStaleTimestamp = false;
 
     // If server provides timestamp, use it to calculate current position more accurately
     if (serverTimestamp != null && isPlaying) {
@@ -110,6 +111,12 @@ class PositionTracker {
       if (serverAge >= 0 && serverAge < 30) {
         anchorPos = position + serverAge;
         _logger.log('PositionTracker: Using server timestamp, age=${serverAge.toStringAsFixed(1)}s, adjusted pos=${anchorPos.toStringAsFixed(1)}s');
+      } else {
+        // Timestamp is stale - mark this so we don't blindly trust the position
+        hasStaleTimestamp = true;
+        if (serverAge >= 30) {
+          _logger.log('PositionTracker: Stale timestamp (age=${serverAge.toStringAsFixed(0)}s), raw pos=${position.toStringAsFixed(1)}s');
+        }
       }
     }
 
@@ -139,6 +146,8 @@ class PositionTracker {
     if (positionDiff > 3 && _isPlaying && isPlaying && !playerChanged) {
       if (isSuspiciousReset) {
         _logger.log('PositionTracker: Ignoring suspicious reset to 0: ${currentInterpolated.toStringAsFixed(1)}s -> ${anchorPos.toStringAsFixed(1)}s (likely bad server data)');
+      } else if (hasStaleTimestamp) {
+        _logger.log('PositionTracker: Ignoring position diff due to stale timestamp: ${currentInterpolated.toStringAsFixed(1)}s -> ${anchorPos.toStringAsFixed(1)}s (keeping interpolated)');
       } else {
         _logger.log('PositionTracker: Position jump detected: ${currentInterpolated.toStringAsFixed(1)}s -> ${anchorPos.toStringAsFixed(1)}s (diff: ${positionDiff.toStringAsFixed(1)}s)');
       }
@@ -148,10 +157,14 @@ class PositionTracker {
     // 1. Player changed
     // 2. Play state changed
     // 3. Position jumped significantly (seek or track change) - BUT NOT if it's a suspicious reset
+    //    AND NOT if the timestamp is stale (stale data shouldn't override interpolated position)
     // 4. We're not playing (paused state should reflect server position)
+    //
+    // Key insight: When timestamp is stale, the raw position from server is likely outdated.
+    // Our interpolated position is probably more accurate, so don't let stale data override it.
     final shouldUpdateAnchor = playerChanged
         || playStateChanged
-        || (positionDiff > 2 && !isSuspiciousReset)
+        || (positionDiff > 2 && !isSuspiciousReset && !hasStaleTimestamp)
         || !isPlaying;
 
     if (shouldUpdateAnchor) {
