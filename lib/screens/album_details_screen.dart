@@ -545,6 +545,47 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
     }
   }
 
+  /// Show fullscreen album art overlay
+  void _showFullscreenArt(String? imageUrl) {
+    if (imageUrl == null) return;
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black87,
+        barrierDismissible: true,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return FadeTransition(
+            opacity: animation,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              onVerticalDragEnd: (details) {
+                if (details.primaryVelocity != null && details.primaryVelocity!.abs() > 300) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Scaffold(
+                backgroundColor: Colors.transparent,
+                body: Center(
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 3.0,
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.contain,
+                      memCacheWidth: 1024,
+                      memCacheHeight: 1024,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // CRITICAL FIX: Use select() instead of watch() to reduce rebuilds
@@ -607,35 +648,38 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const SizedBox(height: 60),
-                  Hero(
-                    tag: HeroTags.albumCover + (widget.album.uri ?? widget.album.itemId) + _heroTagSuffix,
-                    child: Container(
-                      width: 280, // Increased size
-                      height: 280,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant,
-                        borderRadius: BorderRadius.circular(16), // Slightly more rounded
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                        image: imageUrl != null
-                            ? DecorationImage(
-                                image: CachedNetworkImageProvider(imageUrl),
-                                fit: BoxFit.cover,
+                  GestureDetector(
+                    onTap: () => _showFullscreenArt(imageUrl),
+                    child: Hero(
+                      tag: HeroTags.albumCover + (widget.album.uri ?? widget.album.itemId) + _heroTagSuffix,
+                      child: Container(
+                        width: 280, // Increased size
+                        height: 280,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(16), // Slightly more rounded
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                          image: imageUrl != null
+                              ? DecorationImage(
+                                  image: CachedNetworkImageProvider(imageUrl),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                        ),
+                        child: imageUrl == null
+                            ? Icon(
+                                Icons.album_rounded,
+                                size: 120,
+                                color: colorScheme.onSurfaceVariant,
                               )
                             : null,
                       ),
-                      child: imageUrl == null
-                          ? Icon(
-                              Icons.album_rounded,
-                              size: 120,
-                              color: colorScheme.onSurfaceVariant,
-                            )
-                          : null,
                     ),
                   ),
                 ],

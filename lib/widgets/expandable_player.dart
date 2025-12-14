@@ -1212,9 +1212,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       child: GestureDetector(
         // Use translucent to allow child widgets (like buttons) to receive taps
         behavior: HitTestBehavior.translucent,
-        onTap: () {
-          if (!isExpanded) expand();
-        },
+        // Only handle tap when collapsed - when expanded, let children handle their own taps
+        onTap: isExpanded ? null : expand,
         onVerticalDragUpdate: (details) {
           if (details.primaryDelta! < -10 && !isExpanded) {
             expand();
