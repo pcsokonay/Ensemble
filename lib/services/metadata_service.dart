@@ -251,9 +251,82 @@ class MetadataService {
     return null;
   }
 
+  // Cache for album images
+  static final Map<String, String?> _albumImageCache = {};
+
+  /// Fetches album cover URL from Deezer (free, no API key required)
+  /// Returns the image URL if found, null otherwise
+  static Future<String?> getAlbumImageUrl(String albumName, String? artistName) async {
+    // Build cache key
+    final cacheKey = 'albumImage:${artistName ?? ""}:$albumName';
+    if (_albumImageCache.containsKey(cacheKey)) {
+      return _albumImageCache[cacheKey];
+    }
+
+    // Use Deezer API (free, no key, excellent coverage)
+    try {
+      // Search with both album and artist if available for better matching
+      final query = artistName != null && artistName.isNotEmpty
+          ? '$artistName $albumName'
+          : albumName;
+
+      final uri = Uri.https(
+        'api.deezer.com',
+        '/search/album',
+        {
+          'q': query,
+          'limit': '5', // Get a few results to find best match
+        },
+      );
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final albums = data['data'] as List?;
+        if (albums != null && albums.isNotEmpty) {
+          // Try to find exact match first
+          Map<String, dynamic>? bestMatch;
+          for (final album in albums) {
+            final deezerAlbumName = (album['title'] as String?)?.toLowerCase();
+            final deezerArtistName = (album['artist']?['name'] as String?)?.toLowerCase();
+
+            if (deezerAlbumName == albumName.toLowerCase()) {
+              // Album name matches
+              if (artistName == null || artistName.isEmpty ||
+                  deezerArtistName == artistName.toLowerCase()) {
+                // And artist matches (or we don't have artist to match)
+                bestMatch = album;
+                break;
+              }
+              // Album matches but artist doesn't - keep as candidate
+              bestMatch ??= album;
+            }
+          }
+
+          // Fall back to first result if no good match
+          bestMatch ??= albums[0];
+
+          // Use cover_xl for high quality, fall back to cover_medium
+          final imageUrl = bestMatch['cover_xl'] ?? bestMatch['cover_big'] ??
+              bestMatch['cover_medium'] ?? bestMatch['cover'];
+          _albumImageCache[cacheKey] = imageUrl;
+          return imageUrl;
+        }
+      }
+    } catch (e) {
+      _logger.warning('Deezer album image error: $e', context: 'Metadata');
+    }
+
+    // Cache the null result to avoid repeated failed lookups
+    _albumImageCache[cacheKey] = null;
+    return null;
+  }
+
   /// Clears the metadata cache
   static void clearCache() {
     _cache.clear();
     _artistImageCache.clear();
+    _albumImageCache.clear();
   }
 }

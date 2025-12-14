@@ -32,6 +32,7 @@ class _ArtistCardState extends State<ArtistCard> {
   static final _logger = DebugLogger();
   String? _fallbackImageUrl;
   bool _triedFallback = false;
+  bool _maImageFailed = false;
   String? _cachedMaImageUrl;
 
   @override
@@ -57,6 +58,16 @@ class _ArtistCardState extends State<ArtistCard> {
     });
   }
 
+  void _onImageError() {
+    // When MA image fails to load, try Deezer fallback
+    if (!_triedFallback && !_maImageFailed) {
+      _maImageFailed = true;
+      _triedFallback = true;
+      _logger.debug('MA image failed for "${widget.artist.name}", trying fallback', context: 'ArtistCard');
+      _fetchFallbackImage();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
@@ -67,8 +78,8 @@ class _ArtistCardState extends State<ArtistCard> {
 
     final suffix = widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
 
-    // Use MA image if available, otherwise try fallback
-    final imageUrl = maImageUrl ?? _fallbackImageUrl;
+    // Use fallback if MA image failed or wasn't available
+    final imageUrl = (_maImageFailed || maImageUrl == null) ? _fallbackImageUrl : maImageUrl;
 
     return RepaintBoundary(
       child: GestureDetector(
@@ -113,11 +124,19 @@ class _ArtistCardState extends State<ArtistCard> {
                                   memCacheHeight: 256,
                                   fadeInDuration: const Duration(milliseconds: 150),
                                   placeholder: (context, url) => const SizedBox(),
-                                  errorWidget: (context, url, error) => Icon(
-                                    Icons.person_rounded,
-                                    size: size * 0.55,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                                  errorWidget: (context, url, error) {
+                                    // Try fallback on error (only for MA URLs, not fallback URLs)
+                                    if (!_maImageFailed && url == maImageUrl) {
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        _onImageError();
+                                      });
+                                    }
+                                    return Icon(
+                                      Icons.person_rounded,
+                                      size: size * 0.55,
+                                      color: colorScheme.onSurfaceVariant,
+                                    );
+                                  },
                                 )
                               : Icon(Icons.person_rounded, size: size * 0.55, color: colorScheme.onSurfaceVariant),
                         ),

@@ -28,7 +28,10 @@ class ArtistAvatar extends StatefulWidget {
 
 class _ArtistAvatarState extends State<ArtistAvatar> {
   String? _imageUrl;
+  String? _maImageUrl;
+  String? _fallbackImageUrl;
   bool _triedFallback = false;
+  bool _maImageFailed = false;
 
   @override
   void initState() {
@@ -41,6 +44,8 @@ class _ArtistAvatarState extends State<ArtistAvatar> {
 
     // Try MA first
     final maUrl = provider.getImageUrl(widget.artist, size: widget.imageSize);
+    _maImageUrl = maUrl;
+
     if (maUrl != null) {
       if (mounted) {
         setState(() {
@@ -51,16 +56,30 @@ class _ArtistAvatarState extends State<ArtistAvatar> {
       return;
     }
 
-    // Fallback to external sources
-    if (!_triedFallback) {
-      _triedFallback = true;
-      final fallbackUrl = await MetadataService.getArtistImageUrl(widget.artist.name);
-      if (fallbackUrl != null && mounted) {
-        setState(() {
-          _imageUrl = fallbackUrl;
-        });
-        widget.onImageLoaded?.call(fallbackUrl);
-      }
+    // Fallback to external sources (MA returned null)
+    _fetchFallbackImage();
+  }
+
+  Future<void> _fetchFallbackImage() async {
+    if (_triedFallback) return;
+    _triedFallback = true;
+
+    final fallbackUrl = await MetadataService.getArtistImageUrl(widget.artist.name);
+    _fallbackImageUrl = fallbackUrl;
+
+    if (fallbackUrl != null && mounted) {
+      setState(() {
+        _imageUrl = fallbackUrl;
+      });
+      widget.onImageLoaded?.call(fallbackUrl);
+    }
+  }
+
+  void _onImageError() {
+    // When MA image fails to load, try Deezer fallback
+    if (!_maImageFailed) {
+      _maImageFailed = true;
+      _fetchFallbackImage();
     }
   }
 
@@ -68,13 +87,49 @@ class _ArtistAvatarState extends State<ArtistAvatar> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    final avatar = CircleAvatar(
-      radius: widget.radius,
-      backgroundColor: colorScheme.surfaceVariant,
-      backgroundImage: _imageUrl != null ? CachedNetworkImageProvider(_imageUrl!) : null,
-      child: _imageUrl == null
-          ? Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant)
-          : null,
+    // Use fallback if MA image failed
+    final displayUrl = (_maImageFailed && _fallbackImageUrl != null)
+        ? _fallbackImageUrl
+        : _imageUrl;
+
+    Widget avatarContent;
+    if (displayUrl != null) {
+      avatarContent = ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: displayUrl,
+          width: widget.radius * 2,
+          height: widget.radius * 2,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            color: colorScheme.surfaceVariant,
+            child: Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant),
+          ),
+          errorWidget: (context, url, error) {
+            // Try fallback on error (only for MA URLs, not fallback URLs)
+            if (!_maImageFailed && url == _maImageUrl) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _onImageError();
+              });
+            }
+            return Container(
+              color: colorScheme.surfaceVariant,
+              child: Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant),
+            );
+          },
+        ),
+      );
+    } else {
+      avatarContent = CircleAvatar(
+        radius: widget.radius,
+        backgroundColor: colorScheme.surfaceVariant,
+        child: Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant),
+      );
+    }
+
+    final avatar = SizedBox(
+      width: widget.radius * 2,
+      height: widget.radius * 2,
+      child: avatarContent,
     );
 
     if (widget.heroTag != null) {

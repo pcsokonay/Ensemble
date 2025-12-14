@@ -7,8 +7,9 @@ import '../screens/album_details_screen.dart';
 import '../constants/hero_tags.dart';
 import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
+import '../services/metadata_service.dart';
 
-class AlbumCard extends StatelessWidget {
+class AlbumCard extends StatefulWidget {
   final Album album;
   final VoidCallback? onTap;
   final String? heroTagSuffix;
@@ -21,25 +22,81 @@ class AlbumCard extends StatelessWidget {
   });
 
   @override
+  State<AlbumCard> createState() => _AlbumCardState();
+}
+
+class _AlbumCardState extends State<AlbumCard> {
+  String? _fallbackImageUrl;
+  bool _triedFallback = false;
+  bool _maImageFailed = false;
+  String? _cachedMaImageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFallbackImage();
+  }
+
+  void _initFallbackImage() {
+    // Check if MA has an image after first build, then fetch fallback if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final maProvider = context.read<MusicAssistantProvider>();
+      final maImageUrl = maProvider.api?.getImageUrl(widget.album, size: 256);
+      _cachedMaImageUrl = maImageUrl;
+
+      if (maImageUrl == null && !_triedFallback) {
+        _triedFallback = true;
+        _fetchFallbackImage();
+      }
+    });
+  }
+
+  Future<void> _fetchFallbackImage() async {
+    final fallbackUrl = await MetadataService.getAlbumImageUrl(
+      widget.album.name,
+      widget.album.artistsString,
+    );
+    if (fallbackUrl != null && mounted) {
+      setState(() {
+        _fallbackImageUrl = fallbackUrl;
+      });
+    }
+  }
+
+  void _onImageError() {
+    // When MA image fails to load, try Deezer fallback
+    if (!_triedFallback && !_maImageFailed) {
+      _maImageFailed = true;
+      _triedFallback = true;
+      _fetchFallbackImage();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.api?.getImageUrl(album, size: 256);
+    // Use cached URL if available, otherwise get fresh
+    final maImageUrl = _cachedMaImageUrl ?? maProvider.api?.getImageUrl(widget.album, size: 256);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final suffix = heroTagSuffix != null ? '_$heroTagSuffix' : '';
+    final suffix = widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
+
+    // Use fallback if MA image failed or wasn't available
+    final imageUrl = (_maImageFailed || maImageUrl == null) ? _fallbackImageUrl : maImageUrl;
 
     return RepaintBoundary(
       child: GestureDetector(
-        onTap: onTap ?? () {
+        onTap: widget.onTap ?? () {
           // Update adaptive colors immediately on tap
           updateAdaptiveColorsFromImage(context, imageUrl);
           Navigator.push(
             context,
             FadeSlidePageRoute(
               child: AlbumDetailsScreen(
-                album: album,
-                heroTagSuffix: heroTagSuffix,
+                album: widget.album,
+                heroTagSuffix: widget.heroTagSuffix,
               ),
             ),
           );
@@ -51,7 +108,7 @@ class AlbumCard extends StatelessWidget {
             AspectRatio(
               aspectRatio: 1.0,
               child: Hero(
-                tag: HeroTags.albumCover + (album.uri ?? album.itemId) + suffix,
+                tag: HeroTags.albumCover + (widget.album.uri ?? widget.album.itemId) + suffix,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12.0),
                   child: Container(
@@ -64,11 +121,19 @@ class AlbumCard extends StatelessWidget {
                             memCacheHeight: 256,
                             fadeInDuration: const Duration(milliseconds: 150),
                             placeholder: (context, url) => const SizedBox(),
-                            errorWidget: (context, url, error) => Icon(
-                              Icons.album_rounded,
-                              size: 64,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                            errorWidget: (context, url, error) {
+                              // Try fallback on error (only for MA URLs, not fallback URLs)
+                              if (!_maImageFailed && url == maImageUrl) {
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  _onImageError();
+                                });
+                              }
+                              return Icon(
+                                Icons.album_rounded,
+                                size: 64,
+                                color: colorScheme.onSurfaceVariant,
+                              );
+                            },
                           )
                         : Center(
                             child: Icon(
@@ -84,11 +149,11 @@ class AlbumCard extends StatelessWidget {
           const SizedBox(height: 8),
           // Album title
           Hero(
-            tag: HeroTags.albumTitle + (album.uri ?? album.itemId) + suffix,
+            tag: HeroTags.albumTitle + (widget.album.uri ?? widget.album.itemId) + suffix,
             child: Material(
               color: Colors.transparent,
               child: Text(
-                album.name,
+                widget.album.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.titleSmall?.copyWith(
@@ -100,11 +165,11 @@ class AlbumCard extends StatelessWidget {
           ),
           // Artist name
           Hero(
-            tag: HeroTags.artistName + (album.uri ?? album.itemId) + suffix,
+            tag: HeroTags.artistName + (widget.album.uri ?? widget.album.itemId) + suffix,
             child: Material(
               color: Colors.transparent,
               child: Text(
-                album.artistsString,
+                widget.album.artistsString,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.bodySmall?.copyWith(
