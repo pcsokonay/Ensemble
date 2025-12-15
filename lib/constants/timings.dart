@@ -8,8 +8,10 @@ class Timings {
   /// Player state polling interval (for selected player updates)
   static const Duration playerPollingInterval = Duration(seconds: 5);
 
-  /// Local player state report interval (for seek bar smoothness)
-  static const Duration localPlayerReportInterval = Duration(seconds: 1);
+  /// Local player state report interval
+  /// Note: Sendspin protocol only requires state on changes, not periodic reports.
+  /// This is mainly for local UI position tracking. Set to 5s to reduce server traffic.
+  static const Duration localPlayerReportInterval = Duration(seconds: 5);
 
   /// Player list cache duration before refresh
   static const Duration playersCacheDuration = Duration(minutes: 5);

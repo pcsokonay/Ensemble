@@ -239,6 +239,25 @@ class SendspinService {
           if (_ackCompleter != null && !_ackCompleter!.isCompleted) {
             _ackCompleter!.complete(true);
           }
+          // Send initial client/state immediately after handshake (required by spec)
+          _sendInitialState();
+          // Also send initial time sync
+          _sendClientTime();
+          break;
+
+        case 'server/time':
+          // Server responded to our time sync - can be used to calculate clock offset
+          // For now, just log it (proper sync would use Kalman filter)
+          _logger.log('Sendspin: Received server/time response');
+          break;
+
+        case 'group/update':
+          // Group state update - store for reference but no response needed
+          _logger.log('Sendspin: Received group/update');
+          final groupPayload = data['payload'] as Map<String, dynamic>?;
+          if (groupPayload != null) {
+            _logger.log('Sendspin: Group state: ${groupPayload['playback_state']}');
+          }
           break;
 
         case 'ack':
@@ -339,6 +358,7 @@ class SendspinService {
   }
 
   /// Report current player state to server
+  /// Uses Sendspin protocol 'client/state' message format
   void reportState({
     bool? powered,
     bool? playing,
@@ -354,14 +374,19 @@ class SendspinService {
     if (volume != null) _volume = volume;
     if (muted != null) _isMuted = muted;
 
+    // Determine player state for Sendspin protocol
+    // 'synchronized' = ready/playing, 'error' = problem with sync
+    final playerState = _isPlaying || _isPaused ? 'synchronized' : 'synchronized';
+
     _sendMessage({
-      'type': 'state',
-      'powered': _isPowered,
-      'playing': _isPlaying,
-      'paused': _isPaused,
-      'position': _position,
-      'volume': _volume,
-      'muted': _isMuted,
+      'type': 'client/state',
+      'payload': {
+        'player': {
+          'state': playerState,
+          'volume': _volume,
+          'muted': _isMuted,
+        },
+      },
     });
   }
 
@@ -398,11 +423,37 @@ class SendspinService {
     ).toString();
   }
 
-  /// Start heartbeat timer
+  /// Start heartbeat timer using Sendspin's client/time for clock synchronization
   void _startHeartbeat() {
     _stopHeartbeat();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      _sendMessage({'type': 'ping'});
+      _sendClientTime();
+    });
+  }
+
+  /// Send client/time message for clock synchronization (Sendspin protocol)
+  void _sendClientTime() {
+    final timestampMicroseconds = DateTime.now().microsecondsSinceEpoch;
+    _sendMessage({
+      'type': 'client/time',
+      'payload': {
+        'timestamp': timestampMicroseconds,
+      },
+    });
+  }
+
+  /// Send initial client/state immediately after handshake (required by Sendspin spec)
+  void _sendInitialState() {
+    _logger.log('Sendspin: Sending initial client/state');
+    _sendMessage({
+      'type': 'client/state',
+      'payload': {
+        'player': {
+          'state': 'synchronized',
+          'volume': _volume,
+          'muted': _isMuted,
+        },
+      },
     });
   }
 
@@ -435,13 +486,19 @@ class SendspinService {
     }
   }
 
-  /// Disconnect from server
+  /// Disconnect from server using Sendspin's client/goodbye message
   Future<void> disconnect() async {
     _stopHeartbeat();
     _reconnectTimer?.cancel();
 
     if (_channel != null) {
-      _sendMessage({'type': 'disconnect'});
+      // Send graceful goodbye per Sendspin protocol
+      _sendMessage({
+        'type': 'client/goodbye',
+        'payload': {
+          'reason': 'user_request',
+        },
+      });
       await _channel!.sink.close();
       _channel = null;
     }
