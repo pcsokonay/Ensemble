@@ -16,6 +16,7 @@ import '../services/cache_service.dart';
 import '../services/local_player_service.dart';
 import '../services/metadata_service.dart';
 import '../services/position_tracker.dart';
+import '../services/sendspin_service.dart';
 import '../constants/timings.dart';
 import '../main.dart' show audioHandler;
 
@@ -66,6 +67,10 @@ class MusicAssistantProvider with ChangeNotifier {
 
   // Local player service
   late final LocalPlayerService _localPlayer;
+
+  // Sendspin service (MA 2.7.0b20+ replacement for builtin_player)
+  SendspinService? _sendspinService;
+  bool _sendspinConnected = false;
 
   // Search state persistence
   String _lastSearchQuery = '';
@@ -325,6 +330,11 @@ class MusicAssistantProvider with ChangeNotifier {
     _localPlayerEventSubscription?.cancel();
     _playerUpdatedEventSubscription?.cancel();
     _positionTracker.clear();
+    // Disconnect Sendspin if connected
+    if (_sendspinConnected) {
+      await _sendspinService?.disconnect();
+      _sendspinConnected = false;
+    }
     await _api?.disconnect();
     _connectionState = MAConnectionState.disconnected;
     _artists = [];
@@ -477,13 +487,25 @@ class MusicAssistantProvider with ChangeNotifier {
       final errorStr = e.toString();
       if (errorStr.contains('Invalid command') && errorStr.contains('builtin_player')) {
         _logger.log('⚠️ Builtin player API not available (MA 2.7.0b20+ uses Sendspin)');
-        _logger.log('ℹ️ Local player registration skipped - use other players (Chromecast, etc)');
         _builtinPlayerAvailable = false;
+
+        // Try to connect via Sendspin instead
+        _logger.log('🔄 Attempting Sendspin connection...');
+        final sendspinSuccess = await _connectViaSendspin();
+
+        if (sendspinSuccess) {
+          _logger.log('✅ Connected via Sendspin - local player available');
+          _startReportingLocalPlayerState();
+        } else {
+          _logger.log('⚠️ Sendspin connection failed - local player unavailable');
+          _logger.log('ℹ️ Use other players (Chromecast, etc) or ensure /sendspin route is configured');
+        }
+
         if (_registrationInProgress != null && !_registrationInProgress!.isCompleted) {
           _registrationInProgress!.complete();
         }
         _registrationInProgress = null;
-        return; // Non-fatal, continue without local player
+        return; // Non-fatal, continue
       }
 
       _logger.log('❌ Player registration failed: $e');
@@ -493,6 +515,150 @@ class MusicAssistantProvider with ChangeNotifier {
       _registrationInProgress = null;
       rethrow;
     }
+  }
+
+  /// Connect to Music Assistant via Sendspin protocol (MA 2.7.0b20+)
+  /// This is the replacement for builtin_player when that API is not available.
+  ///
+  /// Connection strategy:
+  /// 1. If server is HTTPS, try external wss://{server}/sendspin first
+  /// 2. Get local_ws_url from API and try that
+  /// 3. WebRTC fallback as last resort (requires TURN servers)
+  Future<bool> _connectViaSendspin() async {
+    if (_api == null || _serverUrl == null) return false;
+
+    try {
+      // Initialize Sendspin service
+      _sendspinService?.dispose();
+      _sendspinService = SendspinService(_serverUrl!);
+
+      // Wire up callbacks
+      _sendspinService!.onPlay = _handleSendspinPlay;
+      _sendspinService!.onPause = _handleSendspinPause;
+      _sendspinService!.onStop = _handleSendspinStop;
+      _sendspinService!.onSeek = _handleSendspinSeek;
+      _sendspinService!.onVolume = _handleSendspinVolume;
+
+      final playerId = await DeviceIdService.getOrCreateDevicePlayerId();
+
+      // Strategy 1: If server is HTTPS, try external wss:// first
+      final isHttps = _serverUrl!.startsWith('https://') ||
+                      (!_serverUrl!.contains('://') && !_serverUrl!.contains(':'));
+
+      if (isHttps) {
+        _logger.log('Sendspin: Server is HTTPS, trying external connection first');
+        final connected = await _sendspinService!.connect();
+        if (connected) {
+          _sendspinConnected = true;
+          _logger.log('✅ Sendspin: Connected via external URL');
+          return true;
+        }
+        _logger.log('⚠️ Sendspin: External connection failed, trying local URL');
+      }
+
+      // Strategy 2: Get local_ws_url from API and try that
+      final connectionInfo = await _api!.getSendspinConnectionInfo(playerId);
+      if (connectionInfo != null) {
+        final localWsUrl = connectionInfo['local_ws_url'] as String?;
+        if (localWsUrl != null) {
+          _logger.log('Sendspin: Trying local WebSocket URL: $localWsUrl');
+          final connected = await _sendspinService!.connectWithUrl(localWsUrl);
+          if (connected) {
+            _sendspinConnected = true;
+            _logger.log('✅ Sendspin: Connected via local URL');
+            return true;
+          }
+        }
+      }
+
+      // Strategy 3: WebRTC fallback (requires TURN servers from Nabucasa)
+      // For now, just log that we'd need WebRTC - implementing full WebRTC
+      // would require additional dependencies (flutter_webrtc)
+      _logger.log('⚠️ Sendspin: WebRTC fallback not yet implemented');
+      _logger.log('ℹ️ For external access, configure /sendspin route in your reverse proxy');
+
+      return false;
+    } catch (e) {
+      _logger.log('❌ Sendspin connection error: $e');
+      return false;
+    }
+  }
+
+  /// Handle Sendspin play command
+  void _handleSendspinPlay(String streamUrl, Map<String, dynamic> trackInfo) async {
+    _logger.log('🎵 Sendspin: Play command received');
+
+    try {
+      // Build full URL if needed
+      String fullUrl = streamUrl;
+      if (!streamUrl.startsWith('http') && _serverUrl != null) {
+        var baseUrl = _serverUrl!;
+        if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+          baseUrl = 'https://$baseUrl';
+        }
+        baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+        final path = streamUrl.startsWith('/') ? streamUrl : '/$streamUrl';
+        fullUrl = '$baseUrl$path';
+      }
+
+      // Extract metadata from track info
+      final trackName = trackInfo['title'] as String? ?? trackInfo['name'] as String? ?? 'Unknown Track';
+      final artistName = trackInfo['artist'] as String? ?? 'Unknown Artist';
+      final albumName = trackInfo['album'] as String?;
+      var artworkUrl = trackInfo['image_url'] as String? ?? trackInfo['artwork_url'] as String?;
+      final durationSecs = trackInfo['duration'] as int?;
+
+      if (artworkUrl != null && artworkUrl.startsWith('http://')) {
+        artworkUrl = artworkUrl.replaceFirst('http://', 'https://');
+      }
+
+      final metadata = TrackMetadata(
+        title: trackName,
+        artist: artistName,
+        album: albumName,
+        artworkUrl: artworkUrl,
+        duration: durationSecs != null ? Duration(seconds: durationSecs) : null,
+      );
+
+      _localPlayer.setCurrentTrackMetadata(metadata);
+      _currentNotificationMetadata = metadata;
+
+      await _localPlayer.playUrl(fullUrl);
+
+      // Report state back to MA
+      _sendspinService?.reportState(playing: true, paused: false);
+    } catch (e) {
+      _logger.log('❌ Sendspin: Error handling play command: $e');
+    }
+  }
+
+  /// Handle Sendspin pause command
+  void _handleSendspinPause() async {
+    _logger.log('⏸️ Sendspin: Pause command received');
+    await _localPlayer.pause();
+    _sendspinService?.reportState(playing: false, paused: true);
+  }
+
+  /// Handle Sendspin stop command
+  void _handleSendspinStop() async {
+    _logger.log('⏹️ Sendspin: Stop command received');
+    await _localPlayer.stop();
+    _sendspinService?.reportState(playing: false, paused: false);
+  }
+
+  /// Handle Sendspin seek command
+  void _handleSendspinSeek(int positionSeconds) async {
+    _logger.log('⏩ Sendspin: Seek to $positionSeconds seconds');
+    await _localPlayer.seek(Duration(seconds: positionSeconds));
+    _sendspinService?.reportState(position: positionSeconds);
+  }
+
+  /// Handle Sendspin volume command
+  void _handleSendspinVolume(int volumeLevel) async {
+    _logger.log('🔊 Sendspin: Set volume to $volumeLevel');
+    _localPlayerVolume = volumeLevel;
+    await FlutterVolumeController.setVolume(volumeLevel / 100.0);
+    _sendspinService?.reportState(volume: volumeLevel);
   }
 
   void _startReportingLocalPlayerState() {
@@ -508,7 +674,6 @@ class MusicAssistantProvider with ChangeNotifier {
 
   Future<void> _reportLocalPlayerState() async {
     if (_api == null) return;
-    if (!_builtinPlayerAvailable) return; // Skip on MA 2.7.0b20+ (no builtin_player API)
 
     // Don't try to report state if not authenticated - avoids spamming errors
     if (_api!.currentConnectionState != MAConnectionState.authenticated) return;
@@ -522,6 +687,22 @@ class MusicAssistantProvider with ChangeNotifier {
     // just_audio volume is for local playback, MA volume is for server sync
     final volume = _localPlayerVolume;
     final isPaused = !isPlaying && position > 0;
+
+    // Report via Sendspin if connected (MA 2.7.0b20+)
+    if (_sendspinConnected && _sendspinService != null) {
+      _sendspinService!.reportState(
+        powered: _isLocalPlayerPowered,
+        playing: isPlaying,
+        paused: isPaused,
+        position: position,
+        volume: volume,
+        muted: _localPlayerVolume == 0,
+      );
+      return;
+    }
+
+    // Otherwise use builtin_player API (older MA versions)
+    if (!_builtinPlayerAvailable) return;
 
     await _api!.updateBuiltinPlayerState(
       playerId,
@@ -2112,6 +2293,7 @@ class MusicAssistantProvider with ChangeNotifier {
     _localPlayerEventSubscription?.cancel();
     _playerUpdatedEventSubscription?.cancel();
     _positionTracker.dispose();
+    _sendspinService?.dispose();
     _api?.dispose();
     super.dispose();
   }

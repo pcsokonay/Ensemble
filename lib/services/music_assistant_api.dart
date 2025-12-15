@@ -1703,6 +1703,155 @@ class MusicAssistantAPI {
     }
   }
 
+  // ============================================================================
+  // SENDSPIN PLAYER MANAGEMENT (MA 2.7.0b20+ replacement for builtin_player)
+  // ============================================================================
+
+  /// Stream of Sendspin player events
+  Stream<Map<String, dynamic>> get sendspinPlayerEvents {
+    if (!_eventStreams.containsKey('sendspin_player')) {
+      _eventStreams['sendspin_player'] = StreamController<Map<String, dynamic>>.broadcast();
+    }
+    return _eventStreams['sendspin_player']!.stream;
+  }
+
+  /// Get Sendspin connection info for a player
+  /// Returns connection details including:
+  /// - local_ws_url: Direct WebSocket URL (e.g., ws://192.168.4.120:8927/sendspin)
+  /// - ice_servers: List of ICE/TURN servers for WebRTC fallback
+  /// - player_id: The player's ID
+  Future<Map<String, dynamic>?> getSendspinConnectionInfo(String playerId) async {
+    try {
+      _logger.log('Sendspin: Getting connection info for player $playerId');
+
+      final response = await _sendCommand(
+        'sendspin/connection_info',
+        args: {
+          'player_id': playerId,
+        },
+      );
+
+      final result = response['result'] as Map<String, dynamic>?;
+      if (result != null) {
+        _logger.log('Sendspin: Got connection info - local_ws_url: ${result['local_ws_url']}');
+        _logger.log('Sendspin: ICE servers count: ${(result['ice_servers'] as List?)?.length ?? 0}');
+      }
+
+      return result;
+    } catch (e) {
+      _logger.log('Sendspin: Error getting connection info: $e');
+      return null;
+    }
+  }
+
+  /// Send WebRTC offer to Sendspin server
+  /// Used when establishing WebRTC connection as fallback
+  Future<Map<String, dynamic>?> sendspinOffer(String playerId, String sdp) async {
+    try {
+      _logger.log('Sendspin: Sending WebRTC offer for player $playerId');
+
+      final response = await _sendCommand(
+        'sendspin/webrtc_offer',
+        args: {
+          'player_id': playerId,
+          'sdp': sdp,
+        },
+      );
+
+      return response['result'] as Map<String, dynamic>?;
+    } catch (e) {
+      _logger.log('Sendspin: Error sending WebRTC offer: $e');
+      return null;
+    }
+  }
+
+  /// Send WebRTC answer to Sendspin server
+  Future<void> sendspinAnswer(String playerId, String sdp) async {
+    try {
+      _logger.log('Sendspin: Sending WebRTC answer for player $playerId');
+
+      await _sendCommand(
+        'sendspin/webrtc_answer',
+        args: {
+          'player_id': playerId,
+          'sdp': sdp,
+        },
+      );
+    } catch (e) {
+      _logger.log('Sendspin: Error sending WebRTC answer: $e');
+      rethrow;
+    }
+  }
+
+  /// Send ICE candidate to Sendspin server
+  Future<void> sendspinIceCandidate(String playerId, Map<String, dynamic> candidate) async {
+    try {
+      await _sendCommand(
+        'sendspin/ice_candidate',
+        args: {
+          'player_id': playerId,
+          'candidate': candidate,
+        },
+      );
+    } catch (e) {
+      _logger.log('Sendspin: Error sending ICE candidate: $e');
+      // Don't rethrow - ICE candidate failures are common and non-fatal
+    }
+  }
+
+  /// Update Sendspin player state
+  /// Similar to updateBuiltinPlayerState but for Sendspin protocol
+  Future<void> updateSendspinPlayerState(
+    String playerId, {
+    required bool powered,
+    required bool playing,
+    required bool paused,
+    required int position,
+    required int volume,
+    required bool muted,
+  }) async {
+    try {
+      _logger.log('Sendspin: Updating player state: powered=$powered, playing=$playing, paused=$paused');
+      await _sendCommand(
+        'sendspin/update_state',
+        args: {
+          'player_id': playerId,
+          'state': {
+            'powered': powered,
+            'playing': playing,
+            'paused': paused,
+            'position': position,
+            'volume': volume,
+            'muted': muted,
+          },
+        },
+      );
+    } catch (e) {
+      _logger.log('Sendspin: Error updating player state: $e');
+      // Non-fatal, don't rethrow
+    }
+  }
+
+  /// Disconnect Sendspin player from server
+  Future<void> disconnectSendspinPlayer(String playerId) async {
+    try {
+      _logger.log('Sendspin: Disconnecting player $playerId');
+      await _sendCommand(
+        'sendspin/disconnect',
+        args: {
+          'player_id': playerId,
+        },
+      );
+    } catch (e) {
+      _logger.log('Sendspin: Error disconnecting player: $e');
+      // Non-fatal during cleanup
+    }
+  }
+
+  // ============================================================================
+  // END SENDSPIN PLAYER MANAGEMENT
+  // ============================================================================
+
   Future<void> _sendQueueCommand(String queueId, String command) async {
     try {
       final response = await _sendCommand(
