@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'debug_logger.dart';
@@ -21,6 +22,7 @@ typedef SendspinPauseCallback = void Function();
 typedef SendspinStopCallback = void Function();
 typedef SendspinSeekCallback = void Function(int positionSeconds);
 typedef SendspinVolumeCallback = void Function(int volumeLevel);
+typedef SendspinAudioDataCallback = void Function(Uint8List audioData);
 
 /// Service to manage Sendspin WebSocket connection for local playback
 /// Sendspin is the replacement for builtin_player in MA 2.7.0b20+
@@ -58,6 +60,15 @@ class SendspinService {
   SendspinStopCallback? onStop;
   SendspinSeekCallback? onSeek;
   SendspinVolumeCallback? onVolume;
+  SendspinAudioDataCallback? onAudioData;
+
+  // Audio data stream for raw PCM frames
+  final _audioDataController = StreamController<Uint8List>.broadcast();
+  Stream<Uint8List> get audioDataStream => _audioDataController.stream;
+
+  // Track audio streaming state
+  bool _isStreamingAudio = false;
+  int _audioFramesReceived = 0;
 
   // Player state for reporting to server
   bool _isPowered = true;
@@ -220,9 +231,22 @@ class SendspinService {
   }
 
   /// Handle incoming WebSocket messages
+  /// WebSocket can send text frames (JSON control messages) or binary frames (PCM audio data)
   void _handleMessage(dynamic message) {
+    // Check if this is binary audio data (Uint8List) or text (String)
+    if (message is List<int>) {
+      _handleBinaryAudioData(Uint8List.fromList(message));
+      return;
+    }
+
+    // Handle text messages (JSON)
+    if (message is! String) {
+      _logger.log('Sendspin: Unexpected message type: ${message.runtimeType}');
+      return;
+    }
+
     try {
-      final data = jsonDecode(message as String) as Map<String, dynamic>;
+      final data = jsonDecode(message) as Map<String, dynamic>;
       final type = data['type'] as String?;
 
       _logger.log('Sendspin: Received message type: $type');
@@ -261,6 +285,21 @@ class SendspinService {
           }
           break;
 
+        case 'stream/start':
+          // Server is starting to send audio data
+          _logger.log('Sendspin: Audio stream starting');
+          _isStreamingAudio = true;
+          _audioFramesReceived = 0;
+          _isPlaying = true;
+          _isPaused = false;
+          break;
+
+        case 'stream/end':
+          // Server finished sending audio data
+          _logger.log('Sendspin: Audio stream ended (received $_audioFramesReceived frames)');
+          _isStreamingAudio = false;
+          break;
+
         case 'ack':
         case 'connected':
         case 'registered':
@@ -271,7 +310,7 @@ class SendspinService {
           break;
 
         case 'play':
-          // Server wants us to play audio
+          // Server wants us to play audio (URL-based, not raw PCM)
           final streamUrl = data['url'] as String?;
           final trackInfo = data['track'] as Map<String, dynamic>? ?? {};
           if (streamUrl != null && onPlay != null) {
@@ -290,6 +329,7 @@ class SendspinService {
         case 'stop':
           _isPlaying = false;
           _isPaused = false;
+          _isStreamingAudio = false;
           onStop?.call();
           break;
 
@@ -323,8 +363,28 @@ class SendspinService {
           _logger.log('Sendspin: Unknown message type: $type');
       }
     } catch (e) {
-      _logger.log('Sendspin: Error handling message: $e');
+      _logger.log('Sendspin: Error handling JSON message: $e');
     }
+  }
+
+  /// Handle binary audio data (PCM frames from server)
+  void _handleBinaryAudioData(Uint8List audioData) {
+    _audioFramesReceived++;
+
+    // Log periodically to avoid spam
+    if (_audioFramesReceived == 1) {
+      _logger.log('Sendspin: Receiving audio data (first frame: ${audioData.length} bytes)');
+    } else if (_audioFramesReceived % 100 == 0) {
+      _logger.log('Sendspin: Received $_audioFramesReceived audio frames');
+    }
+
+    // Emit to stream for consumers
+    if (!_audioDataController.isClosed) {
+      _audioDataController.add(audioData);
+    }
+
+    // Call callback if registered
+    onAudioData?.call(audioData);
   }
 
   /// Handle WebSocket errors
@@ -515,5 +575,6 @@ class SendspinService {
     _reconnectTimer?.cancel();
     _channel?.sink.close();
     _stateController.close();
+    _audioDataController.close();
   }
 }
