@@ -163,12 +163,28 @@ class SendspinService {
 
       // Send client/hello message immediately after connecting
       // This is required by the Sendspin protocol - server waits for this
+      // Message format follows aiosendspin protocol spec
       _logger.log('Sendspin: Sending client/hello with player_id=$_playerId');
       _sendMessage({
         'type': 'client/hello',
-        'player_id': _playerId,
-        'player_name': _playerName,
-        'version': '1.0.0',  // Protocol version
+        'payload': {
+          'client_id': _playerId,
+          'name': _playerName,
+          'version': 1,  // Protocol version (integer)
+          'supported_roles': ['player@v1'],
+          'player_support': {
+            'supported_formats': [
+              {
+                'codec': 'pcm',
+                'channels': 2,
+                'sample_rate': 48000,
+                'bit_depth': 16,
+              },
+            ],
+            'buffer_capacity': 1048576,  // 1MB buffer
+            'supported_commands': ['volume', 'mute'],
+          },
+        },
       });
 
       // Wait for server acknowledgment (server sends welcome/registered after hello)
@@ -212,10 +228,23 @@ class SendspinService {
       _logger.log('Sendspin: Received message type: $type');
 
       switch (type) {
+        case 'server/hello':
+          // Server acknowledged our client/hello - we're registered!
+          _logger.log('Sendspin: Received server/hello - connection successful');
+          final payload = data['payload'] as Map<String, dynamic>?;
+          if (payload != null) {
+            _logger.log('Sendspin: Server name: ${payload['name']}, version: ${payload['version']}');
+            _logger.log('Sendspin: Active roles: ${payload['active_roles']}');
+          }
+          if (_ackCompleter != null && !_ackCompleter!.isCompleted) {
+            _ackCompleter!.complete(true);
+          }
+          break;
+
         case 'ack':
         case 'connected':
         case 'registered':
-          // Server acknowledged our connection
+          // Legacy/fallback acknowledgment types
           if (_ackCompleter != null && !_ackCompleter!.isCompleted) {
             _ackCompleter!.complete(true);
           }
