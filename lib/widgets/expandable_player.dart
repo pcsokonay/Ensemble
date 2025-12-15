@@ -588,11 +588,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   /// Animate committing to the next/previous player
   void _animateCommit(int direction, VoidCallback onSwitch) {
     if (_isSliding) return;
-    _isSliding = true;
 
-    // Mark transition BEFORE animation - this keeps peek content visible
-    // and hides main content to prevent any flash
-    _inTransition = true;
+    // Mark transition state in setState to ensure rebuilds happen properly
+    setState(() {
+      _isSliding = true;
+      // Mark transition BEFORE animation - this keeps peek content visible
+      // and hides main content to prevent any flash
+      _inTransition = true;
+    });
 
     final startOffset = _slideOffset;
     final targetOffset = direction < 0 ? -1.0 : 1.0;
@@ -1221,8 +1224,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
                 // Album art - with slide animation when collapsed
                 // Hidden during transition to prevent flash (peek content shows instead)
+                // FALLBACK: Show main content if transition is active but peek content unavailable
+                // This prevents showing only the progress bar with no content
                 // GPU PERF: Use conditional instead of Opacity to avoid saveLayer
-                if (!(_inTransition && t < 0.1))
+                if (!(_inTransition && t < 0.1 && _peekPlayer != null))
                   Positioned(
                     left: artLeft + miniPlayerSlideOffset,
                     top: artTop,
@@ -1273,8 +1278,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
                 // Track title - with slide animation when collapsed
                 // Hidden during transition to prevent flash
+                // FALLBACK: Show if transition active but no peek content available
                 // GPU PERF: Use conditional instead of Opacity to avoid saveLayer
-                if (!(_inTransition && t < 0.1))
+                if (!(_inTransition && t < 0.1 && _peekPlayer != null))
                   Positioned(
                     left: titleLeft + miniPlayerSlideOffset,
                     top: titleTop,
@@ -1298,8 +1304,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
                 // Artist name - with slide animation when collapsed
                 // Hidden during transition to prevent flash
+                // FALLBACK: Show if transition active but no peek content available
                 // GPU PERF: Use conditional instead of Opacity to avoid saveLayer
-                if (!(_inTransition && t < 0.1))
+                if (!(_inTransition && t < 0.1 && _peekPlayer != null))
                   Positioned(
                     left: titleLeft + miniPlayerSlideOffset,
                     top: artistTop,
