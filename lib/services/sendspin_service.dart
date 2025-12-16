@@ -472,8 +472,8 @@ class SendspinService {
     if (muted != null) _isMuted = muted;
 
     // Determine player state for Sendspin protocol
-    // 'synchronized' = ready/playing, 'error' = problem with sync
-    final playerState = _isPlaying || _isPaused ? 'synchronized' : 'synchronized';
+    // 'synchronized' = ready/playing, 'idle' = not playing
+    final playerState = _isPlaying || _isPaused ? 'synchronized' : 'idle';
 
     _sendMessage({
       'type': 'client/state',

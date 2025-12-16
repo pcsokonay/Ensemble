@@ -1347,6 +1347,42 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     ),
                   ),
 
+                // Audio source/format info (expanded only, when Sendspin active)
+                // Shows "Playing from Sendspin" and audio format
+                if (t > 0.5 && maProvider.isSendspinConnected)
+                  Positioned(
+                    left: contentPadding,
+                    right: contentPadding,
+                    top: expandedAlbumTop + (currentTrack.album != null ? 24 : 0),
+                    child: FadeTransition(
+                      opacity: _expandAnimation.drive(
+                        Tween(begin: 0.0, end: 1.0).chain(
+                          CurveTween(curve: const Interval(0.5, 1.0, curve: Curves.easeIn)),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.graphic_eq_rounded,
+                            size: 14,
+                            color: primaryColor.withOpacity(0.7),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            maProvider.currentAudioFormat ?? 'PCM Audio',
+                            style: TextStyle(
+                              color: primaryColor.withOpacity(0.7),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 // Progress bar (expanded only)
                 // GPU PERF: Use FadeTransition instead of Opacity
                 if (t > 0.5 && currentTrack.duration != null)

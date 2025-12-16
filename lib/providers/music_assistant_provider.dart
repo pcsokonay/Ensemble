@@ -113,6 +113,27 @@ class MusicAssistantProvider with ChangeNotifier {
   /// Position tracker for playback progress - single source of truth
   PositionTracker get positionTracker => _positionTracker;
 
+  /// Whether Sendspin (PCM streaming) is connected for builtin player
+  bool get isSendspinConnected => _sendspinConnected;
+
+  /// Whether PCM audio is currently playing via Sendspin
+  bool get isPcmPlaying => _sendspinConnected && _pcmAudioPlayer != null && _pcmAudioPlayer!.isPlaying;
+
+  /// Get current PCM audio format info (when using Sendspin)
+  /// Returns null if not using Sendspin PCM streaming
+  String? get currentAudioFormat {
+    if (!_sendspinConnected || _pcmAudioPlayer == null) return null;
+    return '48kHz • Stereo • 16-bit PCM';
+  }
+
+  /// Get the current playback source description
+  String get playbackSource {
+    if (_sendspinConnected && _pcmAudioPlayer != null) {
+      return 'Sendspin (Local PCM)';
+    }
+    return 'Music Assistant';
+  }
+
   /// Get cached track for a player (used for smooth swipe transitions)
   Track? getCachedTrackForPlayer(String playerId) => _cacheService.getCachedTrackForPlayer(playerId);
 
