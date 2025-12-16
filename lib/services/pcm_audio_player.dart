@@ -46,6 +46,7 @@ class PcmAudioPlayer {
   final List<Uint8List> _audioBuffer = [];
   bool _isFeeding = false;
   bool _isStarted = false;
+  bool _isPausePending = false;  // Flag to stop feed operations during pause
 
   // Stats
   int _framesPlayed = 0;
@@ -155,7 +156,7 @@ class PcmAudioPlayer {
 
   /// Handle incoming audio data from the stream
   void _onAudioData(Uint8List audioData) {
-    if (_state == PcmPlayerState.error) return;
+    if (_state == PcmPlayerState.error || _isPausePending) return;
 
     // Add to buffer
     _audioBuffer.add(audioData);
@@ -166,13 +167,14 @@ class PcmAudioPlayer {
     }
 
     // Resume from paused state when new audio arrives (e.g., new track in radio mode)
-    if (_state == PcmPlayerState.paused) {
+    // But NOT if a pause is being processed
+    if (_state == PcmPlayerState.paused && !_isPausePending) {
       _logger.log('PcmAudioPlayer: Resuming from paused state for new stream');
       play();
     }
 
     // Feed data if not currently feeding
-    if (!_isFeeding && _isStarted) {
+    if (!_isFeeding && _isStarted && !_isPausePending) {
       _feedNextChunk();
     }
   }
@@ -224,19 +226,19 @@ class PcmAudioPlayer {
 
   /// Feed the next chunk of audio data to the player
   Future<void> _feedNextChunk() async {
-    if (_isFeeding || _audioBuffer.isEmpty) return;
+    if (_isFeeding || _audioBuffer.isEmpty || _isPausePending) return;
 
     _isFeeding = true;
 
     try {
-      while (_audioBuffer.isNotEmpty && _state == PcmPlayerState.playing) {
+      while (_audioBuffer.isNotEmpty && _state == PcmPlayerState.playing && !_isPausePending) {
         final chunk = _audioBuffer.removeAt(0);
 
         // Convert Uint8List (raw bytes) to Int16 samples
         // Sendspin sends 16-bit little-endian PCM
         final samples = _bytesToInt16List(chunk);
 
-        if (samples.isNotEmpty) {
+        if (samples.isNotEmpty && !_isPausePending) {
           await pcm.FlutterPcmSound.feed(pcm.PcmArrayInt16.fromList(samples));
 
           _framesPlayed++;
@@ -249,7 +251,10 @@ class PcmAudioPlayer {
         }
       }
     } catch (e) {
-      _logger.log('PcmAudioPlayer: Error feeding audio: $e');
+      // Don't log errors during pause - expected when player is released
+      if (!_isPausePending) {
+        _logger.log('PcmAudioPlayer: Error feeding audio: $e');
+      }
     }
 
     _isFeeding = false;
@@ -284,6 +289,9 @@ class PcmAudioPlayer {
   /// Start playback (if paused)
   Future<void> play() async {
     if (_state == PcmPlayerState.error) return;
+
+    // Clear any pending pause flag
+    _isPausePending = false;
 
     if (_state == PcmPlayerState.paused) {
       // Resume from pause - need to re-initialize since we released on pause
@@ -329,11 +337,22 @@ class PcmAudioPlayer {
   Future<void> pause() async {
     if (_state != PcmPlayerState.playing) return;
 
+    // Set pause pending flag FIRST to stop any in-flight feed operations
+    _isPausePending = true;
+
     // flutter_pcm_sound doesn't have a native pause, so we must release
     // to actually stop audio immediately (otherwise buffered audio plays out)
     _state = PcmPlayerState.paused;
     _bytesPlayedAtLastPause = _bytesPlayed;
     _stopElapsedTimeTimer();
+
+    // Wait for any in-progress feed operation to complete before releasing
+    // This prevents a race condition where release() is called while feed() is executing
+    int waitAttempts = 0;
+    while (_isFeeding && waitAttempts < 10) {
+      await Future.delayed(const Duration(milliseconds: 10));
+      waitAttempts++;
+    }
 
     // Clear our local buffer to prevent stale audio on resume
     _audioBuffer.clear();
@@ -348,14 +367,26 @@ class PcmAudioPlayer {
       _logger.log('PcmAudioPlayer: Error releasing on pause: $e');
     }
 
+    _isPausePending = false;
     _logger.log('PcmAudioPlayer: Paused playback at ${elapsedTime.inSeconds}s (released player)');
   }
 
   /// Stop playback (clears buffer and resets position)
   Future<void> stop() async {
+    // Set pause pending to stop any in-flight feed operations
+    _isPausePending = true;
     _isStarted = false;
-    _audioBuffer.clear();
     _stopElapsedTimeTimer();
+
+    // Wait for any in-progress feed operation to complete
+    int waitAttempts = 0;
+    while (_isFeeding && waitAttempts < 10) {
+      await Future.delayed(const Duration(milliseconds: 10));
+      waitAttempts++;
+    }
+
+    _audioBuffer.clear();
+    _isFeeding = false;
 
     try {
       await pcm.FlutterPcmSound.release();
@@ -363,6 +394,7 @@ class PcmAudioPlayer {
       _logger.log('PcmAudioPlayer: Error releasing: $e');
     }
 
+    _isPausePending = false;
     _state = PcmPlayerState.ready;
     _framesPlayed = 0;
     _bytesPlayed = 0;
