@@ -715,6 +715,11 @@ class MusicAssistantProvider with ChangeNotifier {
       }
     }
 
+    // CRITICAL: Reset paused state when stream starts
+    // This clears _isPausePending and sets state to playing
+    // so that _onAudioData will process incoming audio
+    await _pcmAudioPlayer!.play();
+
     // Reset position for new stream (new track)
     _pcmAudioPlayer!.resetPosition();
 
