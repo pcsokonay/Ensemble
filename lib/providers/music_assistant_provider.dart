@@ -1655,8 +1655,13 @@ class MusicAssistantProvider with ChangeNotifier {
     }
 
     // Only include players that are available AND actively playing/paused
+    // Always include the builtin player so user can switch to local device
     final activePlayers = _availablePlayers.where((p) =>
-      p.available && (p.state == 'playing' || p.state == 'paused')
+      p.available && (
+        p.state == 'playing' ||
+        p.state == 'paused' ||
+        p.playerId.startsWith('ensemble_')  // Always include builtin player
+      )
     ).toList();
 
     if (activePlayers.isEmpty) {
