@@ -362,32 +362,48 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               ],
             ),
             centerTitle: false,
-            actions: [
-              // View mode toggle - changes based on current tab
-              IconButton(
-                icon: Icon(
-                  _getViewModeIcon(_getCurrentViewMode()),
-                  color: colorScheme.primary,
-                ),
-                onPressed: _cycleCurrentViewMode,
-                tooltip: 'Change view',
-              ),
-              const PlayerSelector(),
+            actions: const [
+              PlayerSelector(),
             ],
-            bottom: TabBar(
-              controller: _tabController,
-              labelColor: colorScheme.primary,
-              unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
-              indicatorColor: colorScheme.primary,
-              indicatorWeight: 3,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14),
-              tabs: [
-                const Tab(text: 'Artists'),
-                const Tab(text: 'Albums'),
-                if (_showFavoritesOnly) const Tab(text: 'Tracks'),
-                const Tab(text: 'Playlists'),
-              ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(48),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TabBar(
+                      controller: _tabController,
+                      labelColor: colorScheme.primary,
+                      unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
+                      indicatorColor: colorScheme.primary,
+                      indicatorWeight: 3,
+                      labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14),
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      tabs: [
+                        const Tab(text: 'Artists'),
+                        const Tab(text: 'Albums'),
+                        if (_showFavoritesOnly) const Tab(text: 'Tracks'),
+                        const Tab(text: 'Playlists'),
+                      ],
+                    ),
+                  ),
+                  // View mode toggle in tab row
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: IconButton(
+                      icon: Icon(
+                        _getViewModeIcon(_getCurrentViewMode()),
+                        color: colorScheme.primary,
+                        size: 22,
+                      ),
+                      onPressed: _cycleCurrentViewMode,
+                      tooltip: 'Change view',
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           body: TabBarView(
@@ -553,37 +569,22 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Use AspectRatio to ensure a square, then clip to circle
-          AspectRatio(
-            aspectRatio: 1.0,
-            child: ClipOval(
-              child: Container(
-                color: colorScheme.surfaceVariant,
-                child: imageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        memCacheWidth: 256,
-                        memCacheHeight: 256,
-                        placeholder: (_, __) => Icon(
-                          Icons.person_rounded,
-                          size: 48,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        errorWidget: (_, __, ___) => Icon(
-                          Icons.person_rounded,
-                          size: 48,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      )
-                    : Icon(
-                        Icons.person_rounded,
-                        size: 48,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-              ),
+          // Use LayoutBuilder to get available width for proper circle sizing
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Use the smaller dimension to ensure a circle
+                final size = constraints.maxWidth < constraints.maxHeight
+                    ? constraints.maxWidth
+                    : constraints.maxHeight;
+                return Center(
+                  child: ArtistAvatar(
+                    artist: artist,
+                    radius: size / 2,
+                    imageSize: 256,
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 8),

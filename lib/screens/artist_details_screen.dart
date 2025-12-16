@@ -678,59 +678,56 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
               ),
             )
           else ...[
-            // View controls row - right aligned, minimal gap
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 12.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    // Sort toggle
-                    IconButton(
-                      icon: Icon(
-                        _sortOrder == 'alpha' ? Icons.sort_by_alpha : Icons.calendar_today,
-                        color: colorScheme.primary,
-                        size: 20,
-                      ),
-                      tooltip: _sortOrder == 'alpha' ? 'Sort by year' : 'Sort alphabetically',
-                      onPressed: _toggleSortOrder,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    // View mode toggle
-                    IconButton(
-                      icon: Icon(
-                        _viewMode == 'list'
-                            ? Icons.view_list
-                            : _viewMode == 'grid3'
-                                ? Icons.grid_view
-                                : Icons.grid_on,
-                        color: colorScheme.primary,
-                        size: 20,
-                      ),
-                      tooltip: _viewMode == 'grid2'
-                          ? '3-column grid'
-                          : _viewMode == 'grid3'
-                              ? 'List view'
-                              : '2-column grid',
-                      onPressed: _cycleViewMode,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Library Albums Section
+            // Library Albums Section with inline controls
             if (_albums.isNotEmpty) ...[
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
-                  child: Text(
-                    'In Library',
-                    style: textTheme.titleLarge?.copyWith(
-                      color: colorScheme.onBackground,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  padding: const EdgeInsets.fromLTRB(24.0, 8.0, 12.0, 8.0),
+                  child: Row(
+                    children: [
+                      Text(
+                        'In Library',
+                        style: textTheme.titleLarge?.copyWith(
+                          color: colorScheme.onBackground,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Sort toggle
+                      IconButton(
+                        icon: Icon(
+                          _sortOrder == 'alpha' ? Icons.sort_by_alpha : Icons.calendar_today,
+                          color: colorScheme.primary,
+                          size: 20,
+                        ),
+                        tooltip: _sortOrder == 'alpha' ? 'Sort by year' : 'Sort alphabetically',
+                        onPressed: _toggleSortOrder,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      ),
+                      // View mode toggle
+                      IconButton(
+                        icon: Icon(
+                          _viewMode == 'list'
+                              ? Icons.view_list
+                              : _viewMode == 'grid3'
+                                  ? Icons.grid_view
+                                  : Icons.grid_on,
+                          color: colorScheme.primary,
+                          size: 20,
+                        ),
+                        tooltip: _viewMode == 'grid2'
+                            ? '3-column grid'
+                            : _viewMode == 'grid3'
+                                ? 'List view'
+                                : '2-column grid',
+                        onPressed: _cycleViewMode,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -741,13 +738,53 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
             if (_providerAlbums.isNotEmpty) ...[
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24.0, 32.0, 24.0, 12.0),
-                  child: Text(
-                    'From Providers',
-                    style: textTheme.titleLarge?.copyWith(
-                      color: colorScheme.onBackground,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  padding: EdgeInsets.fromLTRB(24.0, _albums.isEmpty ? 8.0 : 24.0, 12.0, 8.0),
+                  child: Row(
+                    children: [
+                      Text(
+                        'From Providers',
+                        style: textTheme.titleLarge?.copyWith(
+                          color: colorScheme.onBackground,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      // Only show controls here if no library albums
+                      if (_albums.isEmpty) ...[
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(
+                            _sortOrder == 'alpha' ? Icons.sort_by_alpha : Icons.calendar_today,
+                            color: colorScheme.primary,
+                            size: 20,
+                          ),
+                          tooltip: _sortOrder == 'alpha' ? 'Sort by year' : 'Sort alphabetically',
+                          onPressed: _toggleSortOrder,
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            _viewMode == 'list'
+                                ? Icons.view_list
+                                : _viewMode == 'grid3'
+                                    ? Icons.grid_view
+                                    : Icons.grid_on,
+                            color: colorScheme.primary,
+                            size: 20,
+                          ),
+                          tooltip: _viewMode == 'grid2'
+                              ? '3-column grid'
+                              : _viewMode == 'grid3'
+                                  ? 'List view'
+                                  : '2-column grid',
+                          onPressed: _cycleViewMode,
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
