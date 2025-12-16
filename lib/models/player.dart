@@ -27,6 +27,35 @@ class Player {
     this.elapsedTimeLastUpdated,
   });
 
+  /// Create a copy of this Player with some fields replaced
+  Player copyWith({
+    String? playerId,
+    String? name,
+    String? provider,
+    bool? available,
+    bool? powered,
+    String? state,
+    String? currentItemId,
+    int? volumeLevel,
+    bool? volumeMuted,
+    double? elapsedTime,
+    double? elapsedTimeLastUpdated,
+  }) {
+    return Player(
+      playerId: playerId ?? this.playerId,
+      name: name ?? this.name,
+      provider: provider ?? this.provider,
+      available: available ?? this.available,
+      powered: powered ?? this.powered,
+      state: state ?? this.state,
+      currentItemId: currentItemId ?? this.currentItemId,
+      volumeLevel: volumeLevel ?? this.volumeLevel,
+      volumeMuted: volumeMuted ?? this.volumeMuted,
+      elapsedTime: elapsedTime ?? this.elapsedTime,
+      elapsedTimeLastUpdated: elapsedTimeLastUpdated ?? this.elapsedTimeLastUpdated,
+    );
+  }
+
   // Derived properties
   bool get isPlaying => state == 'playing';
   bool get isMuted => volumeMuted ?? false;

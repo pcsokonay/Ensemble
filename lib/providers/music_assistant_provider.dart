@@ -2038,13 +2038,17 @@ class MusicAssistantProvider with ChangeNotifier {
   Future<void> playPauseSelectedPlayer() async {
     if (_selectedPlayer == null) return;
 
-    if (_selectedPlayer!.isPlaying) {
+    final wasPlaying = _selectedPlayer!.isPlaying;
+
+    if (wasPlaying) {
       await pausePlayer(_selectedPlayer!.playerId);
+      // For pause: Don't refresh - we already did optimistic UI update
+      // The player_updated event from MA will handle final state sync
     } else {
       await resumePlayer(_selectedPlayer!.playerId);
+      // For resume: Refresh in background to get updated track info
+      unawaited(refreshPlayers());
     }
-
-    await refreshPlayers();
   }
 
   Future<void> nextTrackSelectedPlayer() async {
@@ -2293,21 +2297,35 @@ class MusicAssistantProvider with ChangeNotifier {
 
   Future<void> pausePlayer(String playerId) async {
     try {
-      // Optimistic local pause for builtin player - don't wait for MA round-trip
+      // Get builtin player ID - this is cached so should be fast
       final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
+
       if (builtinPlayerId != null && playerId == builtinPlayerId && _sendspinConnected) {
-        _logger.log('⏸️ Optimistic local pause for builtin player');
-        // Immediately pause local playback
-        await _pcmAudioPlayer?.pause();
-        await _localPlayer.pause();
-        // Report state to MA (fire and forget)
+        _logger.log('⏸️ Non-blocking local pause for builtin player');
+
+        // CRITICAL: Don't await these - they can block the UI thread
+        // Use unawaited to make them fire-and-forget
+        unawaited(_pcmAudioPlayer?.pause() ?? Future.value());
+
+        // Don't pause just_audio for Sendspin mode - it's not being used for audio output
+        // and calling pause() on it can cause blocking issues
+        // unawaited(_localPlayer.pause());
+
+        // Report state to MA immediately (fire and forget)
         _sendspinService?.reportState(playing: false, paused: true);
+
+        // Update local player state optimistically for UI responsiveness
+        if (_selectedPlayer != null) {
+          _selectedPlayer = _selectedPlayer!.copyWith(state: 'paused');
+          notifyListeners();
+        }
       }
-      // Still send command to MA for proper state sync
-      await _api?.pausePlayer(playerId);
+
+      // Send command to MA for proper state sync - don't await
+      unawaited(_api?.pausePlayer(playerId) ?? Future.value());
     } catch (e) {
       ErrorHandler.logError('Pause player', e);
-      rethrow;
+      // Don't rethrow - we want pause to be resilient
     }
   }
 
