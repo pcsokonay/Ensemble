@@ -126,12 +126,14 @@ class PcmAudioPlayer {
 
   /// Callback when flutter_pcm_sound needs more audio data
   void _onFeedRequested(int remainingFrames) {
-    // This is called when buffer is getting low
-    // We'll feed from our buffer if we have data
-    // Don't start new feed operations if pause is pending
-    if (_audioBuffer.isNotEmpty && !_isFeeding && !_isPausePending) {
-      _feedNextChunk();
-    }
+    // This is called from native when buffer is getting low
+    // Don't start new feed operations if paused or pause is pending
+    // CRITICAL: _isPausePending stays true during pause to block all feeding
+    if (_state != PcmPlayerState.playing) return;
+    if (_isPausePending) return;
+    if (_audioBuffer.isEmpty || _isFeeding) return;
+
+    _feedNextChunk();
   }
 
   /// Connect to a Sendspin audio data stream and start playback
@@ -158,7 +160,14 @@ class PcmAudioPlayer {
 
   /// Handle incoming audio data from the stream
   void _onAudioData(Uint8List audioData) {
-    if (_state == PcmPlayerState.error || _isPausePending) return;
+    // Ignore data if in error state or if pause is pending/active
+    // CRITICAL: When paused, _isPausePending stays true to prevent any feeding
+    if (_state == PcmPlayerState.error) return;
+    if (_isPausePending || _state == PcmPlayerState.paused) {
+      // Silently ignore audio data when paused - don't even buffer it
+      // This prevents buffer accumulation during pause and any race conditions
+      return;
+    }
 
     // Add to buffer
     _audioBuffer.add(audioData);
@@ -168,15 +177,11 @@ class PcmAudioPlayer {
       _startPlayback();
     }
 
-    // Resume from paused state when new audio arrives (e.g., new track in radio mode)
-    // But NOT if a pause is being processed
-    if (_state == PcmPlayerState.paused && !_isPausePending) {
-      _logger.log('PcmAudioPlayer: Resuming from paused state for new stream');
-      play();
-    }
+    // NOTE: Auto-resume from paused state has been removed to prevent race conditions.
+    // The provider should explicitly call play() when ready to resume.
 
     // Feed data if not currently feeding
-    if (!_isFeeding && _isStarted && !_isPausePending) {
+    if (!_isFeeding && _isStarted) {
       _feedNextChunk();
     }
   }
@@ -335,23 +340,43 @@ class PcmAudioPlayer {
 
     _logger.log('PcmAudioPlayer: Pause requested');
 
-    // Set pause pending flag to stop feed loop
+    // Set pause pending flag FIRST to stop feed loop from starting new feeds
+    // CRITICAL: This flag must stay true until the pause operation is complete
     _isPausePending = true;
 
-    // Update state immediately
+    // Update state immediately so UI reflects pause
     _state = PcmPlayerState.paused;
     _bytesPlayedAtLastPause = _bytesPlayed;
     _stopElapsedTimeTimer();
 
     // Clear our buffer - no more data will be fed
     _audioBuffer.clear();
+
+    // Wait for any in-flight feed operation to complete (short timeout)
+    // This is critical to prevent UI freeze from concurrent FFI calls
+    final completer = _feedCompleter;
+    if (completer != null && !completer.isCompleted) {
+      _logger.log('PcmAudioPlayer: Waiting for in-flight feed to complete');
+      try {
+        await completer.future.timeout(
+          const Duration(milliseconds: 100),
+          onTimeout: () {
+            _logger.log('PcmAudioPlayer: Feed wait timed out, proceeding');
+          },
+        );
+      } catch (e) {
+        _logger.log('PcmAudioPlayer: Feed wait error: $e');
+      }
+    }
+
     _isFeeding = false;
 
     // Don't call release() - it causes native deadlocks
     // Audio will stop naturally as the small native buffer drains (~170ms)
     // We keep the player initialized for faster resume
 
-    _isPausePending = false;
+    // CRITICAL: Keep _isPausePending = true! It's only cleared when play() is called
+    // This prevents _onAudioData from auto-resuming and _onFeedRequested from starting feeds
     _logger.log('PcmAudioPlayer: Paused playback at ${elapsedTime.inSeconds}s (buffer will drain)');
   }
 
