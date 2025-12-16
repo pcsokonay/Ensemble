@@ -145,6 +145,7 @@ class Artist extends MediaItem {
 class Album extends MediaItem {
   final List<Artist>? artists;
   final String? albumType;
+  final int? year;
 
   Album({
     required super.itemId,
@@ -152,6 +153,7 @@ class Album extends MediaItem {
     required super.name,
     this.artists,
     this.albumType,
+    this.year,
     super.sortName,
     super.uri,
     super.providerMappings,
@@ -161,6 +163,15 @@ class Album extends MediaItem {
 
   factory Album.fromJson(Map<String, dynamic> json) {
     final item = MediaItem.fromJson(json);
+    // Parse year - can be int or null
+    int? year;
+    final yearValue = json['year'];
+    if (yearValue is int) {
+      year = yearValue;
+    } else if (yearValue is String) {
+      year = int.tryParse(yearValue);
+    }
+
     return Album(
       itemId: item.itemId,
       provider: item.provider,
@@ -169,6 +180,7 @@ class Album extends MediaItem {
           ?.map((e) => Artist.fromJson(e as Map<String, dynamic>))
           .toList(),
       albumType: json['album_type'] as String?,
+      year: year,
       sortName: item.sortName,
       uri: item.uri,
       providerMappings: item.providerMappings,
@@ -180,18 +192,9 @@ class Album extends MediaItem {
   String get artistsString =>
       artists?.map((a) => a.name).join(', ') ?? 'Unknown Artist';
 
-  /// Get the album year from metadata, returns null if not available
-  int? get year {
-    final y = metadata?['year'];
-    if (y is int) return y;
-    if (y is String) return int.tryParse(y);
-    return null;
-  }
-
   /// Get album name with year appended (e.g., "Album Name (2023)")
   String get nameWithYear {
-    final y = year;
-    return y != null ? '$name ($y)' : name;
+    return year != null ? '$name ($year)' : name;
   }
 
   /// Check if this album is in the user's library
