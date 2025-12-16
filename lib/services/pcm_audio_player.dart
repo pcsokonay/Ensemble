@@ -357,37 +357,36 @@ class PcmAudioPlayer {
     _bytesPlayedAtLastPause = _bytesPlayed;
     _stopElapsedTimeTimer();
 
+    // Clear our local buffer immediately
+    _audioBuffer.clear();
+
+    // Schedule the release on a microtask to avoid blocking the UI
+    // The _isPausePending flag will stop any new feeds from starting
+    unawaited(_releasePlayerAsync());
+
+    _logger.log('PcmAudioPlayer: Paused playback at ${elapsedTime.inSeconds}s');
+  }
+
+  /// Release player asynchronously to avoid blocking UI
+  Future<void> _releasePlayerAsync() async {
     // Clear the feed callback to prevent native code from triggering new feeds
     pcm.FlutterPcmSound.setFeedCallback(null);
 
-    // Wait for any in-progress feed operation to complete before releasing
-    // Use the completer for proper synchronization (with timeout to prevent deadlock)
-    final completer = _feedCompleter;
-    if (completer != null && !completer.isCompleted) {
-      _logger.log('PcmAudioPlayer: Waiting for feed operation to complete...');
-      await completer.future.timeout(
-        const Duration(milliseconds: 500),
-        onTimeout: () {
-          _logger.log('PcmAudioPlayer: Feed wait timed out, proceeding anyway');
-        },
-      );
-    }
+    // Small delay to let any in-progress feed operation exit its loop
+    await Future.delayed(const Duration(milliseconds: 50));
 
-    // Clear our local buffer to prevent stale audio on resume
-    _audioBuffer.clear();
     _isFeeding = false;
 
-    // Release flutter_pcm_sound to stop audio immediately
-    // This clears its internal buffer - we'll re-initialize on resume
+    // Release flutter_pcm_sound to stop audio
     try {
       await pcm.FlutterPcmSound.release();
       _isStarted = false;
+      _logger.log('PcmAudioPlayer: Player released');
     } catch (e) {
       _logger.log('PcmAudioPlayer: Error releasing on pause: $e');
     }
 
     _isPausePending = false;
-    _logger.log('PcmAudioPlayer: Paused playback at ${elapsedTime.inSeconds}s (released player)');
   }
 
   /// Stop playback (clears buffer and resets position)
