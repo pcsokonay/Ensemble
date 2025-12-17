@@ -35,6 +35,13 @@ class SettingsService {
   static const String _keyLibraryAlbumsViewMode = 'library_albums_view_mode'; // 'grid2', 'grid3', 'list'
   static const String _keyLibraryPlaylistsViewMode = 'library_playlists_view_mode'; // 'grid2', 'grid3', 'list'
 
+  // Audiobook View Mode Settings
+  static const String _keyAuthorAudiobooksSortOrder = 'author_audiobooks_sort_order'; // 'alpha' or 'year'
+  static const String _keyAuthorAudiobooksViewMode = 'author_audiobooks_view_mode'; // 'grid2', 'grid3', 'list'
+  static const String _keyLibraryAuthorsViewMode = 'library_authors_view_mode'; // 'grid2', 'grid3', 'list'
+  static const String _keyLibraryAudiobooksViewMode = 'library_audiobooks_view_mode'; // 'grid2', 'grid3', 'list'
+  static const String _keyLibraryAudiobooksSortOrder = 'library_audiobooks_sort_order'; // 'alpha' or 'year'
+
   static Future<String?> getServerUrl() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyServerUrl);
@@ -441,5 +448,58 @@ class SettingsService {
   static Future<void> setLibraryPlaylistsViewMode(String mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLibraryPlaylistsViewMode, mode);
+  }
+
+  // View Mode Settings - Author Audiobooks (author detail screen)
+  static Future<String> getAuthorAudiobooksSortOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyAuthorAudiobooksSortOrder) ?? 'alpha';
+  }
+
+  static Future<void> setAuthorAudiobooksSortOrder(String order) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyAuthorAudiobooksSortOrder, order);
+  }
+
+  static Future<String> getAuthorAudiobooksViewMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyAuthorAudiobooksViewMode) ?? 'grid2';
+  }
+
+  static Future<void> setAuthorAudiobooksViewMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyAuthorAudiobooksViewMode, mode);
+  }
+
+  // View Mode Settings - Library Authors
+  static Future<String> getLibraryAuthorsViewMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLibraryAuthorsViewMode) ?? 'list';
+  }
+
+  static Future<void> setLibraryAuthorsViewMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLibraryAuthorsViewMode, mode);
+  }
+
+  // View Mode Settings - Library Audiobooks
+  static Future<String> getLibraryAudiobooksViewMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLibraryAudiobooksViewMode) ?? 'grid2';
+  }
+
+  static Future<void> setLibraryAudiobooksViewMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLibraryAudiobooksViewMode, mode);
+  }
+
+  static Future<String> getLibraryAudiobooksSortOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLibraryAudiobooksSortOrder) ?? 'alpha';
+  }
+
+  static Future<void> setLibraryAudiobooksSortOrder(String order) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLibraryAudiobooksSortOrder, order);
   }
 }

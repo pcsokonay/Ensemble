@@ -19,6 +19,8 @@ import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
 import 'playlist_details_screen.dart';
 import 'settings_screen.dart';
+import 'audiobook_author_screen.dart';
+import 'audiobook_detail_screen.dart';
 
 /// Media type for the library
 enum LibraryMediaType { music, books, podcasts }
@@ -49,6 +51,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   String _albumsViewMode = 'grid2'; // 'grid2', 'grid3', 'list'
   String _playlistsViewMode = 'list'; // 'grid2', 'grid3', 'list'
   String _audiobooksViewMode = 'grid2'; // 'grid2', 'grid3', 'list'
+  String _authorsViewMode = 'list'; // 'grid2', 'grid3', 'list'
+  String _audiobooksSortOrder = 'alpha'; // 'alpha', 'year'
 
   // Restoration: Remember selected tab across app restarts
   final RestorableInt _selectedTabIndex = RestorableInt(0);
@@ -91,11 +95,17 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final artistsMode = await SettingsService.getLibraryArtistsViewMode();
     final albumsMode = await SettingsService.getLibraryAlbumsViewMode();
     final playlistsMode = await SettingsService.getLibraryPlaylistsViewMode();
+    final authorsMode = await SettingsService.getLibraryAuthorsViewMode();
+    final audiobooksMode = await SettingsService.getLibraryAudiobooksViewMode();
+    final audiobooksSortOrder = await SettingsService.getLibraryAudiobooksSortOrder();
     if (mounted) {
       setState(() {
         _artistsViewMode = artistsMode;
         _albumsViewMode = albumsMode;
         _playlistsViewMode = playlistsMode;
+        _authorsViewMode = authorsMode;
+        _audiobooksViewMode = audiobooksMode;
+        _audiobooksSortOrder = audiobooksSortOrder;
       });
     }
   }
@@ -146,6 +156,44 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
     setState(() => _playlistsViewMode = newMode);
     SettingsService.setLibraryPlaylistsViewMode(newMode);
+  }
+
+  void _cycleAuthorsViewMode() {
+    String newMode;
+    switch (_authorsViewMode) {
+      case 'list':
+        newMode = 'grid2';
+        break;
+      case 'grid2':
+        newMode = 'grid3';
+        break;
+      default:
+        newMode = 'list';
+    }
+    setState(() => _authorsViewMode = newMode);
+    SettingsService.setLibraryAuthorsViewMode(newMode);
+  }
+
+  void _cycleAudiobooksViewMode() {
+    String newMode;
+    switch (_audiobooksViewMode) {
+      case 'grid2':
+        newMode = 'grid3';
+        break;
+      case 'grid3':
+        newMode = 'list';
+        break;
+      default:
+        newMode = 'grid2';
+    }
+    setState(() => _audiobooksViewMode = newMode);
+    SettingsService.setLibraryAudiobooksViewMode(newMode);
+  }
+
+  void _toggleAudiobooksSortOrder() {
+    final newOrder = _audiobooksSortOrder == 'alpha' ? 'year' : 'alpha';
+    setState(() => _audiobooksSortOrder = newOrder);
+    SettingsService.setLibraryAudiobooksSortOrder(newOrder);
   }
 
   IconData _getViewModeIcon(String mode) {
@@ -591,7 +639,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   // ============ BOOKS TABS ============
   Widget _buildBooksAuthorsTab(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final maProvider = context.read<MusicAssistantProvider>();
+    final textTheme = Theme.of(context).textTheme;
 
     if (_isLoadingAudiobooks) {
       return Center(child: CircularProgressIndicator(color: colorScheme.primary));
@@ -632,53 +680,174 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       color: colorScheme.primary,
       backgroundColor: colorScheme.surface,
       onRefresh: () => _loadAudiobooks(favoriteOnly: _showFavoritesOnly ? true : null),
-      child: ListView.builder(
+      child: CustomScrollView(
         key: const PageStorageKey<String>('books_authors_list'),
-        padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.navBarOnly),
-        itemCount: sortedAuthors.length,
-        itemBuilder: (context, index) {
-          final authorName = sortedAuthors[index];
-          final authorBooks = authorMap[authorName]!;
-          return _buildAuthorSection(context, authorName, authorBooks, maProvider);
-        },
+        slivers: [
+          // Header with view mode toggle
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              child: Row(
+                children: [
+                  Text(
+                    '${sortedAuthors.length} ${sortedAuthors.length == 1 ? 'Author' : 'Authors'}',
+                    style: textTheme.titleSmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(
+                      _getViewModeIcon(_authorsViewMode),
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
+                    onPressed: _cycleAuthorsViewMode,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Authors list/grid
+          _buildAuthorsSliver(sortedAuthors, authorMap),
+          const SliverToBoxAdapter(child: SizedBox(height: 140)),
+        ],
       ),
     );
   }
 
-  Widget _buildAuthorSection(
-    BuildContext context,
-    String authorName,
-    List<Audiobook> books,
-    MusicAssistantProvider maProvider,
-  ) {
+  Widget _buildAuthorsSliver(List<String> authors, Map<String, List<Audiobook>> authorMap) {
+    if (_authorsViewMode == 'list') {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _buildAuthorListTile(authors[index], authorMap[authors[index]]!),
+            childCount: authors.length,
+          ),
+        ),
+      );
+    }
+
+    final crossAxisCount = _authorsViewMode == 'grid3' ? 3 : 2;
+    final childAspectRatio = _authorsViewMode == 'grid3' ? 0.85 : 0.90;
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          childAspectRatio: childAspectRatio,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => _buildAuthorCard(authors[index], authorMap[authors[index]]!),
+          childCount: authors.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuthorListTile(String authorName, List<Audiobook> books) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return ExpansionTile(
-      key: PageStorageKey<String>('author_$authorName'),
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       leading: CircleAvatar(
         backgroundColor: colorScheme.primaryContainer,
+        radius: 24,
         child: Text(
           authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
           style: TextStyle(
             color: colorScheme.onPrimaryContainer,
             fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
         ),
       ),
       title: Text(
         authorName,
         style: textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        '${books.length} ${books.length == 1 ? 'book' : 'books'}',
+        '${books.length} ${books.length == 1 ? 'audiobook' : 'audiobooks'}',
         style: textTheme.bodySmall?.copyWith(
           color: colorScheme.onSurface.withOpacity(0.6),
         ),
       ),
-      children: books.map((book) => _buildAudiobookListTile(context, book, maProvider)).toList(),
+      onTap: () => _navigateToAuthor(authorName, books),
+    );
+  }
+
+  Widget _buildAuthorCard(String authorName, List<Audiobook> books) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return InkWell(
+      onTap: () => _navigateToAuthor(authorName, books),
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    color: colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                    fontSize: _authorsViewMode == 'grid3' ? 32 : 40,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            authorName,
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          Text(
+            '${books.length} ${books.length == 1 ? 'book' : 'books'}',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToAuthor(String authorName, List<Audiobook> books) {
+    Navigator.push(
+      context,
+      FadeSlidePageRoute(
+        child: AudiobookAuthorScreen(
+          authorName: authorName,
+          audiobooks: books,
+        ),
+      ),
     );
   }
 
@@ -688,13 +857,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final textTheme = Theme.of(context).textTheme;
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: Container(
-          width: 48,
-          height: 48,
-          color: colorScheme.surfaceVariant,
+          width: 56,
+          height: 56,
+          color: colorScheme.surfaceContainerHighest,
           child: imageUrl != null
               ? CachedNetworkImage(
                   imageUrl: imageUrl,
@@ -713,22 +882,20 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       ),
       title: Text(
         book.name,
-        style: textTheme.bodyMedium?.copyWith(
+        style: textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.w500,
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: book.narratorsString != 'Unknown Narrator'
-          ? Text(
-              'Narrated by ${book.narratorsString}',
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.6),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            )
-          : null,
+      subtitle: Text(
+        book.authorsString,
+        style: textTheme.bodySmall?.copyWith(
+          color: colorScheme.onSurface.withOpacity(0.6),
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: book.progress > 0
           ? SizedBox(
               width: 32,
@@ -736,19 +903,27 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               child: CircularProgressIndicator(
                 value: book.progress,
                 strokeWidth: 3,
-                backgroundColor: colorScheme.surfaceVariant,
+                backgroundColor: colorScheme.surfaceContainerHighest,
                 color: colorScheme.primary,
               ),
             )
           : null,
-      onTap: () {
-        // TODO: Navigate to audiobook detail screen
-      },
+      onTap: () => _navigateToAudiobook(book),
+    );
+  }
+
+  void _navigateToAudiobook(Audiobook book) {
+    Navigator.push(
+      context,
+      FadeSlidePageRoute(
+        child: AudiobookDetailScreen(audiobook: book),
+      ),
     );
   }
 
   Widget _buildAllBooksTab(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final maProvider = context.read<MusicAssistantProvider>();
 
     if (_isLoadingAudiobooks) {
@@ -756,9 +931,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
 
     // Filter by favorites if enabled
-    final audiobooks = _showFavoritesOnly
+    var audiobooks = _showFavoritesOnly
         ? _audiobooks.where((a) => a.favorite == true).toList()
-        : _audiobooks;
+        : List<Audiobook>.from(_audiobooks);
 
     if (audiobooks.isEmpty) {
       if (_showFavoritesOnly) {
@@ -776,35 +951,105 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       );
     }
 
+    // Sort audiobooks
+    if (_audiobooksSortOrder == 'year') {
+      audiobooks.sort((a, b) {
+        if (a.year == null && b.year == null) return a.name.compareTo(b.name);
+        if (a.year == null) return 1;
+        if (b.year == null) return -1;
+        return a.year!.compareTo(b.year!);
+      });
+    } else {
+      audiobooks.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    }
+
     return RefreshIndicator(
       color: colorScheme.primary,
       backgroundColor: colorScheme.surface,
       onRefresh: () => _loadAudiobooks(favoriteOnly: _showFavoritesOnly ? true : null),
-      child: _audiobooksViewMode == 'list'
-          ? ListView.builder(
-              key: PageStorageKey<String>('all_books_list_${_showFavoritesOnly ? 'fav' : 'all'}'),
-              padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.navBarOnly),
-              itemCount: audiobooks.length,
-              itemBuilder: (context, index) {
-                final book = audiobooks[index];
-                return _buildAudiobookListTile(context, book, maProvider);
-              },
-            )
-          : GridView.builder(
-              key: PageStorageKey<String>('all_books_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_audiobooksViewMode'),
-              padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.navBarOnly),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: _audiobooksViewMode == 'grid3' ? 3 : 2,
-                childAspectRatio: _audiobooksViewMode == 'grid3' ? 0.65 : 0.70,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+      child: CustomScrollView(
+        key: PageStorageKey<String>('all_books_${_showFavoritesOnly ? 'fav' : 'all'}_$_audiobooksViewMode'),
+        slivers: [
+          // Header with controls
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              child: Row(
+                children: [
+                  Text(
+                    '${audiobooks.length} ${audiobooks.length == 1 ? 'Audiobook' : 'Audiobooks'}',
+                    style: textTheme.titleSmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Sort toggle
+                  IconButton(
+                    icon: Icon(
+                      _audiobooksSortOrder == 'alpha' ? Icons.sort_by_alpha : Icons.calendar_today,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
+                    tooltip: _audiobooksSortOrder == 'alpha' ? 'Sort by year' : 'Sort alphabetically',
+                    onPressed: _toggleAudiobooksSortOrder,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
+                  // View mode toggle
+                  IconButton(
+                    icon: Icon(
+                      _getViewModeIcon(_audiobooksViewMode),
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
+                    onPressed: _cycleAudiobooksViewMode,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
+                ],
               ),
-              itemCount: audiobooks.length,
-              itemBuilder: (context, index) {
-                final book = audiobooks[index];
-                return _buildAudiobookCard(context, book, maProvider);
-              },
             ),
+          ),
+          // Books list/grid
+          _buildAudiobooksSliver(audiobooks, maProvider),
+          const SliverToBoxAdapter(child: SizedBox(height: 140)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAudiobooksSliver(List<Audiobook> audiobooks, MusicAssistantProvider maProvider) {
+    if (_audiobooksViewMode == 'list') {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _buildAudiobookListTile(context, audiobooks[index], maProvider),
+            childCount: audiobooks.length,
+          ),
+        ),
+      );
+    }
+
+    final crossAxisCount = _audiobooksViewMode == 'grid3' ? 3 : 2;
+    final childAspectRatio = _audiobooksViewMode == 'grid3' ? 0.65 : 0.70;
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          childAspectRatio: childAspectRatio,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => _buildAudiobookCard(context, audiobooks[index], maProvider),
+          childCount: audiobooks.length,
+        ),
+      ),
     );
   }
 
@@ -814,9 +1059,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final textTheme = Theme.of(context).textTheme;
 
     return GestureDetector(
-      onTap: () {
-        // TODO: Navigate to audiobook detail screen
-      },
+      onTap: () => _navigateToAudiobook(book),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
