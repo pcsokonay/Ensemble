@@ -4,6 +4,10 @@ enum MediaType {
   track,
   playlist,
   radio,
+  audiobook,
+  chapter,
+  podcast,
+  podcastEpisode,
 }
 
 class ProviderMapping {
@@ -307,5 +311,144 @@ class Playlist extends MediaItem {
       metadata: item.metadata,
       favorite: item.favorite,
     );
+  }
+}
+
+class Chapter {
+  final int chapterNumber;
+  final int positionMs;
+  final String title;
+  final Duration? duration;
+
+  Chapter({
+    required this.chapterNumber,
+    required this.positionMs,
+    required this.title,
+    this.duration,
+  });
+
+  factory Chapter.fromJson(Map<String, dynamic> json) {
+    return Chapter(
+      chapterNumber: json['chapter_number'] as int? ?? json['chapter_id'] as int? ?? 0,
+      positionMs: json['position_ms'] as int? ?? json['position'] as int? ?? 0,
+      title: json['title'] as String? ?? 'Chapter ${json['chapter_number'] ?? 0}',
+      duration: json['duration'] != null
+          ? Duration(seconds: (json['duration'] as num).toInt())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'chapter_number': chapterNumber,
+      'position_ms': positionMs,
+      'title': title,
+      if (duration != null) 'duration': duration!.inSeconds,
+    };
+  }
+}
+
+class Audiobook extends MediaItem {
+  final List<Artist>? authors;
+  final List<Artist>? narrators;
+  final String? publisher;
+  final String? description;
+  final int? year;
+  final List<Chapter>? chapters;
+  final int? resumePositionMs;
+  final bool? fullyPlayed;
+
+  Audiobook({
+    required super.itemId,
+    required super.provider,
+    required super.name,
+    this.authors,
+    this.narrators,
+    this.publisher,
+    this.description,
+    this.year,
+    this.chapters,
+    this.resumePositionMs,
+    this.fullyPlayed,
+    super.sortName,
+    super.uri,
+    super.providerMappings,
+    super.metadata,
+    super.favorite,
+    super.duration,
+  }) : super(mediaType: MediaType.audiobook);
+
+  factory Audiobook.fromJson(Map<String, dynamic> json) {
+    final item = MediaItem.fromJson(json);
+
+    // Parse year
+    int? year;
+    final yearValue = json['year'];
+    if (yearValue is int) {
+      year = yearValue;
+    } else if (yearValue is String) {
+      year = int.tryParse(yearValue);
+    }
+
+    return Audiobook(
+      itemId: item.itemId,
+      provider: item.provider,
+      name: item.name,
+      authors: (json['authors'] as List<dynamic>?)
+          ?.map((e) => Artist.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      narrators: (json['narrators'] as List<dynamic>?)
+          ?.map((e) => Artist.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      publisher: json['publisher'] as String?,
+      description: json['description'] as String?,
+      year: year,
+      chapters: (json['chapters'] as List<dynamic>?)
+          ?.map((e) => Chapter.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      resumePositionMs: json['resume_position_ms'] as int?,
+      fullyPlayed: json['fully_played'] as bool?,
+      sortName: item.sortName,
+      uri: item.uri,
+      providerMappings: item.providerMappings,
+      metadata: item.metadata,
+      favorite: item.favorite,
+      duration: item.duration,
+    );
+  }
+
+  String get authorsString =>
+      authors?.map((a) => a.name).join(', ') ?? 'Unknown Author';
+
+  String get narratorsString =>
+      narrators?.map((n) => n.name).join(', ') ?? 'Unknown Narrator';
+
+  /// Get progress as a percentage (0.0 to 1.0)
+  double get progress {
+    if (fullyPlayed == true) return 1.0;
+    if (resumePositionMs == null || duration == null) return 0.0;
+    final totalMs = duration!.inMilliseconds;
+    if (totalMs == 0) return 0.0;
+    return (resumePositionMs! / totalMs).clamp(0.0, 1.0);
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    final json = super.toJson();
+    if (authors != null) {
+      json['authors'] = authors!.map((a) => a.toJson()).toList();
+    }
+    if (narrators != null) {
+      json['narrators'] = narrators!.map((n) => n.toJson()).toList();
+    }
+    if (publisher != null) json['publisher'] = publisher;
+    if (description != null) json['description'] = description;
+    if (year != null) json['year'] = year;
+    if (chapters != null) {
+      json['chapters'] = chapters!.map((c) => c.toJson()).toList();
+    }
+    if (resumePositionMs != null) json['resume_position_ms'] = resumePositionMs;
+    if (fullyPlayed != null) json['fully_played'] = fullyPlayed;
+    return json;
   }
 }

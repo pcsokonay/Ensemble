@@ -498,6 +498,39 @@ class MusicAssistantAPI {
     }
   }
 
+  Future<List<Audiobook>> getAudiobooks({
+    int? limit,
+    int? offset,
+    String? search,
+    bool? favoriteOnly,
+    String? authorId,
+  }) async {
+    try {
+      final args = <String, dynamic>{
+        if (limit != null) 'limit': limit,
+        if (offset != null) 'offset': offset,
+        if (search != null) 'search': search,
+        if (favoriteOnly != null) 'favorite': favoriteOnly,
+        if (authorId != null) 'author_id': authorId,
+      };
+
+      final response = await _sendCommand(
+        'music/audiobooks/library_items',
+        args: args,
+      );
+
+      final items = response['result'] as List<dynamic>?;
+      if (items == null) return [];
+
+      return items
+          .map((item) => Audiobook.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      _logger.log('Error getting audiobooks: $e');
+      return [];
+    }
+  }
+
   /// Get recently played albums
   /// Gets recently played tracks, then fetches full track details to extract album info
   /// Optimized: batches track lookups to avoid N+1 query problem
