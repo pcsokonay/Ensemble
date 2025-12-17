@@ -514,24 +514,46 @@ class MusicAssistantAPI {
         if (authorId != null) 'author_id': authorId,
       };
 
+      _logger.log('📚 Calling music/audiobooks/library_items with args: $args');
+
       final response = await _sendCommand(
         'music/audiobooks/library_items',
         args: args,
       );
 
-      _logger.log('Audiobooks response keys: ${response.keys.toList()}');
-      _logger.log('Audiobooks response: $response');
+      _logger.log('📚 Audiobooks response keys: ${response.keys.toList()}');
 
-      final items = response['result'] as List<dynamic>?;
-      if (items == null) {
-        _logger.log('Audiobooks: result is null');
+      // Check for error in response
+      if (response.containsKey('error_code')) {
+        _logger.log('📚 ERROR: ${response['error_code']} - ${response['details']}');
         return [];
       }
 
-      _logger.log('Audiobooks: found ${items.length} items');
-      return items
-          .map((item) => Audiobook.fromJson(item as Map<String, dynamic>))
-          .toList();
+      final items = response['result'] as List<dynamic>?;
+      if (items == null) {
+        _logger.log('📚 Audiobooks: result is null, full response: $response');
+        return [];
+      }
+
+      _logger.log('📚 Audiobooks: found ${items.length} items');
+
+      if (items.isNotEmpty) {
+        _logger.log('📚 First audiobook raw: ${items.first}');
+      }
+
+      final audiobooks = <Audiobook>[];
+      for (int i = 0; i < items.length; i++) {
+        try {
+          final book = Audiobook.fromJson(items[i] as Map<String, dynamic>);
+          audiobooks.add(book);
+        } catch (e) {
+          _logger.log('📚 Failed to parse audiobook $i: $e');
+          _logger.log('📚 Raw data: ${items[i]}');
+        }
+      }
+
+      _logger.log('📚 Successfully parsed ${audiobooks.length}/${items.length} audiobooks');
+      return audiobooks;
     } catch (e, stack) {
       _logger.log('Error getting audiobooks: $e');
       _logger.log('Stack: $stack');

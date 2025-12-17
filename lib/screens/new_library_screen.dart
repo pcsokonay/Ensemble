@@ -14,6 +14,7 @@ import '../theme/theme_provider.dart';
 import '../widgets/common/empty_state.dart';
 import '../widgets/common/disconnected_state.dart';
 import '../services/settings_service.dart';
+import '../services/debug_logger.dart';
 import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
 import 'playlist_details_screen.dart';
@@ -235,14 +236,21 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   void _changeMediaType(LibraryMediaType type) {
-    if (_selectedMediaType == type) return;
+    _logger.log('📚 _changeMediaType called: $type (current: $_selectedMediaType)');
+    if (_selectedMediaType == type) {
+      _logger.log('📚 Same type, skipping');
+      return;
+    }
     setState(() {
       _selectedMediaType = type;
       _recreateTabController();
     });
     // Load audiobooks when switching to books tab
-    if (type == LibraryMediaType.books && _audiobooks.isEmpty) {
-      _loadAudiobooks(favoriteOnly: _showFavoritesOnly ? true : null);
+    if (type == LibraryMediaType.books) {
+      _logger.log('📚 Switched to Books, _audiobooks.isEmpty=${_audiobooks.isEmpty}');
+      if (_audiobooks.isEmpty) {
+        _loadAudiobooks(favoriteOnly: _showFavoritesOnly ? true : null);
+      }
     }
   }
 
@@ -310,8 +318,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
   }
 
+  final _logger = DebugLogger();
+
   Future<void> _loadAudiobooks({bool? favoriteOnly}) async {
-    if (_isLoadingAudiobooks) return;
+    _logger.log('📚 _loadAudiobooks called, favoriteOnly=$favoriteOnly');
+    if (_isLoadingAudiobooks) {
+      _logger.log('📚 Already loading, skipping');
+      return;
+    }
 
     setState(() {
       _isLoadingAudiobooks = true;
@@ -319,17 +333,24 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
     final maProvider = context.read<MusicAssistantProvider>();
     if (maProvider.api != null) {
+      _logger.log('📚 Calling API getAudiobooks...');
       final audiobooks = await maProvider.api!.getAudiobooks(
         limit: 500,
         favoriteOnly: favoriteOnly,
       );
+      _logger.log('📚 API returned ${audiobooks.length} audiobooks');
+      if (audiobooks.isNotEmpty) {
+        _logger.log('📚 First audiobook: ${audiobooks.first.name} by ${audiobooks.first.authorsString}');
+      }
       if (mounted) {
         setState(() {
           _audiobooks = audiobooks;
           _isLoadingAudiobooks = false;
         });
+        _logger.log('📚 State updated, _audiobooks.length = ${_audiobooks.length}');
       }
     } else {
+      _logger.log('📚 API is null!');
       if (mounted) {
         setState(() {
           _isLoadingAudiobooks = false;
