@@ -387,7 +387,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     if (maProvider.api != null) {
       _logger.log('📚 Calling API getAudiobooks...');
       final audiobooks = await maProvider.api!.getAudiobooks(
-        limit: 500,
+        limit: 10000,  // Large limit to get all audiobooks
         favoriteOnly: favoriteOnly,
       );
       _logger.log('📚 API returned ${audiobooks.length} audiobooks');

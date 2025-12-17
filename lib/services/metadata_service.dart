@@ -326,8 +326,8 @@ class MetadataService {
     return null;
   }
 
-  /// Fetches author image URL from Open Library (free, no API key required)
-  /// Used for audiobook authors
+  /// Fetches author image URL from multiple sources
+  /// Tries Audnexus first (best for audiobook authors), then Open Library
   /// Returns the image URL if found, null otherwise
   static Future<String?> getAuthorImageUrl(String authorName) async {
     // Check cache first
@@ -336,7 +336,33 @@ class MetadataService {
       return _authorImageCache[cacheKey];
     }
 
-    // Use Open Library API (free, no key, good coverage for book authors)
+    // Try Audnexus first (specifically for audiobook authors, uses Audible data)
+    try {
+      final audnexusUri = Uri.https(
+        'api.audnex.us',
+        '/authors',
+        {'name': authorName},
+      );
+
+      final audnexusResponse = await http.get(audnexusUri).timeout(const Duration(seconds: 5));
+
+      if (audnexusResponse.statusCode == 200) {
+        final data = json.decode(audnexusResponse.body);
+        // Audnexus returns an array of authors
+        if (data is List && data.isNotEmpty) {
+          final author = data[0];
+          final imageUrl = author['image'] as String?;
+          if (imageUrl != null && imageUrl.isNotEmpty) {
+            _authorImageCache[cacheKey] = imageUrl;
+            return imageUrl;
+          }
+        }
+      }
+    } catch (e) {
+      _logger.warning('Audnexus author image error: $e', context: 'Metadata');
+    }
+
+    // Fall back to Open Library API
     try {
       final uri = Uri.https(
         'openlibrary.org',
@@ -358,11 +384,19 @@ class MetadataService {
           if (authorKey != null) {
             // Open Library author images are available at:
             // https://covers.openlibrary.org/a/olid/{OLID}-L.jpg
-            // The key is like "OL123456A", we need just the ID part
             final olid = authorKey.replaceAll('/authors/', '');
             final imageUrl = 'https://covers.openlibrary.org/a/olid/$olid-L.jpg';
-            _authorImageCache[cacheKey] = imageUrl;
-            return imageUrl;
+
+            // Verify the image actually exists (Open Library returns 404 for missing images)
+            try {
+              final imageCheck = await http.head(Uri.parse(imageUrl)).timeout(const Duration(seconds: 3));
+              if (imageCheck.statusCode == 200) {
+                _authorImageCache[cacheKey] = imageUrl;
+                return imageUrl;
+              }
+            } catch (_) {
+              // Image doesn't exist, continue to cache null
+            }
           }
         }
       }
