@@ -390,16 +390,33 @@ class Audiobook extends MediaItem {
       year = int.tryParse(yearValue);
     }
 
+    // Helper to parse authors/narrators that can be either strings or Artist objects
+    List<Artist>? parseArtistList(dynamic data) {
+      if (data == null) return null;
+      if (data is! List) return null;
+
+      return data.map((e) {
+        if (e is String) {
+          // MA returns just the name as a string
+          return Artist(
+            itemId: '',
+            provider: 'library',
+            name: e,
+          );
+        } else if (e is Map<String, dynamic>) {
+          // Full Artist object
+          return Artist.fromJson(e);
+        }
+        return Artist(itemId: '', provider: 'library', name: 'Unknown');
+      }).toList();
+    }
+
     return Audiobook(
       itemId: item.itemId,
       provider: item.provider,
       name: item.name,
-      authors: (json['authors'] as List<dynamic>?)
-          ?.map((e) => Artist.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      narrators: (json['narrators'] as List<dynamic>?)
-          ?.map((e) => Artist.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      authors: parseArtistList(json['authors']),
+      narrators: parseArtistList(json['narrators']),
       publisher: json['publisher'] as String?,
       description: json['description'] as String?,
       year: year,
