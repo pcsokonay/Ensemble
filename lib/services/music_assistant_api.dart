@@ -566,6 +566,27 @@ class MusicAssistantAPI {
     }
   }
 
+  /// Play an audiobook
+  Future<void> playAudiobook(String playerId, Audiobook audiobook) async {
+    try {
+      // Build the audiobook URI
+      final uri = audiobook.uri ?? 'library://audiobook/${audiobook.itemId}';
+      _logger.log('📚 Playing audiobook: ${audiobook.name} with URI: $uri');
+
+      await _sendCommand(
+        'player_queues/play_media',
+        args: {
+          'queue_id': playerId,
+          'media': [uri],
+          'option': 'replace',
+        },
+      );
+    } catch (e) {
+      _logger.log('Error playing audiobook: $e');
+      rethrow;
+    }
+  }
+
   /// Get recently played albums
   /// Gets recently played tracks, then fetches full track details to extract album info
   /// Optimized: batches track lookups to avoid N+1 query problem

@@ -152,17 +152,16 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
     }
 
     try {
-      // For audiobooks, we play the audiobook media item
-      await maProvider.api?.playMedia(
+      // Play the audiobook
+      await maProvider.api?.playAudiobook(
         selectedPlayer.playerId,
-        widget.audiobook.uri ?? 'library://audiobook/${widget.audiobook.itemId}',
-        'audiobook',
+        widget.audiobook,
       );
 
       // If we have a resume position, seek to it
       if (startPositionMs != null && startPositionMs > 0) {
         await Future.delayed(const Duration(milliseconds: 500));
-        await maProvider.api?.queueCommandSeek(
+        await maProvider.api?.seek(
           selectedPlayer.playerId,
           startPositionMs ~/ 1000, // Convert to seconds
         );
