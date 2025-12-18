@@ -565,11 +565,46 @@ class MusicAssistantAPI {
         }
       }
 
+      // Get enabled libraries for filtering
+      final enabledLibraries = await SettingsService.getEnabledAbsLibraries();
+
       final audiobooks = <Audiobook>[];
       final parseErrors = <String>[];
+      int filteredCount = 0;
+
       for (int i = 0; i < items.length; i++) {
         try {
           final book = Audiobook.fromJson(items[i] as Map<String, dynamic>);
+
+          // Filter by enabled libraries if any are configured
+          if (enabledLibraries != null && book.providerMappings != null) {
+            // Check if this audiobook belongs to an enabled library
+            bool isEnabled = false;
+            for (final mapping in book.providerMappings!) {
+              // The item_id format is like "lb 54eb55e5-.../li item_id"
+              // The library path format is "audiobookshelf--xxx://lb 54eb55e5-..."
+              // We need to check if any enabled library path contains the library ID from item_id
+              final itemId = mapping.itemId;
+              final libraryIdMatch = RegExp(r'lb ([a-f0-9-]+)').firstMatch(itemId);
+              if (libraryIdMatch != null) {
+                final libraryId = libraryIdMatch.group(1);
+                // Check if this library ID is in any enabled library path
+                for (final enabledPath in enabledLibraries) {
+                  if (enabledPath.contains(libraryId!)) {
+                    isEnabled = true;
+                    break;
+                  }
+                }
+              }
+              if (isEnabled) break;
+            }
+
+            if (!isEnabled) {
+              filteredCount++;
+              continue;
+            }
+          }
+
           audiobooks.add(book);
         } catch (e) {
           parseErrors.add('Item $i: $e');
@@ -578,6 +613,10 @@ class MusicAssistantAPI {
 
       if (parseErrors.isNotEmpty) {
         _logger.log('📚 Parse errors (${parseErrors.length}): ${parseErrors.take(3).join(", ")}');
+      }
+
+      if (filteredCount > 0) {
+        _logger.log('📚 Filtered out $filteredCount audiobooks from disabled libraries');
       }
 
       _logger.log('📚 Successfully parsed ${audiobooks.length}/${items.length} audiobooks');
@@ -872,11 +911,13 @@ class MusicAssistantAPI {
 
             for (final seriesItem in seriesItems) {
               final seriesMap = seriesItem as Map<String, dynamic>;
-              // Skip parent navigation and media items
+              // Skip parent navigation
               if (seriesMap['path'] == 'root' || seriesMap['name'] == '..') continue;
-              if (seriesMap.containsKey('media_type') && seriesMap['media_type'] != null) continue;
+              // Skip actual audiobook items (we only want series folders)
+              final mediaType = seriesMap['media_type'] as String?;
+              if (mediaType == 'audiobook' || mediaType == 'track') continue;
 
-              _logger.log('📚 Series: name=${seriesMap['name']}, path=${seriesMap['path']}');
+              _logger.log('📚 Series: name=${seriesMap['name']}, path=${seriesMap['path']}, media_type=$mediaType');
               allSeries.add(AudiobookSeries.fromJson(seriesMap));
             }
             break; // Found series in this library, move to next library

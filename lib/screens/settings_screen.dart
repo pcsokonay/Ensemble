@@ -645,6 +645,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _libraryEnabled[path] = value;
                             });
                             await SettingsService.toggleAbsLibrary(path, value);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Pull to refresh the library to apply changes'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
                           },
                           activeColor: colorScheme.primary,
                         ),
