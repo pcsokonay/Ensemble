@@ -144,15 +144,13 @@ class ChaptersPanel extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                subtitle: chapter.duration != null
-                    ? Text(
-                        _formatDuration(chapter.duration!.inSeconds),
+                subtitle: Text(
+                        _formatDuration(chapter.positionMs ~/ 1000),
                         style: TextStyle(
                           color: textColor.withOpacity(0.5),
                           fontSize: 12,
                         ),
-                      )
-                    : null,
+                      ),
                 trailing: isCurrentChapter
                     ? Icon(Icons.play_arrow_rounded, color: primaryColor, size: 20)
                     : null,

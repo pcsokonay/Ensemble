@@ -831,23 +831,21 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          subtitle: Text(
-            isInProgress
-                ? 'In progress • ${_formatPositionTime(chapter.positionMs)}'
-                : _formatPositionTime(chapter.positionMs),
-            style: textTheme.bodySmall?.copyWith(
-              color: isInProgress ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.5),
-            ),
-          ),
-          trailing: chapter.duration != null
+          subtitle: isInProgress
               ? Text(
-                  _formatDuration(chapter.duration!),
+                  'In progress',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.primary,
+                  ),
+                )
+              : null,
+          trailing: Text(
+                  _formatPositionTime(chapter.positionMs),
                   style: textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurface.withOpacity(0.6),
                     fontWeight: FontWeight.w500,
                   ),
-                )
-              : null,
+                ),
           onTap: () {
             if (isExpanded) {
               setState(() {

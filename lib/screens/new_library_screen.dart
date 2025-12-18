@@ -1589,6 +1589,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           return CachedNetworkImage(
             imageUrl: displayCovers[index],
             fit: BoxFit.cover,
+            fadeInDuration: Duration.zero,
+            fadeOutDuration: Duration.zero,
             placeholder: (_, __) => Container(
               color: colorScheme.surfaceContainerHighest,
             ),
