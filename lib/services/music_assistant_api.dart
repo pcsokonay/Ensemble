@@ -586,8 +586,10 @@ class MusicAssistantAPI {
 
           // Filter by enabled libraries if any are configured
           if (enabledLibraries != null && book.providerMappings != null) {
-            // Debug: log first audiobook's provider mappings
+            // Debug: log first audiobook's provider mappings and URI
             if (!loggedFirstMapping && book.providerMappings!.isNotEmpty) {
+              _logger.log('📚 First audiobook URI: ${book.uri}');
+              _logger.log('📚 First audiobook itemId: ${book.itemId}');
               _logger.log('📚 First audiobook providerMappings:');
               for (final m in book.providerMappings!) {
                 _logger.log('📚   itemId: ${m.itemId}, provider: ${m.providerInstance}');
