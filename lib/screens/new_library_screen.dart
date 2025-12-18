@@ -1485,6 +1485,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       });
     }
 
+    final heroTag = 'series_cover_${series.id}';
+
     return Card(
       clipBehavior: Clip.antiAlias,
       elevation: 2,
@@ -1494,7 +1496,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => AudiobookSeriesScreen(series: series),
+              builder: (context) => AudiobookSeriesScreen(
+                series: series,
+                heroTag: heroTag,
+              ),
             ),
           );
         },
@@ -1502,9 +1507,12 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: Container(
-                color: colorScheme.surfaceContainerHighest,
-                child: _buildSeriesCoverGrid(series, colorScheme, maProvider),
+              child: Hero(
+                tag: heroTag,
+                child: Container(
+                  color: colorScheme.surfaceContainerHighest,
+                  child: _buildSeriesCoverGrid(series, colorScheme, maProvider),
+                ),
               ),
             ),
             Padding(

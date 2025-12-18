@@ -5,14 +5,17 @@ import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart' show BottomSpacing;
 import '../services/debug_logger.dart';
+import '../constants/hero_tags.dart';
 import 'audiobook_detail_screen.dart';
 
 class AudiobookSeriesScreen extends StatefulWidget {
   final AudiobookSeries series;
+  final String? heroTag;
 
   const AudiobookSeriesScreen({
     super.key,
     required this.series,
+    this.heroTag,
   });
 
   @override
@@ -99,7 +102,12 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                   shadows: [Shadow(blurRadius: 8, color: Colors.black54)],
                 ),
               ),
-              background: _buildHeaderBackground(colorScheme),
+              background: widget.heroTag != null
+                  ? Hero(
+                      tag: widget.heroTag!,
+                      child: _buildHeaderBackground(colorScheme),
+                    )
+                  : _buildHeaderBackground(colorScheme),
             ),
           ),
 
@@ -164,37 +172,42 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                 (context, index) {
                   final book = _audiobooks[index];
                   final imageUrl = maProvider.getImageUrl(book);
+                  final heroTagSuffix = 'series_${widget.series.id}_$index';
+                  final heroTag = HeroTags.audiobookCover + (book.uri ?? book.itemId) + '_$heroTagSuffix';
 
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: imageUrl != null
-                            ? CachedNetworkImage(
-                                imageUrl: imageUrl,
-                                fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(
+                    leading: Hero(
+                      tag: heroTag,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: SizedBox(
+                          width: 56,
+                          height: 56,
+                          child: imageUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                    color: colorScheme.surfaceContainerHighest,
+                                    child: Icon(Icons.book,
+                                        color: colorScheme.onSurfaceVariant),
+                                  ),
+                                  errorWidget: (_, __, ___) => Container(
+                                    color: colorScheme.surfaceContainerHighest,
+                                    child: Icon(Icons.book,
+                                        color: colorScheme.onSurfaceVariant),
+                                  ),
+                                )
+                              : Container(
                                   color: colorScheme.surfaceContainerHighest,
                                   child: Icon(Icons.book,
                                       color: colorScheme.onSurfaceVariant),
                                 ),
-                                errorWidget: (_, __, ___) => Container(
-                                  color: colorScheme.surfaceContainerHighest,
-                                  child: Icon(Icons.book,
-                                      color: colorScheme.onSurfaceVariant),
-                                ),
-                              )
-                            : Container(
-                                color: colorScheme.surfaceContainerHighest,
-                                child: Icon(Icons.book,
-                                    color: colorScheme.onSurfaceVariant),
-                              ),
+                        ),
                       ),
                     ),
                     title: Text(
@@ -223,7 +236,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                         MaterialPageRoute(
                           builder: (context) => AudiobookDetailScreen(
                             audiobook: book,
-                            heroTagSuffix: 'series_${widget.series.id}_$index',
+                            heroTagSuffix: heroTagSuffix,
                           ),
                         ),
                       );
