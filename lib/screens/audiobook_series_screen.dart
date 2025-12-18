@@ -248,6 +248,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
         ),
       ),
     );
+    END OF DISABLED CODE */
   }
 
   Widget _buildHeaderBackground(ColorScheme colorScheme) {
