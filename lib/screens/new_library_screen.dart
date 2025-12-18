@@ -883,7 +883,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
 
     final crossAxisCount = _authorsViewMode == 'grid3' ? 3 : 2;
-    final childAspectRatio = _authorsViewMode == 'grid3' ? 0.85 : 0.90;
+    // Circle at 0.75 aspect + space for author name + book count
+    final childAspectRatio = _authorsViewMode == 'grid3' ? 0.72 : 0.72;
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -974,63 +975,67 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final authorImageUrl = _authorImages[authorName];
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
 
+    // Use Expanded to fill available space and center the circle
     return InkWell(
       onTap: () => _navigateToAuthor(authorName, books, heroTagSuffix: 'library$heroSuffix'),
       borderRadius: BorderRadius.circular(12),
       child: Column(
         children: [
-          AspectRatio(
-            aspectRatio: 1.0,
-            child: Hero(
-              tag: HeroTags.authorImage + authorName + '_library$heroSuffix',
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: ClipOval(
-                  child: authorImageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: authorImageUrl,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          placeholder: (_, __) => Center(
+          // Circle image with controlled size
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Hero(
+                tag: HeroTags.authorImage + authorName + '_library$heroSuffix',
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: ClipOval(
+                    child: authorImageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: authorImageUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            placeholder: (_, __) => Center(
+                              child: Text(
+                                authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
+                                style: TextStyle(
+                                  color: colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: _authorsViewMode == 'grid3' ? 28 : 36,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (_, __, ___) => Center(
+                              child: Text(
+                                authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
+                                style: TextStyle(
+                                  color: colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: _authorsViewMode == 'grid3' ? 28 : 36,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Center(
                             child: Text(
                               authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
                               style: TextStyle(
                                 color: colorScheme.onPrimaryContainer,
                                 fontWeight: FontWeight.bold,
-                                fontSize: _authorsViewMode == 'grid3' ? 32 : 40,
+                                fontSize: _authorsViewMode == 'grid3' ? 28 : 36,
                               ),
                             ),
                           ),
-                          errorWidget: (_, __, ___) => Center(
-                            child: Text(
-                              authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                              style: TextStyle(
-                                color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                                fontSize: _authorsViewMode == 'grid3' ? 32 : 40,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Center(
-                          child: Text(
-                            authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                            style: TextStyle(
-                              color: colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                              fontSize: _authorsViewMode == 'grid3' ? 32 : 40,
-                            ),
-                          ),
-                        ),
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             authorName,
             style: textTheme.titleSmall?.copyWith(
@@ -1040,6 +1045,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 2),
           Text(
             '${books.length} ${books.length == 1 ? 'book' : 'books'}',
             style: textTheme.bodySmall?.copyWith(
@@ -1048,6 +1054,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 4),
         ],
       ),
     );
@@ -1262,7 +1269,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
 
     final crossAxisCount = _audiobooksViewMode == 'grid3' ? 3 : 2;
-    final childAspectRatio = _audiobooksViewMode == 'grid3' ? 0.65 : 0.70;
+    // Square artwork (1:1) + space for 2 lines title + 1 line author
+    final childAspectRatio = _audiobooksViewMode == 'grid3' ? 0.68 : 0.68;
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1292,7 +1300,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          // Square artwork with progress inside
+          AspectRatio(
+            aspectRatio: 1.0,
             child: Stack(
               children: [
                 Hero(
@@ -1301,6 +1311,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       width: double.infinity,
+                      height: double.infinity,
                       color: colorScheme.surfaceVariant,
                       child: imageUrl != null
                           ? CachedNetworkImage(
@@ -1325,7 +1336,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     ),
                   ),
                 ),
-                // Progress indicator overlay
+                // Progress indicator overlay inside artwork
                 if (book.progress > 0)
                   Positioned(
                     bottom: 8,
@@ -1453,16 +1464,16 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       );
     }
 
-    // Series grid
+    // Series grid - matches books tab style
     return RefreshIndicator(
       onRefresh: _loadSeries,
       child: GridView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, BottomSpacing.withMiniPlayer + 16),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.75,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          childAspectRatio: 0.68, // Same as books tab
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
         ),
         itemCount: _series.length,
         itemBuilder: (context, index) {
@@ -1487,62 +1498,56 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
     final heroTag = 'series_cover_${series.id}';
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 2,
-      child: InkWell(
-        onTap: () {
-          _logger.log('📚 Tapped series: ${series.name}, path: ${series.id}');
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AudiobookSeriesScreen(
-                series: series,
-                heroTag: heroTag,
-              ),
+    // Matches books tab style - square artwork with text below
+    return GestureDetector(
+      onTap: () {
+        _logger.log('📚 Tapped series: ${series.name}, path: ${series.id}');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AudiobookSeriesScreen(
+              series: series,
+              heroTag: heroTag,
             ),
-          );
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Hero(
-                tag: heroTag,
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Square cover grid
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: Hero(
+              tag: heroTag,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  color: colorScheme.surfaceContainerHighest,
+                  color: colorScheme.surfaceVariant,
                   child: _buildSeriesCoverGrid(series, colorScheme, maProvider),
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    series.name,
-                    style: textTheme.titleSmall?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (series.bookCount != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '${series.bookCount} book${series.bookCount == 1 ? '' : 's'}',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                  ],
-                ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            series.name,
+            style: textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (series.bookCount != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              '${series.bookCount} book${series.bookCount == 1 ? '' : 's'}',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
