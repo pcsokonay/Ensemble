@@ -28,13 +28,9 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   @override
   void initState() {
     super.initState();
-    _logger.log('📚 SeriesScreen initState for: ${widget.series.name}');
-    // Defer loading until after first frame to allow UI to render first
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _loadSeriesBooks();
-      }
-    });
+    // DEBUG: Skip loading entirely to test if screen renders
+    // If this works, the freeze is in the data loading
+    // TODO: Remove this debug code after testing
   }
 
   Future<void> _loadSeriesBooks() async {
