@@ -1006,6 +1006,11 @@ class MusicAssistantAPI {
           // Debug: Log key fields for sequence detection
           _logger.log('📚 Raw data $i: position=${itemMap['position']}, sort_name=${itemMap['sort_name']}, metadata.series=${(itemMap['metadata'] as Map?)?['series']}');
           try {
+            // Inject browse_order as fallback for series sequencing
+            // This preserves the order returned by MA/Audiobookshelf browse API
+            if (itemMap['position'] == null) {
+              itemMap['_browse_order'] = i + 1; // 1-indexed like series numbers
+            }
             audiobooks.add(Audiobook.fromJson(itemMap));
             _logger.log('📚 Parsed audiobook $i successfully');
           } catch (e) {

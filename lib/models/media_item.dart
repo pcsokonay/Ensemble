@@ -393,6 +393,8 @@ class Audiobook extends MediaItem {
   final List<Chapter>? chapters;
   final int? resumePositionMs;
   final bool? fullyPlayed;
+  /// Browse order from API - used as fallback for series sequencing
+  final int? browseOrder;
 
   Audiobook({
     required super.itemId,
@@ -406,6 +408,7 @@ class Audiobook extends MediaItem {
     this.chapters,
     this.resumePositionMs,
     this.fullyPlayed,
+    this.browseOrder,
     super.sortName,
     super.uri,
     super.providerMappings,
@@ -480,6 +483,7 @@ class Audiobook extends MediaItem {
       chapters: chapters,
       resumePositionMs: json['resume_position_ms'] as int?,
       fullyPlayed: json['fully_played'] as bool?,
+      browseOrder: json['_browse_order'] as int?,
       sortName: item.sortName,
       uri: item.uri,
       providerMappings: item.providerMappings,
@@ -563,6 +567,9 @@ class Audiobook extends MediaItem {
       }
     }
 
+    // Last resort: use browse order from API (preserves MA/Audiobookshelf order)
+    if (browseOrder != null) return browseOrder!.toDouble();
+
     return null;
   }
 
@@ -583,6 +590,7 @@ class Audiobook extends MediaItem {
     }
     if (resumePositionMs != null) json['resume_position_ms'] = resumePositionMs;
     if (fullyPlayed != null) json['fully_played'] = fullyPlayed;
+    if (browseOrder != null) json['_browse_order'] = browseOrder;
     return json;
   }
 }

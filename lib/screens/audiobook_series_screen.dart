@@ -128,7 +128,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
 
       // Debug: Log sequence data for each book
       for (final book in books) {
-        _logger.log('📚 Book: "${book.name}" | position=${book.position} | sortName=${book.sortName} | seq=${book.seriesSequence} | metadata.series=${book.metadata?['series']}');
+        _logger.log('📚 Book: "${book.name}" | position=${book.position} | browseOrder=${book.browseOrder} | sortName=${book.sortName} | seq=${book.seriesSequence} | metadata.series=${book.metadata?['series']}');
       }
 
       if (mounted) {
