@@ -28,9 +28,12 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   @override
   void initState() {
     super.initState();
-    // DEBUG: Skip loading entirely to test if screen renders
-    // If this works, the freeze is in the data loading
-    // TODO: Remove this debug code after testing
+    // Defer loading until after first frame to ensure UI renders first
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadSeriesBooks();
+      }
+    });
   }
 
   Future<void> _loadSeriesBooks() async {
@@ -78,6 +81,17 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // DEBUG: Absolute minimal build to find freeze cause
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.series.name),
+      ),
+      body: const Center(
+        child: Text('Minimal test - if this shows, screen works'),
+      ),
+    );
+
+    /* DISABLED FOR DEBUGGING
     final colorScheme = Theme.of(context).colorScheme;
     final maProvider = context.watch<MusicAssistantProvider>();
 
@@ -86,7 +100,6 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
         body: CustomScrollView(
           slivers: [
             // App bar with series image
-            // DEBUG: Simplified app bar - no image loading
             SliverAppBar(
               expandedHeight: 200,
               pinned: true,
@@ -97,14 +110,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                     shadows: [Shadow(blurRadius: 8, color: Colors.black54)],
                   ),
                 ),
-                background: Container(
-                  color: colorScheme.primaryContainer,
-                  child: Icon(
-                    Icons.library_books,
-                    size: 64,
-                    color: colorScheme.onPrimaryContainer.withOpacity(0.5),
-                  ),
-                ),
+                background: _buildHeaderBackground(colorScheme),
               ),
             ),
 
@@ -239,6 +245,41 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderBackground(ColorScheme colorScheme) {
+    final thumbnailUrl = widget.series.thumbnailUrl;
+
+    // Show placeholder if no URL or invalid URL
+    if (thumbnailUrl == null || thumbnailUrl.isEmpty) {
+      return _buildHeaderPlaceholder(colorScheme);
+    }
+
+    // Use CachedNetworkImage with proper error handling
+    return CachedNetworkImage(
+      imageUrl: thumbnailUrl,
+      fit: BoxFit.cover,
+      color: Colors.black.withOpacity(0.3),
+      colorBlendMode: BlendMode.darken,
+      placeholder: (context, url) => _buildHeaderPlaceholder(colorScheme),
+      errorWidget: (context, url, error) {
+        _logger.log('📚 Error loading series header image: $error');
+        return _buildHeaderPlaceholder(colorScheme);
+      },
+    );
+  }
+
+  Widget _buildHeaderPlaceholder(ColorScheme colorScheme) {
+    return Container(
+      color: colorScheme.primaryContainer,
+      child: Center(
+        child: Icon(
+          Icons.library_books,
+          size: 64,
+          color: colorScheme.onPrimaryContainer.withOpacity(0.5),
         ),
       ),
     );
