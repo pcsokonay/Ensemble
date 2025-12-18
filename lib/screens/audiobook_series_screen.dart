@@ -91,7 +91,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                     ? CachedNetworkImage(
                         imageUrl: widget.series.thumbnailUrl!,
                         fit: BoxFit.cover,
-                        color: Colors.black.withValues(alpha: 0.3),
+                        color: Colors.black.withOpacity(0.3),
                         colorBlendMode: BlendMode.darken,
                       )
                     : Container(
@@ -99,7 +99,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                         child: Icon(
                           Icons.library_books,
                           size: 64,
-                          color: colorScheme.onPrimaryContainer.withValues(alpha: 0.5),
+                          color: colorScheme.onPrimaryContainer.withOpacity(0.5),
                         ),
                       ),
               ),
