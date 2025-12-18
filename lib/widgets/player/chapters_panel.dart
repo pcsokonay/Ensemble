@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../providers/music_assistant_provider.dart';
-import '../../models/media_item.dart';
+import '../../models/media_item.dart' show Audiobook, Chapter;
 import '../../theme/design_tokens.dart';
 import '../common/empty_state.dart';
 
@@ -91,7 +91,7 @@ class ChaptersPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildChaptersList(List<AudiobookChapter> chapters, int currentChapterIndex) {
+  Widget _buildChaptersList(List<Chapter> chapters, int currentChapterIndex) {
     return ListView.builder(
       padding: Spacing.paddingH8,
       cacheExtent: 500,
@@ -173,7 +173,7 @@ class ChaptersPanel extends StatelessWidget {
     if (chapters == null || chapterIndex >= chapters.length) return;
 
     final chapter = chapters[chapterIndex];
-    // Seek to the chapter's start position
-    maProvider.seek(player.playerId, chapter.position.inSeconds);
+    // Seek to the chapter's start position (positionMs is in milliseconds)
+    maProvider.seek(player.playerId, (chapter.positionMs / 1000).round());
   }
 }
