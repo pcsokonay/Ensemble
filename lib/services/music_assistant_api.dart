@@ -585,37 +585,31 @@ class MusicAssistantAPI {
           final book = Audiobook.fromJson(items[i] as Map<String, dynamic>);
 
           // Filter by enabled libraries if any are configured
-          if (enabledLibraries != null && book.providerMappings != null) {
-            // Debug: log first audiobook's provider mappings and URI
-            if (!loggedFirstMapping && book.providerMappings!.isNotEmpty) {
+          if (enabledLibraries != null) {
+            // Debug: log first audiobook's URI
+            if (!loggedFirstMapping) {
               _logger.log('📚 First audiobook URI: ${book.uri}');
               _logger.log('📚 First audiobook itemId: ${book.itemId}');
-              _logger.log('📚 First audiobook providerMappings:');
-              for (final m in book.providerMappings!) {
-                _logger.log('📚   itemId: ${m.itemId}, provider: ${m.providerInstance}');
-              }
               loggedFirstMapping = true;
             }
 
             // Check if this audiobook belongs to an enabled library
+            // Try to extract library ID from the URI (format: audiobookshelf--xxx://lb LIBRARY_ID/...)
             bool isEnabled = false;
-            for (final mapping in book.providerMappings!) {
-              // The item_id format is like "lb 54eb55e5-.../li item_id"
-              // The library path format is "audiobookshelf--xxx://lb 54eb55e5-..."
-              // We need to check if any enabled library path contains the library ID from item_id
-              final itemId = mapping.itemId;
-              final libraryIdMatch = RegExp(r'lb ([a-f0-9-]+)').firstMatch(itemId);
-              if (libraryIdMatch != null) {
-                final libraryId = libraryIdMatch.group(1);
-                // Check if this library ID is in any enabled library path
-                for (final enabledPath in enabledLibraries) {
-                  if (enabledPath.contains(libraryId!)) {
-                    isEnabled = true;
-                    break;
-                  }
+            final uri = book.uri ?? '';
+            final libraryIdMatch = RegExp(r'lb ([a-f0-9-]+)').firstMatch(uri);
+            if (libraryIdMatch != null) {
+              final libraryId = libraryIdMatch.group(1)!;
+              // Check if this library ID is in any enabled library path
+              for (final enabledPath in enabledLibraries) {
+                if (enabledPath.contains(libraryId)) {
+                  isEnabled = true;
+                  break;
                 }
               }
-              if (isEnabled) break;
+            } else {
+              // If we can't determine the library, default to enabled (don't filter)
+              isEnabled = true;
             }
 
             if (!isEnabled) {
