@@ -44,9 +44,19 @@ This application was built with AI-assisted development using **Claude Code** an
 - **Playlist Support** - Browse and play your playlists
 - **Search** - Find music across your entire library
 
+### Audiobooks
+- **Audiobooks Tab** - Browse your audiobook library with grid/list view options
+- **Series Support** - View audiobooks organized by series with collage cover art
+- **Author Browsing** - Browse audiobooks by author
+- **Chapter Navigation** - Jump between chapters with timestamp display
+- **Progress Tracking** - Track your listening progress across sessions
+- **Continue Listening** - Pick up where you left off
+- **Mark as Finished/Unplayed** - Manage your reading progress
+
 ### Smart Features
+- **Instant App Restore** - App loads instantly with cached library data while syncing in background
 - **Auto-Reconnect** - Automatically reconnects when connection is lost
-- **Caching** - Fast navigation with cached content
+- **Offline Browsing** - Browse your cached library even when disconnected
 - **Hero Animations** - Smooth transitions between screens
 
 ### Theming
@@ -94,11 +104,10 @@ Ensemble supports multiple authentication methods:
 
 ## Requirements
 
-- Music Assistant server (v2.7.0 or later recommended)
+- Music Assistant server (v2.7.0 beta 20 or later)
 - Network connectivity to your Music Assistant server
 - Android device (Android 5.0+)
-
-> **Note:** Local device playback (streaming to your phone) is not currently supported on Music Assistant beta 20+. This is due to MA replacing the built-in player with Sendspin. Support will be added once Sendspin is more stable. Remote control of other players works fine.
+- Audiobookshelf provider configured in Music Assistant (for audiobook features)
 
 ## License
 
