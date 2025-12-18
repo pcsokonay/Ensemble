@@ -1309,7 +1309,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     ),
                   ),
 
-                // Artist name - with slide animation when collapsed
+                // Artist/Author name - with slide animation when collapsed
+                // For audiobooks: show author from audiobook context
                 // Hidden during transition to prevent flash
                 // FALLBACK: Show if transition active but no peek content available
                 // GPU PERF: Use conditional instead of Opacity to avoid saveLayer
@@ -1320,7 +1321,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     child: SizedBox(
                       width: titleWidth,
                       child: Text(
-                        currentTrack.artistsString,
+                        maProvider.isPlayingAudiobook
+                            ? (maProvider.currentAudiobook?.authorsString ?? 'Unknown Author')
+                            : currentTrack.artistsString,
                         style: TextStyle(
                           color: textColor.withOpacity(t > 0.5 ? 0.7 : 0.6),
                           fontSize: artistFontSize,
@@ -1658,7 +1661,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     ),
                   ),
 
-                // Queue panel (slides in from right)
+                // Queue/Chapters panel (slides in from right)
+                // For audiobooks: show chapters panel
+                // For music: show queue panel
                 if (t > 0.5 && queueT > 0)
                   Positioned.fill(
                     child: RepaintBoundary(
@@ -1667,17 +1672,27 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                           begin: const Offset(1, 0),
                           end: Offset.zero,
                         ).animate(_queuePanelAnimation),
-                        child: QueuePanel(
-                          maProvider: maProvider,
-                          queue: _queue,
-                          isLoading: _isLoadingQueue,
-                          textColor: textColor,
-                          primaryColor: primaryColor,
-                          backgroundColor: expandedBg,
-                          topPadding: topPadding,
-                          onClose: _toggleQueuePanel,
-                          onRefresh: _loadQueue,
-                        ),
+                        child: maProvider.isPlayingAudiobook
+                            ? ChaptersPanel(
+                                maProvider: maProvider,
+                                audiobook: maProvider.currentAudiobook,
+                                textColor: textColor,
+                                primaryColor: primaryColor,
+                                backgroundColor: expandedBg,
+                                topPadding: topPadding,
+                                onClose: _toggleQueuePanel,
+                              )
+                            : QueuePanel(
+                                maProvider: maProvider,
+                                queue: _queue,
+                                isLoading: _isLoadingQueue,
+                                textColor: textColor,
+                                primaryColor: primaryColor,
+                                backgroundColor: expandedBg,
+                                topPadding: topPadding,
+                                onClose: _toggleQueuePanel,
+                                onRefresh: _loadQueue,
+                              ),
                       ),
                     ),
                   ),
