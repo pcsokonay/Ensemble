@@ -369,44 +369,55 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
       );
     }
 
-    // Determine grid size
-    int gridSize;
-    if (covers.length == 1) {
-      gridSize = 1;
-    } else if (covers.length <= 4) {
-      gridSize = 2;
-    } else {
-      gridSize = 3;
+    // Always use 3x3 grid for series detail
+    const int gridSize = 3;
+
+    // Pad covers to fill grid, using empty strings for missing slots
+    final displayCovers = List<String?>.filled(gridSize * gridSize, null);
+    for (var i = 0; i < covers.length && i < displayCovers.length; i++) {
+      displayCovers[i] = covers[i];
     }
 
-    final displayCovers = covers.take(gridSize * gridSize).toList();
+    // Build grid using Column/Row for proper sizing (no scrolling issues)
+    return Column(
+      children: List.generate(gridSize, (row) {
+        return Expanded(
+          child: Row(
+            children: List.generate(gridSize, (col) {
+              final index = row * gridSize + col;
+              final coverUrl = displayCovers[index];
 
-    return GridView.builder(
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: gridSize,
-        childAspectRatio: 1,
-        crossAxisSpacing: 1,
-        mainAxisSpacing: 1,
-      ),
-      itemCount: displayCovers.length,
-      itemBuilder: (context, index) {
-        return CachedNetworkImage(
-          imageUrl: displayCovers[index],
-          fit: BoxFit.cover,
-          placeholder: (_, __) => Container(
-            color: colorScheme.surfaceContainerHighest,
-          ),
-          errorWidget: (_, __, ___) => Container(
-            color: colorScheme.surfaceContainerHighest,
-            child: Icon(
-              Icons.book,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.3),
-              size: 20,
-            ),
+              return Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(
+                    right: col < gridSize - 1 ? 1 : 0,
+                    bottom: row < gridSize - 1 ? 1 : 0,
+                  ),
+                  child: coverUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: coverUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            color: colorScheme.surfaceContainerHighest,
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            color: colorScheme.surfaceContainerHighest,
+                            child: Icon(
+                              Icons.book,
+                              color: colorScheme.onSurfaceVariant.withOpacity(0.3),
+                              size: 20,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: colorScheme.surfaceContainerHighest,
+                        ),
+                ),
+              );
+            }),
           ),
         );
-      },
+      }),
     );
   }
 
