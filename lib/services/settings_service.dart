@@ -562,7 +562,7 @@ class SettingsService {
   // View Mode Settings - Series Audiobooks (series detail screen)
   static Future<String> getSeriesAudiobooksSortOrder() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keySeriesAudiobooksSortOrder) ?? 'alpha';
+    return prefs.getString(_keySeriesAudiobooksSortOrder) ?? 'series';
   }
 
   static Future<void> setSeriesAudiobooksSortOrder(String order) async {

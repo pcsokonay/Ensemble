@@ -38,6 +38,8 @@ class SyncService with ChangeNotifier {
   // Cached data (loaded from DB, updated after sync)
   List<Album> _cachedAlbums = [];
   List<Artist> _cachedArtists = [];
+  List<Audiobook> _cachedAudiobooks = [];
+  List<Playlist> _cachedPlaylists = [];
 
   // Getters
   SyncStatus get status => _status;
@@ -46,7 +48,10 @@ class SyncService with ChangeNotifier {
   bool get isSyncing => _isSyncing;
   List<Album> get cachedAlbums => _cachedAlbums;
   List<Artist> get cachedArtists => _cachedArtists;
-  bool get hasCache => _cachedAlbums.isNotEmpty || _cachedArtists.isNotEmpty;
+  List<Audiobook> get cachedAudiobooks => _cachedAudiobooks;
+  List<Playlist> get cachedPlaylists => _cachedPlaylists;
+  bool get hasCache => _cachedAlbums.isNotEmpty || _cachedArtists.isNotEmpty ||
+                       _cachedAudiobooks.isNotEmpty || _cachedPlaylists.isNotEmpty;
 
   /// Load library data from database cache (instant)
   /// Call this on app startup for immediate data
@@ -81,7 +86,30 @@ class SyncService with ChangeNotifier {
         }
       }).whereType<Artist>().toList();
 
-      _logger.log('📦 Loaded ${_cachedAlbums.length} albums, ${_cachedArtists.length} artists from cache');
+      // Load audiobooks from cache
+      final audiobookData = await _db.getCachedItems('audiobook');
+      _cachedAudiobooks = audiobookData.map((data) {
+        try {
+          return Audiobook.fromJson(data);
+        } catch (e) {
+          _logger.log('⚠️ Failed to parse cached audiobook: $e');
+          return null;
+        }
+      }).whereType<Audiobook>().toList();
+
+      // Load playlists from cache
+      final playlistData = await _db.getCachedItems('playlist');
+      _cachedPlaylists = playlistData.map((data) {
+        try {
+          return Playlist.fromJson(data);
+        } catch (e) {
+          _logger.log('⚠️ Failed to parse cached playlist: $e');
+          return null;
+        }
+      }).whereType<Playlist>().toList();
+
+      _logger.log('📦 Loaded ${_cachedAlbums.length} albums, ${_cachedArtists.length} artists, '
+                  '${_cachedAudiobooks.length} audiobooks, ${_cachedPlaylists.length} playlists from cache');
       notifyListeners();
     } catch (e) {
       _logger.log('❌ Failed to load from cache: $e');
@@ -105,8 +133,10 @@ class SyncService with ChangeNotifier {
     if (!force) {
       final albumsNeedSync = await _db.needsSync('albums', maxAge: const Duration(minutes: 5));
       final artistsNeedSync = await _db.needsSync('artists', maxAge: const Duration(minutes: 5));
+      final audiobooksNeedSync = await _db.needsSync('audiobooks', maxAge: const Duration(minutes: 5));
+      final playlistsNeedSync = await _db.needsSync('playlists', maxAge: const Duration(minutes: 5));
 
-      if (!albumsNeedSync && !artistsNeedSync) {
+      if (!albumsNeedSync && !artistsNeedSync && !audiobooksNeedSync && !playlistsNeedSync) {
         _logger.log('✅ Cache is fresh, skipping sync');
         return;
       }
@@ -120,28 +150,39 @@ class SyncService with ChangeNotifier {
     try {
       _logger.log('🔄 Starting background library sync...');
 
-      // Fetch fresh data from MA API
+      // Fetch fresh data from MA API (in parallel for speed)
       final results = await Future.wait([
         api.getAlbums(limit: 1000),
         api.getArtists(limit: 1000),
+        api.getAudiobooks(limit: 1000),
+        api.getPlaylists(limit: 1000),
       ]);
 
       final albums = results[0] as List<Album>;
       final artists = results[1] as List<Artist>;
+      final audiobooks = results[2] as List<Audiobook>;
+      final playlists = results[3] as List<Playlist>;
 
-      _logger.log('📥 Fetched ${albums.length} albums, ${artists.length} artists from MA');
+      _logger.log('📥 Fetched ${albums.length} albums, ${artists.length} artists, '
+                  '${audiobooks.length} audiobooks, ${playlists.length} playlists from MA');
 
       // Save to database cache
       await _saveAlbumsToCache(albums);
       await _saveArtistsToCache(artists);
+      await _saveAudiobooksToCache(audiobooks);
+      await _savePlaylistsToCache(playlists);
 
       // Update sync metadata
       await _db.updateSyncMetadata('albums', albums.length);
       await _db.updateSyncMetadata('artists', artists.length);
+      await _db.updateSyncMetadata('audiobooks', audiobooks.length);
+      await _db.updateSyncMetadata('playlists', playlists.length);
 
       // Update in-memory cache
       _cachedAlbums = albums;
       _cachedArtists = artists;
+      _cachedAudiobooks = audiobooks;
+      _cachedPlaylists = playlists;
       _lastSyncTime = DateTime.now();
       _status = SyncStatus.completed;
 
@@ -188,6 +229,38 @@ class SyncService with ChangeNotifier {
     _logger.log('💾 Saved ${artists.length} artists to cache');
   }
 
+  /// Save audiobooks to database cache
+  Future<void> _saveAudiobooksToCache(List<Audiobook> audiobooks) async {
+    for (final audiobook in audiobooks) {
+      try {
+        await _db.cacheItem(
+          itemType: 'audiobook',
+          itemId: audiobook.itemId,
+          data: audiobook.toJson(),
+        );
+      } catch (e) {
+        _logger.log('⚠️ Failed to cache audiobook ${audiobook.name}: $e');
+      }
+    }
+    _logger.log('💾 Saved ${audiobooks.length} audiobooks to cache');
+  }
+
+  /// Save playlists to database cache
+  Future<void> _savePlaylistsToCache(List<Playlist> playlists) async {
+    for (final playlist in playlists) {
+      try {
+        await _db.cacheItem(
+          itemType: 'playlist',
+          itemId: playlist.itemId,
+          data: playlist.toJson(),
+        );
+      } catch (e) {
+        _logger.log('⚠️ Failed to cache playlist ${playlist.name}: $e');
+      }
+    }
+    _logger.log('💾 Saved ${playlists.length} playlists to cache');
+  }
+
   /// Force a fresh sync (for pull-to-refresh)
   Future<void> forceSync(MusicAssistantAPI api) async {
     await syncFromApi(api, force: true);
@@ -200,6 +273,8 @@ class SyncService with ChangeNotifier {
     await _db.clearAllCache();
     _cachedAlbums = [];
     _cachedArtists = [];
+    _cachedAudiobooks = [];
+    _cachedPlaylists = [];
     _lastSyncTime = null;
     _status = SyncStatus.idle;
     notifyListeners();
@@ -212,6 +287,13 @@ class SyncService with ChangeNotifier {
   /// Get artists (from cache or empty if not loaded)
   List<Artist> getArtists() => _cachedArtists;
 
+  /// Get audiobooks (from cache or empty if not loaded)
+  List<Audiobook> getAudiobooks() => _cachedAudiobooks;
+
+  /// Get playlists (from cache or empty if not loaded)
+  List<Playlist> getPlaylists() => _cachedPlaylists;
+
   /// Check if we have data available (from cache or sync)
-  bool get hasData => _cachedAlbums.isNotEmpty || _cachedArtists.isNotEmpty;
+  bool get hasData => _cachedAlbums.isNotEmpty || _cachedArtists.isNotEmpty ||
+                      _cachedAudiobooks.isNotEmpty || _cachedPlaylists.isNotEmpty;
 }

@@ -504,6 +504,39 @@ class Audiobook extends MediaItem {
     return (resumePositionMs! / totalMs).clamp(0.0, 1.0);
   }
 
+  /// Get series sequence number from metadata (for sorting within a series)
+  /// Tries various metadata fields commonly used by audiobook providers
+  double? get seriesSequence {
+    if (metadata == null) return null;
+
+    // Try common metadata fields for series sequence
+    final seq = metadata!['sequence'] ??
+                metadata!['series_sequence'] ??
+                metadata!['series_number'] ??
+                metadata!['position'];
+
+    if (seq is num) return seq.toDouble();
+    if (seq is String) return double.tryParse(seq);
+
+    // Check if there's a series object with sequence
+    final series = metadata!['series'];
+    if (series is Map) {
+      final seriesSeq = series['sequence'] ?? series['number'];
+      if (seriesSeq is num) return seriesSeq.toDouble();
+      if (seriesSeq is String) return double.tryParse(seriesSeq);
+    }
+    if (series is List && series.isNotEmpty) {
+      final first = series.first;
+      if (first is Map) {
+        final seriesSeq = first['sequence'] ?? first['number'];
+        if (seriesSeq is num) return seriesSeq.toDouble();
+        if (seriesSeq is String) return double.tryParse(seriesSeq);
+      }
+    }
+
+    return null;
+  }
+
   @override
   Map<String, dynamic> toJson() {
     final json = super.toJson();

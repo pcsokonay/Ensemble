@@ -32,7 +32,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   String? _error;
 
   // View preferences
-  String _sortOrder = 'alpha'; // 'alpha' or 'year'
+  String _sortOrder = 'series'; // 'series' (by series number) or 'alpha'
   String _viewMode = 'grid2'; // 'grid2', 'grid3', 'list'
 
   @override
@@ -59,7 +59,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   }
 
   void _toggleSortOrder() {
-    final newOrder = _sortOrder == 'alpha' ? 'year' : 'alpha';
+    final newOrder = _sortOrder == 'series' ? 'alpha' : 'series';
     setState(() {
       _sortOrder = newOrder;
       _sortAudiobooks();
@@ -86,14 +86,18 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   }
 
   void _sortAudiobooks() {
-    if (_sortOrder == 'year') {
+    if (_sortOrder == 'series') {
+      // Sort by series number (sequence), falling back to name for books without sequence
       _audiobooks.sort((a, b) {
-        if (a.year == null && b.year == null) return a.name.compareTo(b.name);
-        if (a.year == null) return 1;
-        if (b.year == null) return -1;
-        return a.year!.compareTo(b.year!);
+        final seqA = a.seriesSequence;
+        final seqB = b.seriesSequence;
+        if (seqA == null && seqB == null) return a.name.compareTo(b.name);
+        if (seqA == null) return 1; // Books without sequence go to end
+        if (seqB == null) return -1;
+        return seqA.compareTo(seqB);
       });
     } else {
+      // Sort alphabetically
       _audiobooks.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     }
   }
@@ -240,11 +244,11 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                   // Sort toggle
                   IconButton(
                     icon: Icon(
-                      _sortOrder == 'alpha' ? Icons.sort_by_alpha : Icons.calendar_today,
+                      _sortOrder == 'series' ? Icons.format_list_numbered : Icons.sort_by_alpha,
                       color: colorScheme.primary,
                       size: 20,
                     ),
-                    tooltip: _sortOrder == 'alpha' ? 'Sort by year' : 'Sort alphabetically',
+                    tooltip: _sortOrder == 'series' ? 'Sort alphabetically' : 'Sort by series order',
                     onPressed: _toggleSortOrder,
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,

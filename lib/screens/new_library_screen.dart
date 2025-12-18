@@ -16,6 +16,7 @@ import '../widgets/common/disconnected_state.dart';
 import '../services/settings_service.dart';
 import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
+import '../services/sync_service.dart';
 import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
 import 'playlist_details_screen.dart';
@@ -607,8 +608,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       builder: (context, isConnected, _) {
         final colorScheme = Theme.of(context).colorScheme;
         final textTheme = Theme.of(context).textTheme;
+        final syncService = SyncService.instance;
 
-        if (!isConnected) {
+        // Show cached data even when not connected (if we have cache)
+        // Only show disconnected state if we have no cached data at all
+        if (!isConnected && !syncService.hasCache) {
           return Scaffold(
             backgroundColor: colorScheme.background,
             appBar: AppBar(
@@ -708,9 +712,42 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               ),
             ),
           ),
-          body: TabBarView(
-            controller: _tabController,
-            children: _buildTabViews(context),
+          body: Column(
+            children: [
+              // Connecting banner when showing cached data
+              if (!isConnected && syncService.hasCache)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: colorScheme.primaryContainer.withOpacity(0.5),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Connecting...',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: _buildTabViews(context),
+                ),
+              ),
+            ],
           ),
         );
       },

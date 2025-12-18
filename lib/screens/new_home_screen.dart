@@ -173,19 +173,58 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           selector: (_, p) => p.isConnected,
           builder: (context, isConnected, child) {
             final maProvider = context.read<MusicAssistantProvider>();
-            return !isConnected
-                ? DisconnectedState.full(
-                    onSettings: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const SettingsScreen()),
+            final syncService = SyncService.instance;
+
+            // Show cached data even when not connected (if we have cache)
+            // Only show disconnected state if we have no cached data at all
+            if (!isConnected && !syncService.hasCache) {
+              return DisconnectedState.full(
+                onSettings: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                ),
+              );
+            }
+
+            return Column(
+              children: [
+                // Connecting banner when showing cached data
+                if (!isConnected && syncService.hasCache)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    color: colorScheme.primaryContainer.withOpacity(0.5),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Connecting...',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ],
                     ),
-                  )
-                : RefreshIndicator(
+                  ),
+                Expanded(
+                  child: RefreshIndicator(
                     onRefresh: _onRefresh,
                     color: colorScheme.primary,
                     backgroundColor: colorScheme.surface,
                     child: _buildConnectedView(context, maProvider),
-                  );
+                  ),
+                ),
+              ],
+            );
           },
         ),
       ),
