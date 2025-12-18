@@ -26,6 +26,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _showFavoriteAlbums = false;
   bool _showFavoriteArtists = false;
   bool _showFavoriteTracks = false;
+  // Audiobook home rows (default off)
+  bool _showContinueListeningAudiobooks = false;
+  bool _showDiscoverAudiobooks = false;
+  bool _showDiscoverSeries = false;
   // Audiobook libraries
   List<Map<String, String>> _discoveredLibraries = [];
   Map<String, bool> _libraryEnabled = {};
@@ -55,6 +59,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final showFavArtists = await SettingsService.getShowFavoriteArtists();
     final showFavTracks = await SettingsService.getShowFavoriteTracks();
 
+    // Load audiobook home row settings
+    final showContinueAudiobooks = await SettingsService.getShowContinueListeningAudiobooks();
+    final showDiscAudiobooks = await SettingsService.getShowDiscoverAudiobooks();
+    final showDiscSeries = await SettingsService.getShowDiscoverSeries();
+
     // Load audiobook library settings
     final discovered = await SettingsService.getDiscoveredAbsLibraries() ?? [];
     final enabled = await SettingsService.getEnabledAbsLibraries();
@@ -73,6 +82,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _showFavoriteAlbums = showFavAlbums;
         _showFavoriteArtists = showFavArtists;
         _showFavoriteTracks = showFavTracks;
+        _showContinueListeningAudiobooks = showContinueAudiobooks;
+        _showDiscoverAudiobooks = showDiscAudiobooks;
+        _showDiscoverSeries = showDiscSeries;
         _discoveredLibraries = discovered;
         _libraryEnabled = libraryEnabled;
       });
@@ -501,6 +513,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: (value) {
                       setState(() => _showFavoriteTracks = value);
                       SettingsService.setShowFavoriteTracks(value);
+                    },
+                    activeColor: colorScheme.primary,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            Text(
+              'Audiobooks',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onBackground.withOpacity(0.6),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Audiobook home rows section
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceVariant.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    title: Text(
+                      'Continue Listening',
+                      style: TextStyle(color: colorScheme.onSurface),
+                    ),
+                    subtitle: Text(
+                      'Show audiobooks in progress',
+                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                    ),
+                    value: _showContinueListeningAudiobooks,
+                    onChanged: (value) {
+                      setState(() => _showContinueListeningAudiobooks = value);
+                      SettingsService.setShowContinueListeningAudiobooks(value);
+                    },
+                    activeColor: colorScheme.primary,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  Divider(color: colorScheme.outline.withOpacity(0.2), height: 1),
+                  SwitchListTile(
+                    title: Text(
+                      'Discover Audiobooks',
+                      style: TextStyle(color: colorScheme.onSurface),
+                    ),
+                    subtitle: Text(
+                      'Show random audiobooks to discover',
+                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                    ),
+                    value: _showDiscoverAudiobooks,
+                    onChanged: (value) {
+                      setState(() => _showDiscoverAudiobooks = value);
+                      SettingsService.setShowDiscoverAudiobooks(value);
+                    },
+                    activeColor: colorScheme.primary,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  Divider(color: colorScheme.outline.withOpacity(0.2), height: 1),
+                  SwitchListTile(
+                    title: Text(
+                      'Discover Series',
+                      style: TextStyle(color: colorScheme.onSurface),
+                    ),
+                    subtitle: Text(
+                      'Show random audiobook series to discover',
+                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                    ),
+                    value: _showDiscoverSeries,
+                    onChanged: (value) {
+                      setState(() => _showDiscoverSeries = value);
+                      SettingsService.setShowDiscoverSeries(value);
                     },
                     activeColor: colorScheme.primary,
                     contentPadding: EdgeInsets.zero,

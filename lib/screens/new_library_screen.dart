@@ -54,6 +54,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   String _playlistsViewMode = 'list'; // 'grid2', 'grid3', 'list'
   String _audiobooksViewMode = 'grid2'; // 'grid2', 'grid3', 'list'
   String _authorsViewMode = 'list'; // 'grid2', 'grid3', 'list'
+  String _seriesViewMode = 'grid2'; // 'grid2', 'grid3'
   String _audiobooksSortOrder = 'alpha'; // 'alpha', 'year'
 
   // Author image cache
@@ -112,6 +113,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final authorsMode = await SettingsService.getLibraryAuthorsViewMode();
     final audiobooksMode = await SettingsService.getLibraryAudiobooksViewMode();
     final audiobooksSortOrder = await SettingsService.getLibraryAudiobooksSortOrder();
+    final seriesMode = await SettingsService.getLibrarySeriesViewMode();
     if (mounted) {
       setState(() {
         _artistsViewMode = artistsMode;
@@ -120,6 +122,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         _authorsViewMode = authorsMode;
         _audiobooksViewMode = audiobooksMode;
         _audiobooksSortOrder = audiobooksSortOrder;
+        _seriesViewMode = seriesMode;
       });
     }
   }
@@ -210,6 +213,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     SettingsService.setLibraryAudiobooksSortOrder(newOrder);
   }
 
+  void _cycleSeriesViewMode() {
+    // Series only has grid2 and grid3 (no list view)
+    final newMode = _seriesViewMode == 'grid2' ? 'grid3' : 'grid2';
+    setState(() => _seriesViewMode = newMode);
+    SettingsService.setLibrarySeriesViewMode(newMode);
+  }
+
   IconData _getViewModeIcon(String mode) {
     switch (mode) {
       case 'list':
@@ -233,7 +243,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         case 1:
           return _audiobooksViewMode;
         case 2:
-          return 'grid2'; // Series - default grid view
+          return _seriesViewMode;
         default:
           return 'list';
       }
@@ -282,7 +292,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           _cycleAudiobooksViewMode();
           break;
         case 2:
-          // Series - could add view toggle later
+          _cycleSeriesViewMode();
           break;
       }
       return;
@@ -838,7 +848,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: false,
               itemCount: sortedAuthors.length,
-              padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.navBarOnly),
+              padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.withMiniPlayer),
               itemBuilder: (context, index) {
                 return _buildAuthorListTile(sortedAuthors[index], authorMap[sortedAuthors[index]]!);
               },
@@ -848,7 +858,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               cacheExtent: 500,
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: false,
-              padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.navBarOnly),
+              padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: _authorsViewMode == 'grid3' ? 3 : 2,
                 childAspectRatio: _authorsViewMode == 'grid3' ? 0.75 : 0.80, // Match music artists
@@ -1169,7 +1179,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: false,
               itemCount: audiobooks.length,
-              padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.navBarOnly),
+              padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.withMiniPlayer),
               itemBuilder: (context, index) {
                 return _buildAudiobookListTile(context, audiobooks[index], maProvider);
               },
@@ -1179,7 +1189,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               cacheExtent: 500,
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: false,
-              padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.navBarOnly),
+              padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: _audiobooksViewMode == 'grid3' ? 3 : 2,
                 childAspectRatio: _audiobooksViewMode == 'grid3' ? 0.70 : 0.75, // Match music albums
@@ -1370,26 +1380,28 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
 
     // Series grid - matches music albums tab style
+    final isGrid3 = _seriesViewMode == 'grid3';
     return RefreshIndicator(
       onRefresh: _loadSeries,
       child: GridView.builder(
-        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.navBarOnly),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.75, // Match music albums
+        key: PageStorageKey<String>('series_grid_$_seriesViewMode'),
+        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: isGrid3 ? 3 : 2,
+          childAspectRatio: isGrid3 ? 0.70 : 0.75, // Match music albums
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
         ),
         itemCount: _series.length,
         itemBuilder: (context, index) {
           final series = _series[index];
-          return _buildSeriesCard(context, series, maProvider);
+          return _buildSeriesCard(context, series, maProvider, maxCoverGridSize: isGrid3 ? 2 : 3);
         },
       ),
     );
   }
 
-  Widget _buildSeriesCard(BuildContext context, AudiobookSeries series, MusicAssistantProvider maProvider) {
+  Widget _buildSeriesCard(BuildContext context, AudiobookSeries series, MusicAssistantProvider maProvider, {int maxCoverGridSize = 3}) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -1429,7 +1441,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   color: colorScheme.surfaceVariant,
-                  child: _buildSeriesCoverGrid(series, colorScheme, maProvider),
+                  child: _buildSeriesCoverGrid(series, colorScheme, maProvider, maxGridSize: maxCoverGridSize),
                 ),
               ),
             ),
@@ -1457,14 +1469,24 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     );
   }
 
-  Widget _buildSeriesCoverGrid(AudiobookSeries series, ColorScheme colorScheme, MusicAssistantProvider maProvider) {
+  Widget _buildSeriesCoverGrid(AudiobookSeries series, ColorScheme colorScheme, MusicAssistantProvider maProvider, {int maxGridSize = 3}) {
     final covers = _seriesBookCovers[series.id];
     final isLoading = _seriesCoversLoading.contains(series.id);
 
     // If we have covers, show the grid
     if (covers != null && covers.isNotEmpty) {
       // Determine grid size based on number of covers
-      final gridSize = covers.length >= 4 ? 3 : (covers.length >= 2 ? 2 : 1);
+      // 1 cover = 1x1, 2-4 covers = 2x2, 5+ covers = 3x3
+      int gridSize;
+      if (covers.length == 1) {
+        gridSize = 1;
+      } else if (covers.length <= 4) {
+        gridSize = 2;
+      } else {
+        gridSize = 3;
+      }
+      // Respect maxGridSize parameter (for smaller displays like 3-column grid)
+      gridSize = gridSize.clamp(1, maxGridSize);
       final displayCovers = covers.take(gridSize * gridSize).toList();
 
       return GridView.builder(

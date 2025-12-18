@@ -24,6 +24,9 @@ class SettingsService {
   static const String _keyShowRecentAlbums = 'show_recent_albums';
   static const String _keyShowDiscoverArtists = 'show_discover_artists';
   static const String _keyShowDiscoverAlbums = 'show_discover_albums';
+  static const String _keyShowContinueListeningAudiobooks = 'show_continue_listening_audiobooks';
+  static const String _keyShowDiscoverAudiobooks = 'show_discover_audiobooks';
+  static const String _keyShowDiscoverSeries = 'show_discover_series';
   static const String _keyShowFavoriteAlbums = 'show_favorite_albums';
   static const String _keyShowFavoriteArtists = 'show_favorite_artists';
   static const String _keyShowFavoriteTracks = 'show_favorite_tracks';
@@ -41,6 +44,7 @@ class SettingsService {
   static const String _keyLibraryAuthorsViewMode = 'library_authors_view_mode'; // 'grid2', 'grid3', 'list'
   static const String _keyLibraryAudiobooksViewMode = 'library_audiobooks_view_mode'; // 'grid2', 'grid3', 'list'
   static const String _keyLibraryAudiobooksSortOrder = 'library_audiobooks_sort_order'; // 'alpha' or 'year'
+  static const String _keyLibrarySeriesViewMode = 'library_series_view_mode'; // 'grid2', 'grid3'
 
   // Audiobookshelf Direct Integration Settings
   static const String _keyAbsServerUrl = 'abs_server_url';
@@ -374,6 +378,37 @@ class SettingsService {
     await prefs.setBool(_keyShowDiscoverAlbums, show);
   }
 
+  // Home Screen Audiobook Rows (default off - optional)
+  static Future<bool> getShowContinueListeningAudiobooks() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyShowContinueListeningAudiobooks) ?? false;
+  }
+
+  static Future<void> setShowContinueListeningAudiobooks(bool show) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyShowContinueListeningAudiobooks, show);
+  }
+
+  static Future<bool> getShowDiscoverAudiobooks() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyShowDiscoverAudiobooks) ?? false;
+  }
+
+  static Future<void> setShowDiscoverAudiobooks(bool show) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyShowDiscoverAudiobooks, show);
+  }
+
+  static Future<bool> getShowDiscoverSeries() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyShowDiscoverSeries) ?? false;
+  }
+
+  static Future<void> setShowDiscoverSeries(bool show) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyShowDiscoverSeries, show);
+  }
+
   // Home Screen Favorites Settings (default off)
   static Future<bool> getShowFavoriteAlbums() async {
     final prefs = await SharedPreferences.getInstance();
@@ -510,6 +545,16 @@ class SettingsService {
   static Future<void> setLibraryAudiobooksSortOrder(String order) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLibraryAudiobooksSortOrder, order);
+  }
+
+  static Future<String> getLibrarySeriesViewMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLibrarySeriesViewMode) ?? 'grid2';
+  }
+
+  static Future<void> setLibrarySeriesViewMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLibrarySeriesViewMode, mode);
   }
 
   // Audiobookshelf Settings
