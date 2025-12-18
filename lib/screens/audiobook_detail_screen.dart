@@ -191,6 +191,69 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
     }
   }
 
+  void _showPlayOnMenu(BuildContext context) {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final players = maProvider.availablePlayers;
+
+    GlobalPlayerOverlay.hidePlayer();
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final sheetHeight = (screenHeight * 0.45) + bottomPadding;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: sheetHeight,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
+            Text(
+              'Play on...',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: players.isEmpty
+                  ? const Center(child: Text('No players available'))
+                  : ListView.builder(
+                      padding: EdgeInsets.only(bottom: bottomPadding + 16),
+                      itemCount: players.length,
+                      itemBuilder: (context, index) {
+                        final player = players[index];
+                        return ListTile(
+                          leading: Icon(
+                            Icons.speaker,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          title: Text(player.name),
+                          onTap: () async {
+                            Navigator.pop(context);
+                            maProvider.selectPlayer(player);
+                            maProvider.setCurrentAudiobook(_audiobook);
+                            await maProvider.api?.playAudiobook(
+                              player.playerId,
+                              widget.audiobook,
+                            );
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    ).whenComplete(() {
+      GlobalPlayerOverlay.showPlayer();
+    });
+  }
+
   Future<void> _markAsFinished() async {
     try {
       // Update local audiobook state to show as finished
@@ -629,6 +692,24 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                             ),
                           ),
                         ],
+
+                        const SizedBox(width: 12),
+
+                        // Play On Button
+                        SizedBox(
+                          height: 50,
+                          width: 50,
+                          child: FilledButton.tonal(
+                            onPressed: () => _showPlayOnMenu(context),
+                            style: FilledButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Icon(Icons.speaker_group_outlined),
+                          ),
+                        ),
 
                         const SizedBox(width: 12),
 
