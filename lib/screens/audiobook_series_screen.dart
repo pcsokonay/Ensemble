@@ -129,10 +129,10 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
       if (mounted) {
         setState(() {
           _audiobooks = books;
+          _sortAudiobooks(); // Sort inside setState so UI updates
           _isLoading = false;
         });
-        _sortAudiobooks();
-        _logger.log('📚 SeriesScreen setState complete');
+        _logger.log('📚 SeriesScreen setState complete, sorted by $_sortOrder');
       }
     } catch (e, stack) {
       _logger.log('📚 SeriesScreen error: $e');

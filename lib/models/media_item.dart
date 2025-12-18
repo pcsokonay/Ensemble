@@ -507,13 +507,42 @@ class Audiobook extends MediaItem {
   /// Get series sequence number from metadata (for sorting within a series)
   /// Tries various metadata fields commonly used by audiobook providers
   double? get seriesSequence {
+    // First try the parent's position field (used by MA browse results)
+    if (position != null) return position!.toDouble();
+
+    // Try extracting number from sort_name (e.g., "01 - Book Title" or "Book 1")
+    if (sortName != null && sortName!.isNotEmpty) {
+      // Try to extract leading number
+      final match = RegExp(r'^(\d+)').firstMatch(sortName!);
+      if (match != null) {
+        return double.tryParse(match.group(1)!);
+      }
+      // Try to extract "Book N" pattern
+      final bookMatch = RegExp(r'[Bb]ook\s*(\d+)').firstMatch(sortName!);
+      if (bookMatch != null) {
+        return double.tryParse(bookMatch.group(1)!);
+      }
+    }
+
+    // Try extracting from the name itself
+    final nameMatch = RegExp(r'^(\d+)').firstMatch(name);
+    if (nameMatch != null) {
+      return double.tryParse(nameMatch.group(1)!);
+    }
+    final bookNameMatch = RegExp(r'[Bb]ook\s*(\d+)').firstMatch(name);
+    if (bookNameMatch != null) {
+      return double.tryParse(bookNameMatch.group(1)!);
+    }
+
     if (metadata == null) return null;
 
     // Try common metadata fields for series sequence
     final seq = metadata!['sequence'] ??
                 metadata!['series_sequence'] ??
                 metadata!['series_number'] ??
-                metadata!['position'];
+                metadata!['position'] ??
+                metadata!['sort_order'] ??
+                metadata!['order'];
 
     if (seq is num) return seq.toDouble();
     if (seq is String) return double.tryParse(seq);
@@ -521,14 +550,14 @@ class Audiobook extends MediaItem {
     // Check if there's a series object with sequence
     final series = metadata!['series'];
     if (series is Map) {
-      final seriesSeq = series['sequence'] ?? series['number'];
+      final seriesSeq = series['sequence'] ?? series['number'] ?? series['order'];
       if (seriesSeq is num) return seriesSeq.toDouble();
       if (seriesSeq is String) return double.tryParse(seriesSeq);
     }
     if (series is List && series.isNotEmpty) {
       final first = series.first;
       if (first is Map) {
-        final seriesSeq = first['sequence'] ?? first['number'];
+        final seriesSeq = first['sequence'] ?? first['number'] ?? first['order'];
         if (seriesSeq is num) return seriesSeq.toDouble();
         if (seriesSeq is String) return double.tryParse(seriesSeq);
       }
