@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart' show BottomSpacing;
+import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
+import '../utils/page_transitions.dart';
 import '../constants/hero_tags.dart';
 import 'audiobook_detail_screen.dart';
 
@@ -28,15 +31,71 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   bool _isLoading = true;
   String? _error;
 
+  // View preferences
+  String _sortOrder = 'alpha'; // 'alpha' or 'year'
+  String _viewMode = 'grid2'; // 'grid2', 'grid3', 'list'
+
   @override
   void initState() {
     super.initState();
+    _loadViewPreferences();
     // Defer loading until after first frame to ensure UI renders first
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _loadSeriesBooks();
       }
     });
+  }
+
+  Future<void> _loadViewPreferences() async {
+    final sortOrder = await SettingsService.getSeriesAudiobooksSortOrder();
+    final viewMode = await SettingsService.getSeriesAudiobooksViewMode();
+    if (mounted) {
+      setState(() {
+        _sortOrder = sortOrder;
+        _viewMode = viewMode;
+      });
+    }
+  }
+
+  void _toggleSortOrder() {
+    final newOrder = _sortOrder == 'alpha' ? 'year' : 'alpha';
+    setState(() {
+      _sortOrder = newOrder;
+      _sortAudiobooks();
+    });
+    SettingsService.setSeriesAudiobooksSortOrder(newOrder);
+  }
+
+  void _cycleViewMode() {
+    String newMode;
+    switch (_viewMode) {
+      case 'grid2':
+        newMode = 'grid3';
+        break;
+      case 'grid3':
+        newMode = 'list';
+        break;
+      default:
+        newMode = 'grid2';
+    }
+    setState(() {
+      _viewMode = newMode;
+    });
+    SettingsService.setSeriesAudiobooksViewMode(newMode);
+  }
+
+  void _sortAudiobooks() {
+    if (_sortOrder == 'year') {
+      _audiobooks.sort((a, b) {
+        if (a.year == null && b.year == null) return a.name.compareTo(b.name);
+        if (a.year == null) return 1;
+        if (b.year == null) return -1;
+        return a.year!.compareTo(b.year!);
+      });
+    } else {
+      _audiobooks.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    }
   }
 
   Future<void> _loadSeriesBooks() async {
@@ -68,6 +127,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
           _audiobooks = books;
           _isLoading = false;
         });
+        _sortAudiobooks();
         _logger.log('📚 SeriesScreen setState complete');
       }
     } catch (e, stack) {
@@ -85,43 +145,130 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final maProvider = context.watch<MusicAssistantProvider>();
 
-    // NOTE: Don't wrap with GlobalPlayerOverlay - it's already at app level in MaterialApp.builder
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       body: CustomScrollView(
         slivers: [
-          // App bar with series image
+          // App bar with series cover collage
           SliverAppBar(
             expandedHeight: 200,
             pinned: true,
+            backgroundColor: colorScheme.surface,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => Navigator.pop(context),
+              color: colorScheme.onSurface,
+            ),
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                widget.series.name,
-                style: const TextStyle(
-                  shadows: [Shadow(blurRadius: 8, color: Colors.black54)],
-                ),
+              background: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 60),
+                  // Series cover collage - centered square with rounded corners
+                  Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: _buildSeriesCover(colorScheme, maProvider),
+                    ),
+                  ),
+                ],
               ),
-              background: widget.heroTag != null
-                  ? Hero(
-                      tag: widget.heroTag!,
-                      child: _buildHeaderBackground(colorScheme),
-                    )
-                  : _buildHeaderBackground(colorScheme),
             ),
           ),
 
-          // Book count
+          // Title and count
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                _isLoading
-                    ? 'Loading...'
-                    : '${_audiobooks.length} ${_audiobooks.length == 1 ? 'book' : 'books'}',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.series.name,
+                    style: textTheme.headlineMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _isLoading
+                        ? 'Loading...'
+                        : '${_audiobooks.length} ${_audiobooks.length == 1 ? 'book' : 'books'}',
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Books section header with controls
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24.0, 8.0, 12.0, 8.0),
+              child: Row(
+                children: [
+                  Text(
+                    'Books',
+                    style: textTheme.titleLarge?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Sort toggle
+                  IconButton(
+                    icon: Icon(
+                      _sortOrder == 'alpha' ? Icons.sort_by_alpha : Icons.calendar_today,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
+                    tooltip: _sortOrder == 'alpha' ? 'Sort by year' : 'Sort alphabetically',
+                    onPressed: _toggleSortOrder,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
+                  // View mode toggle
+                  IconButton(
+                    icon: Icon(
+                      _viewMode == 'list'
+                          ? Icons.view_list
+                          : _viewMode == 'grid3'
+                              ? Icons.grid_view
+                              : Icons.grid_on,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
+                    tooltip: _viewMode == 'grid2'
+                        ? '3-column grid'
+                        : _viewMode == 'grid3'
+                            ? 'List view'
+                            : '2-column grid',
+                    onPressed: _cycleViewMode,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
+                ],
               ),
             ),
           ),
@@ -167,85 +314,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
               ),
             )
           else
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final book = _audiobooks[index];
-                  final imageUrl = maProvider.getImageUrl(book);
-                  final heroTagSuffix = 'series_${widget.series.id}_$index';
-                  final heroTag = HeroTags.audiobookCover + (book.uri ?? book.itemId) + '_$heroTagSuffix';
-
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    leading: Hero(
-                      tag: heroTag,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: SizedBox(
-                          width: 56,
-                          height: 56,
-                          child: imageUrl != null
-                              ? CachedNetworkImage(
-                                  imageUrl: imageUrl,
-                                  fit: BoxFit.cover,
-                                  placeholder: (_, __) => Container(
-                                    color: colorScheme.surfaceContainerHighest,
-                                    child: Icon(Icons.book,
-                                        color: colorScheme.onSurfaceVariant),
-                                  ),
-                                  errorWidget: (_, __, ___) => Container(
-                                    color: colorScheme.surfaceContainerHighest,
-                                    child: Icon(Icons.book,
-                                        color: colorScheme.onSurfaceVariant),
-                                  ),
-                                )
-                              : Container(
-                                  color: colorScheme.surfaceContainerHighest,
-                                  child: Icon(Icons.book,
-                                      color: colorScheme.onSurfaceVariant),
-                                ),
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      book.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: book.authors?.isNotEmpty == true
-                        ? Text(
-                            book.authors!.map((a) => a.name).join(', '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                        : null,
-                    trailing: book.duration != null
-                        ? Text(
-                            _formatDuration(book.duration!),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                          )
-                        : null,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AudiobookDetailScreen(
-                            audiobook: book,
-                            heroTagSuffix: heroTagSuffix,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-                childCount: _audiobooks.length,
-              ),
-            ),
+            _buildAudiobookSliver(maProvider),
 
           // Bottom padding for mini player
           const SliverToBoxAdapter(
@@ -256,36 +325,313 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
     );
   }
 
-  Widget _buildHeaderBackground(ColorScheme colorScheme) {
-    final thumbnailUrl = widget.series.thumbnailUrl;
-
-    // Show placeholder if no URL or invalid URL
-    if (thumbnailUrl == null || thumbnailUrl.isEmpty) {
-      return _buildHeaderPlaceholder(colorScheme);
+  Widget _buildSeriesCover(ColorScheme colorScheme, MusicAssistantProvider maProvider) {
+    // If still loading or no books, show placeholder
+    if (_isLoading || _audiobooks.isEmpty) {
+      return Container(
+        color: colorScheme.surfaceContainerHighest,
+        child: Center(
+          child: Icon(
+            Icons.collections_bookmark_rounded,
+            size: 64,
+            color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+          ),
+        ),
+      );
     }
 
-    // Use CachedNetworkImage with proper error handling
-    return CachedNetworkImage(
-      imageUrl: thumbnailUrl,
-      fit: BoxFit.cover,
-      color: Colors.black.withOpacity(0.3),
-      colorBlendMode: BlendMode.darken,
-      placeholder: (context, url) => _buildHeaderPlaceholder(colorScheme),
-      errorWidget: (context, url, error) {
-        _logger.log('📚 Error loading series header image: $error');
-        return _buildHeaderPlaceholder(colorScheme);
+    // Get cover URLs from loaded books
+    final covers = <String>[];
+    for (final book in _audiobooks.take(9)) {
+      final imageUrl = maProvider.getImageUrl(book);
+      if (imageUrl != null) {
+        covers.add(imageUrl);
+      }
+    }
+
+    if (covers.isEmpty) {
+      return Container(
+        color: colorScheme.surfaceContainerHighest,
+        child: Center(
+          child: Icon(
+            Icons.collections_bookmark_rounded,
+            size: 64,
+            color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+          ),
+        ),
+      );
+    }
+
+    // Determine grid size
+    int gridSize;
+    if (covers.length == 1) {
+      gridSize = 1;
+    } else if (covers.length <= 4) {
+      gridSize = 2;
+    } else {
+      gridSize = 3;
+    }
+
+    final displayCovers = covers.take(gridSize * gridSize).toList();
+
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: gridSize,
+        childAspectRatio: 1,
+        crossAxisSpacing: 1,
+        mainAxisSpacing: 1,
+      ),
+      itemCount: displayCovers.length,
+      itemBuilder: (context, index) {
+        return CachedNetworkImage(
+          imageUrl: displayCovers[index],
+          fit: BoxFit.cover,
+          placeholder: (_, __) => Container(
+            color: colorScheme.surfaceContainerHighest,
+          ),
+          errorWidget: (_, __, ___) => Container(
+            color: colorScheme.surfaceContainerHighest,
+            child: Icon(
+              Icons.book,
+              color: colorScheme.onSurfaceVariant.withOpacity(0.3),
+              size: 20,
+            ),
+          ),
+        );
       },
     );
   }
 
-  Widget _buildHeaderPlaceholder(ColorScheme colorScheme) {
-    return Container(
-      color: colorScheme.primaryContainer,
-      child: Center(
-        child: Icon(
-          Icons.library_books,
-          size: 64,
-          color: colorScheme.onPrimaryContainer.withOpacity(0.5),
+  Widget _buildAudiobookSliver(MusicAssistantProvider maProvider) {
+    if (_viewMode == 'list') {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _buildAudiobookListTile(_audiobooks[index], maProvider),
+            childCount: _audiobooks.length,
+          ),
+        ),
+      );
+    }
+
+    final crossAxisCount = _viewMode == 'grid3' ? 3 : 2;
+    final childAspectRatio = _viewMode == 'grid3' ? 0.65 : 0.70;
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          childAspectRatio: childAspectRatio,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => _buildAudiobookCard(_audiobooks[index], maProvider),
+          childCount: _audiobooks.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudiobookCard(Audiobook book, MusicAssistantProvider maProvider) {
+    final imageUrl = maProvider.getImageUrl(book, size: 256);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final heroSuffix = 'series_${widget.series.id}';
+
+    return InkWell(
+      onTap: () => _navigateToAudiobook(book, heroTagSuffix: heroSuffix),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: Stack(
+              children: [
+                Hero(
+                  tag: HeroTags.audiobookCover + (book.uri ?? book.itemId) + '_$heroSuffix',
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      color: colorScheme.surfaceContainerHighest,
+                      child: imageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              placeholder: (_, __) => Center(
+                                child: Icon(
+                                  MdiIcons.bookOutline,
+                                  size: 48,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              errorWidget: (_, __, ___) => Center(
+                                child: Icon(
+                                  MdiIcons.bookOutline,
+                                  size: 48,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Icon(
+                                MdiIcons.bookOutline,
+                                size: 48,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                // Progress indicator
+                if (book.progress > 0)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: LinearProgressIndicator(
+                      value: book.progress,
+                      backgroundColor: Colors.black54,
+                      valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                      minHeight: 3,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Hero(
+            tag: HeroTags.audiobookTitle + (book.uri ?? book.itemId) + '_$heroSuffix',
+            child: Material(
+              color: Colors.transparent,
+              child: Text(
+                book.name,
+                style: textTheme.titleSmall?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          if (book.authorsString.isNotEmpty && book.authorsString != 'Unknown Author')
+            Text(
+              book.authorsString,
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.6),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAudiobookListTile(Audiobook book, MusicAssistantProvider maProvider) {
+    final imageUrl = maProvider.getImageUrl(book, size: 128);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final heroSuffix = 'series_${widget.series.id}';
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      leading: Hero(
+        tag: HeroTags.audiobookCover + (book.uri ?? book.itemId) + '_$heroSuffix',
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: Stack(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                color: colorScheme.surfaceContainerHighest,
+                child: imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Icon(
+                          MdiIcons.bookOutline,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        errorWidget: (_, __, ___) => Icon(
+                          MdiIcons.bookOutline,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    : Icon(
+                        MdiIcons.bookOutline,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+              ),
+              if (book.progress > 0)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(
+                    value: book.progress,
+                    backgroundColor: Colors.black54,
+                    valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                    minHeight: 2,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      title: Hero(
+        tag: HeroTags.audiobookTitle + (book.uri ?? book.itemId) + '_$heroSuffix',
+        child: Material(
+          color: Colors.transparent,
+          child: Text(
+            book.name,
+            style: textTheme.titleMedium?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+      subtitle: Text(
+        book.authorsString.isNotEmpty && book.authorsString != 'Unknown Author'
+            ? book.authorsString
+            : book.duration != null
+                ? _formatDuration(book.duration!)
+                : '',
+        style: textTheme.bodySmall?.copyWith(
+          color: colorScheme.onSurface.withOpacity(0.7),
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: book.progress > 0
+          ? Text(
+              '${(book.progress * 100).toInt()}%',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.primary,
+              ),
+            )
+          : null,
+      onTap: () => _navigateToAudiobook(book, heroTagSuffix: heroSuffix),
+    );
+  }
+
+  void _navigateToAudiobook(Audiobook book, {String? heroTagSuffix}) {
+    Navigator.push(
+      context,
+      FadeSlidePageRoute(
+        child: AudiobookDetailScreen(
+          audiobook: book,
+          heroTagSuffix: heroTagSuffix,
         ),
       ),
     );
@@ -293,7 +639,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
 
   String _formatDuration(Duration duration) {
     final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
+    final minutes = duration.inMinutes % 60;
     if (hours > 0) {
       return '${hours}h ${minutes}m';
     }

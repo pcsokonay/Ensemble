@@ -44,7 +44,9 @@ class SettingsService {
   static const String _keyLibraryAuthorsViewMode = 'library_authors_view_mode'; // 'grid2', 'grid3', 'list'
   static const String _keyLibraryAudiobooksViewMode = 'library_audiobooks_view_mode'; // 'grid2', 'grid3', 'list'
   static const String _keyLibraryAudiobooksSortOrder = 'library_audiobooks_sort_order'; // 'alpha' or 'year'
-  static const String _keyLibrarySeriesViewMode = 'library_series_view_mode'; // 'grid2', 'grid3'
+  static const String _keyLibrarySeriesViewMode = 'library_series_view_mode'; // 'grid2', 'grid3', 'list'
+  static const String _keySeriesAudiobooksSortOrder = 'series_audiobooks_sort_order'; // 'alpha' or 'year'
+  static const String _keySeriesAudiobooksViewMode = 'series_audiobooks_view_mode'; // 'grid2', 'grid3', 'list'
 
   // Audiobookshelf Direct Integration Settings
   static const String _keyAbsServerUrl = 'abs_server_url';
@@ -555,6 +557,27 @@ class SettingsService {
   static Future<void> setLibrarySeriesViewMode(String mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLibrarySeriesViewMode, mode);
+  }
+
+  // View Mode Settings - Series Audiobooks (series detail screen)
+  static Future<String> getSeriesAudiobooksSortOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keySeriesAudiobooksSortOrder) ?? 'alpha';
+  }
+
+  static Future<void> setSeriesAudiobooksSortOrder(String order) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keySeriesAudiobooksSortOrder, order);
+  }
+
+  static Future<String> getSeriesAudiobooksViewMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keySeriesAudiobooksViewMode) ?? 'grid2';
+  }
+
+  static Future<void> setSeriesAudiobooksViewMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keySeriesAudiobooksViewMode, mode);
   }
 
   // Audiobookshelf Settings

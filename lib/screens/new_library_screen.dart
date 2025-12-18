@@ -214,8 +214,18 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   void _cycleSeriesViewMode() {
-    // Series only has grid2 and grid3 (no list view)
-    final newMode = _seriesViewMode == 'grid2' ? 'grid3' : 'grid2';
+    // Series now has grid2, grid3, and list view
+    String newMode;
+    switch (_seriesViewMode) {
+      case 'grid2':
+        newMode = 'grid3';
+        break;
+      case 'grid3':
+        newMode = 'list';
+        break;
+      default:
+        newMode = 'grid2';
+    }
     setState(() => _seriesViewMode = newMode);
     SettingsService.setLibrarySeriesViewMode(newMode);
   }
@@ -1379,25 +1389,107 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       );
     }
 
-    // Series grid - matches music albums tab style
-    final isGrid3 = _seriesViewMode == 'grid3';
+    // Series view - supports grid2, grid3, and list modes
     return RefreshIndicator(
       onRefresh: _loadSeries,
-      child: GridView.builder(
-        key: PageStorageKey<String>('series_grid_$_seriesViewMode'),
-        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isGrid3 ? 3 : 2,
-          childAspectRatio: isGrid3 ? 0.70 : 0.75, // Match music albums
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
+      child: _seriesViewMode == 'list'
+          ? ListView.builder(
+              key: const PageStorageKey<String>('series_list'),
+              cacheExtent: 500,
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: false,
+              itemCount: _series.length,
+              padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.withMiniPlayer),
+              itemBuilder: (context, index) {
+                return _buildSeriesListTile(context, _series[index], maProvider);
+              },
+            )
+          : GridView.builder(
+              key: PageStorageKey<String>('series_grid_$_seriesViewMode'),
+              padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: _seriesViewMode == 'grid3' ? 3 : 2,
+                childAspectRatio: _seriesViewMode == 'grid3' ? 0.70 : 0.75,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: _series.length,
+              itemBuilder: (context, index) {
+                final series = _series[index];
+                return _buildSeriesCard(context, series, maProvider, maxCoverGridSize: _seriesViewMode == 'grid3' ? 2 : 3);
+              },
+            ),
+    );
+  }
+
+  Widget _buildSeriesListTile(BuildContext context, AudiobookSeries series, MusicAssistantProvider maProvider) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    // Trigger loading of series covers if not cached
+    if (!_seriesBookCovers.containsKey(series.id) && !_seriesCoversLoading.contains(series.id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadSeriesCovers(series.id, maProvider);
+      });
+    }
+
+    final covers = _seriesBookCovers[series.id];
+    final firstCover = covers != null && covers.isNotEmpty ? covers.first : null;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          width: 56,
+          height: 56,
+          color: colorScheme.surfaceContainerHighest,
+          child: firstCover != null
+              ? CachedNetworkImage(
+                  imageUrl: firstCover,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Icon(
+                    Icons.collections_bookmark_rounded,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  errorWidget: (_, __, ___) => Icon(
+                    Icons.collections_bookmark_rounded,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : Icon(
+                  Icons.collections_bookmark_rounded,
+                  color: colorScheme.onSurfaceVariant,
+                ),
         ),
-        itemCount: _series.length,
-        itemBuilder: (context, index) {
-          final series = _series[index];
-          return _buildSeriesCard(context, series, maProvider, maxCoverGridSize: isGrid3 ? 2 : 3);
-        },
       ),
+      title: Text(
+        series.name,
+        style: textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: series.bookCount != null
+          ? Text(
+              '${series.bookCount} ${series.bookCount == 1 ? 'book' : 'books'}',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.6),
+              ),
+            )
+          : null,
+      onTap: () {
+        _logger.log('📚 Tapped series: ${series.name}, path: ${series.id}');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AudiobookSeriesScreen(
+              series: series,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1413,9 +1505,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       });
     }
 
-    final heroTag = 'series_cover_${series.id}';
-
     // Matches books tab style - square artwork with text below
+    // No Hero animation for series cards - causes issues with dynamic cover loading
     return GestureDetector(
       onTap: () {
         _logger.log('📚 Tapped series: ${series.name}, path: ${series.id}');
@@ -1424,7 +1515,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           MaterialPageRoute(
             builder: (context) => AudiobookSeriesScreen(
               series: series,
-              heroTag: heroTag,
             ),
           ),
         );
@@ -1432,17 +1522,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Square cover grid
+          // Square cover grid - no animation
           AspectRatio(
             aspectRatio: 1.0,
-            child: Hero(
-              tag: heroTag,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  color: colorScheme.surfaceVariant,
-                  child: _buildSeriesCoverGrid(series, colorScheme, maProvider, maxGridSize: maxCoverGridSize),
-                ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                color: colorScheme.surfaceVariant,
+                child: _buildSeriesCoverGrid(series, colorScheme, maProvider, maxGridSize: maxCoverGridSize),
               ),
             ),
           ),
@@ -1528,6 +1615,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   Widget _buildSeriesLoadingGrid(ColorScheme colorScheme) {
+    // Static placeholder grid - no animations
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -1540,16 +1628,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       itemBuilder: (context, index) {
         return Container(
           color: colorScheme.surfaceContainerHighest,
-          child: Center(
-            child: SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: colorScheme.onSurfaceVariant.withOpacity(0.3),
-              ),
-            ),
-          ),
         );
       },
     );
