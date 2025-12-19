@@ -1009,7 +1009,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
     final collapsedTitleTop = (_collapsedHeight - 36) / 2; // Centered vertically (adjusted for increased track/artist gap)
 
-    final collapsedTitleWidth = screenSize.width - _collapsedArtSize - 130; // 8px gap to controls
+    // Controls: 36 (prev) + 34 (play) + 36 (next) + 8 (right margin) = 114px from right
+    // For 8px gap: text ends at screenWidth - 114 - 8 = screenWidth - 122
+    final collapsedTitleWidth = screenSize.width - collapsedTitleLeft - 122;
     final expandedTitleWidth = screenSize.width - (contentPadding * 2);
     final titleWidth = _lerpDouble(collapsedTitleWidth, expandedTitleWidth, t);
 
@@ -1304,6 +1306,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                         ),
                         textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
                         maxLines: t > 0.5 ? 2 : 1,
+                        softWrap: t > 0.5, // false in collapsed to ensure ellipsis truncation
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -1331,6 +1334,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                         ),
                         textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
                         maxLines: 1,
+                        softWrap: t > 0.5, // false in collapsed to ensure ellipsis truncation
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
