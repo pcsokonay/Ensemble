@@ -1044,6 +1044,13 @@ class MusicAssistantProvider with ChangeNotifier {
 
       if (currentMedia != null) {
         final mediaType = currentMedia['media_type'] as String?;
+
+        // Clear audiobook context when switching to music (track) playback
+        if (mediaType == 'track' && _currentAudiobook != null) {
+          _logger.log('📚 Media type changed to track - clearing audiobook context');
+          clearCurrentAudiobook();
+        }
+
         if (mediaType != 'flow_stream') {
           final durationSecs = (currentMedia['duration'] as num?)?.toInt();
           final albumName = currentMedia['album'] as String?;
