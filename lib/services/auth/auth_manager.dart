@@ -176,10 +176,12 @@ class AuthManager {
   Future<String?> _checkMusicAssistantAuth(String baseUrl) async {
     try {
       final uri = Uri.parse(baseUrl);
+      // Use the port from URL if specified, otherwise use default ports (80/443)
+      // Don't default to 8095 here - that's only for direct connections without reverse proxy
       final apiUrl = Uri(
         scheme: uri.scheme,
         host: uri.host,
-        port: uri.hasPort ? uri.port : (uri.scheme == 'https' ? null : 8095),
+        port: uri.hasPort ? uri.port : null,
         path: '/api',
       );
 
