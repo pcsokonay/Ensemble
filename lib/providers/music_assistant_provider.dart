@@ -1749,6 +1749,11 @@ class MusicAssistantProvider with ChangeNotifier {
 
     _preloadAdjacentPlayers();
 
+    // Immediately fetch fresh track data from queue to avoid showing stale cache
+    // This is important when resuming app after being in background - cached data
+    // from player_updated events may have incomplete artist info
+    await _updatePlayerState();
+
     if (!skipNotify) {
       notifyListeners();
     }
