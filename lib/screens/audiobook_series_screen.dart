@@ -481,13 +481,21 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
 
     final covers = _coverUrls;
 
-    // Always use 3x3 grid for series detail
-    const int gridSize = 3;
+    // Dynamic grid size based on number of covers (matches library screen)
+    // 1 cover = 1x1, 2-4 covers = 2x2, 5+ covers = 3x3
+    int gridSize;
+    if (covers.length == 1) {
+      gridSize = 1;
+    } else if (covers.length <= 4) {
+      gridSize = 2;
+    } else {
+      gridSize = 3;
+    }
 
     // Use series ID to pick consistent colors and nested grid patterns
     final colorSeed = widget.series.id.hashCode;
 
-    // Pad covers to fill grid, using empty strings for missing slots
+    // Pad covers to fill grid
     final displayCovers = List<String?>.filled(gridSize * gridSize, null);
     for (var i = 0; i < covers.length && i < displayCovers.length; i++) {
       displayCovers[i] = covers[i];
