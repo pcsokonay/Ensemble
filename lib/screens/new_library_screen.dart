@@ -1578,7 +1578,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           return Text(
             '$count ${count == 1 ? 'book' : 'books'}',
             style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.6),
+              color: colorScheme.onSurface.withOpacity(0.7),
             ),
           );
         },
@@ -1663,7 +1663,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 child: Text(
                   '$count ${count == 1 ? 'book' : 'books'}',
                   style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.6),
+                    color: colorScheme.onSurface.withOpacity(0.7),
                   ),
                 ),
               );

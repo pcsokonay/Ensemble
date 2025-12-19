@@ -244,7 +244,7 @@ class _SeriesCard extends StatelessWidget {
               return Text(
                 '$count ${count == 1 ? 'book' : 'books'}',
                 style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.6),
+                  color: colorScheme.onSurface.withOpacity(0.7),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
