@@ -1001,7 +1001,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Artist: medium weight, secondary (18px expanded, was 16px)
     // Album: light, tertiary (15px expanded, was 13px)
     final titleFontSize = _lerpDouble(16.0, 24.0, t);
-    final artistFontSize = _lerpDouble(12.0, 18.0, t); // 12px collapsed (matches DeviceSelectorBar), 18px expanded
+    final artistFontSize = _lerpDouble(14.0, 18.0, t); // 14px collapsed, 18px expanded
 
     final collapsedTitleLeft = _collapsedArtSize + 8; // Reduced from 12 to 8 (4px less)
     final expandedTitleLeft = contentPadding;
@@ -1009,7 +1009,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
     final collapsedTitleTop = (_collapsedHeight - 36) / 2; // Centered vertically (adjusted for increased track/artist gap)
 
-    final collapsedTitleWidth = screenSize.width - _collapsedArtSize - 150;
+    final collapsedTitleWidth = screenSize.width - _collapsedArtSize - 130; // 8px gap to controls
     final expandedTitleWidth = screenSize.width - (contentPadding * 2);
     final titleWidth = _lerpDouble(collapsedTitleWidth, expandedTitleWidth, t);
 
@@ -1224,7 +1224,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     titleWidth: collapsedTitleWidth,
                     artistTop: collapsedArtistTop,
                     titleFontSize: 16.0,
-                    artistFontSize: 12.0,
+                    artistFontSize: 14.0,
                     textColor: textColor,
                     colorScheme: colorScheme,
                   ),

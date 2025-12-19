@@ -87,7 +87,7 @@ class DeviceSelectorBar extends StatelessWidget {
                                   'Swipe to switch device',
                                   style: TextStyle(
                                     color: textColor.withOpacity(0.6),
-                                    fontSize: 12,
+                                    fontSize: 14,
                                   ),
                                 ),
                             ],
@@ -147,7 +147,7 @@ class DeviceSelectorBar extends StatelessWidget {
                       'Swipe to switch device',
                       style: TextStyle(
                         color: textColor.withOpacity(0.6),
-                        fontSize: 12,
+                        fontSize: 14,
                       ),
                     ),
                 ],
