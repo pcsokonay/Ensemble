@@ -583,6 +583,13 @@ class MusicAssistantProvider with ChangeNotifier {
       _sendspinService?.dispose();
       _sendspinService = SendspinService(_serverUrl!);
 
+      // Set auth token for MA 2.7.1+ proxy authentication
+      final authToken = await SettingsService.getMaAuthToken();
+      if (authToken != null) {
+        _sendspinService!.setAuthToken(authToken);
+        _logger.log('Sendspin: Auth token set for proxy authentication');
+      }
+
       // Initialize PCM audio player for raw audio streaming
       _pcmAudioPlayer?.dispose();
       _pcmAudioPlayer = PcmAudioPlayer();

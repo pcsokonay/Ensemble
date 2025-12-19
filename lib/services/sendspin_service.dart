@@ -84,7 +84,15 @@ class SendspinService {
 
   bool _isDisposed = false;
 
+  // Auth token for proxy authentication (MA 2.7.1+)
+  String? _authToken;
+
   SendspinService(this.serverUrl);
+
+  /// Set the MA auth token for proxy authentication
+  void setAuthToken(String? token) {
+    _authToken = token;
+  }
 
   /// Initialize and connect to Sendspin server
   /// Uses persistent player ID and username-based naming
@@ -105,10 +113,11 @@ class SendspinService {
       bool connected = false;
 
       // Strategy 1: If server is HTTPS, try external wss:// first
+      // Use proxy auth for MA 2.7.1+ - the proxy requires authentication before hello
       if (_isHttpsServer()) {
         final externalUrl = _buildExternalSendspinUrl();
         _logger.log('Sendspin: Trying external URL: $externalUrl');
-        connected = await _tryConnect(externalUrl, timeout: const Duration(seconds: 3));
+        connected = await _tryConnect(externalUrl, timeout: const Duration(seconds: 5), useProxyAuth: true);
       }
 
       // Strategy 2: If external failed or server is HTTP, try local connection
@@ -158,10 +167,11 @@ class SendspinService {
   }
 
   /// Attempt to connect to a specific WebSocket URL
-  Future<bool> _tryConnect(String url, {Duration timeout = const Duration(seconds: 5)}) async {
+  /// If useProxyAuth is true and we have an auth token, authenticate first (for MA 2.7.1+ proxy)
+  Future<bool> _tryConnect(String url, {Duration timeout = const Duration(seconds: 5), bool useProxyAuth = false}) async {
     try {
       // Connect to the base URL without query params - we send player info in hello message
-      _logger.log('Sendspin: Connecting to $url');
+      _logger.log('Sendspin: Connecting to $url${useProxyAuth ? ' (with proxy auth)' : ''}');
 
       // Create WebSocket connection
       final webSocket = await WebSocket.connect(url).timeout(timeout);
@@ -175,6 +185,29 @@ class SendspinService {
         onError: _handleError,
         onDone: _handleDone,
       );
+
+      // If using proxy auth (MA 2.7.1+), authenticate first
+      if (useProxyAuth && _authToken != null) {
+        _logger.log('Sendspin: Sending proxy auth with token');
+        _sendMessage({
+          'type': 'auth',
+          'token': _authToken,
+        }, allowDuringHandshake: true);
+
+        // Wait for auth_ok response
+        final authOk = await _waitForAuth().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => false,
+        );
+
+        if (!authOk) {
+          _logger.log('Sendspin: Proxy authentication failed or timed out');
+          await _channel?.sink.close();
+          _channel = null;
+          return false;
+        }
+        _logger.log('Sendspin: Proxy auth successful, proceeding with hello');
+      }
 
       // Send client/hello message immediately after connecting
       // This is required by the Sendspin protocol - server waits for this
@@ -228,10 +261,16 @@ class SendspinService {
 
   /// Wait for server acknowledgment after connection
   Completer<bool>? _ackCompleter;
+  Completer<bool>? _authCompleter;
 
   Future<bool> _waitForAck() async {
     _ackCompleter = Completer<bool>();
     return _ackCompleter!.future;
+  }
+
+  Future<bool> _waitForAuth() async {
+    _authCompleter = Completer<bool>();
+    return _authCompleter!.future;
   }
 
   /// Handle incoming WebSocket messages
@@ -308,6 +347,14 @@ class SendspinService {
           _isPlaying = false;
           // Notify provider to stop PCM player
           onStreamEnd?.call();
+          break;
+
+        case 'auth_ok':
+          // Proxy authentication successful (MA 2.7.1+)
+          _logger.log('Sendspin: Proxy authentication successful');
+          if (_authCompleter != null && !_authCompleter!.isCompleted) {
+            _authCompleter!.complete(true);
+          }
           break;
 
         case 'ack':
