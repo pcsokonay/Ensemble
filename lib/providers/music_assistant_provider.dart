@@ -402,6 +402,30 @@ class MusicAssistantProvider with ChangeNotifier {
       return;
     }
 
+    // IMMEDIATELY load cached players for instant UI display
+    // This makes mini player and device button appear instantly on app resume
+    if (_availablePlayers.isEmpty && _cacheService.hasCachedPlayers) {
+      _availablePlayers = _cacheService.getCachedPlayers()!;
+      _selectedPlayer = _cacheService.getCachedSelectedPlayer();
+      // Also try to restore from settings if cache doesn't have selected player
+      if (_selectedPlayer == null && _availablePlayers.isNotEmpty) {
+        final lastSelectedPlayerId = await SettingsService.getLastSelectedPlayerId();
+        if (lastSelectedPlayerId != null) {
+          try {
+            _selectedPlayer = _availablePlayers.firstWhere(
+              (p) => p.playerId == lastSelectedPlayerId,
+            );
+          } catch (e) {
+            _selectedPlayer = _availablePlayers.first;
+          }
+        } else {
+          _selectedPlayer = _availablePlayers.first;
+        }
+      }
+      _logger.log('⚡ Loaded ${_availablePlayers.length} cached players instantly');
+      notifyListeners(); // Update UI immediately with cached data
+    }
+
     if (_connectionState != MAConnectionState.connected &&
         _connectionState != MAConnectionState.authenticated) {
       _logger.log('🔄 Not connected, attempting reconnect to $_serverUrl');
@@ -1664,7 +1688,8 @@ class MusicAssistantProvider with ChangeNotifier {
 
       _availablePlayers.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-      _cacheService.updatePlayersLastFetched();
+      // Cache players for instant display on app resume
+      _cacheService.setCachedPlayers(_availablePlayers);
 
       _logger.log('🎛️ After filtering: ${_availablePlayers.length} players available');
 
@@ -1733,6 +1758,8 @@ class MusicAssistantProvider with ChangeNotifier {
   void selectPlayer(Player player, {bool skipNotify = false}) async {
     _selectedPlayer = player;
 
+    // Cache for instant display on app resume
+    _cacheService.setCachedSelectedPlayer(player);
     SettingsService.setLastSelectedPlayerId(player.playerId);
 
     // Immediately set currentTrack from cache to avoid flash during player switch

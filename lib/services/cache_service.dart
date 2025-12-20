@@ -1,4 +1,5 @@
 import '../models/media_item.dart';
+import '../models/player.dart';
 import '../services/debug_logger.dart';
 import '../constants/timings.dart';
 
@@ -28,6 +29,8 @@ class CacheService {
   final Map<String, DateTime> _searchCacheTime = {};
 
   // Player list caching
+  List<Player>? _cachedPlayers;
+  Player? _cachedSelectedPlayer;
   DateTime? _playersLastFetched;
 
   // Player track cache (for smooth swipe transitions)
@@ -219,6 +222,26 @@ class CacheService {
     _playersLastFetched = DateTime.now();
   }
 
+  /// Get cached players list
+  List<Player>? getCachedPlayers() => _cachedPlayers;
+
+  /// Set cached players list
+  void setCachedPlayers(List<Player> players) {
+    _cachedPlayers = players;
+    _playersLastFetched = DateTime.now();
+  }
+
+  /// Get cached selected player
+  Player? getCachedSelectedPlayer() => _cachedSelectedPlayer;
+
+  /// Set cached selected player
+  void setCachedSelectedPlayer(Player? player) {
+    _cachedSelectedPlayer = player;
+  }
+
+  /// Check if we have cached players (for instant UI display on app resume)
+  bool get hasCachedPlayers => _cachedPlayers != null && _cachedPlayers!.isNotEmpty;
+
   /// Get cached track for a player (used for smooth swipe transitions)
   Track? getCachedTrackForPlayer(String playerId) => _playerTrackCache[playerId];
 
@@ -249,6 +272,8 @@ class CacheService {
   void clearAll() {
     invalidateHomeCache();
     clearAllDetailCaches();
+    _cachedPlayers = null;
+    _cachedSelectedPlayer = null;
     _playersLastFetched = null;
   }
 }
