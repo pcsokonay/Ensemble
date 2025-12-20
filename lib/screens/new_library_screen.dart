@@ -902,7 +902,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         ];
       case LibraryMediaType.podcasts:
         return [
-          _buildPodcastsComingSoonTab(context),
+          _buildPodcastsComingSoonTab(context, l10n),
         ];
     }
   }
@@ -1841,7 +1841,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ PODCASTS TAB (Placeholder) ============
-  Widget _buildPodcastsComingSoonTab(BuildContext context) {
+  Widget _buildPodcastsComingSoonTab(BuildContext context, S l10n) {
     final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
