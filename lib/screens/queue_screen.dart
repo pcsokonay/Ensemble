@@ -141,7 +141,7 @@ class _QueueScreenState extends State<QueueScreen> {
     }
 
     if (_queue == null || _queue!.items.isEmpty) {
-      return EmptyState.queue();
+      return EmptyState.queue(context: context);
     }
 
     // Filter to show only current and upcoming items (not history)

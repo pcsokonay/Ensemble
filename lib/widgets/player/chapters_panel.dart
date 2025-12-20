@@ -86,6 +86,7 @@ class ChaptersPanel extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     return EmptyState.custom(
+      context: context,
       icon: Icons.bookmark_outline_rounded,
       title: S.of(context)!.noChapters,
       subtitle: S.of(context)!.noChapterInfo,

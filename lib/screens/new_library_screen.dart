@@ -922,12 +922,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     if (audiobooks.isEmpty) {
       if (_showFavoritesOnly) {
         return EmptyState.custom(
+          context: context,
           icon: Icons.favorite_border,
           title: l10n.noFavoriteAudiobooks,
           subtitle: l10n.tapHeartAudiobook,
         );
       }
       return EmptyState.custom(
+        context: context,
         icon: MdiIcons.bookOutline,
         title: l10n.noAudiobooks,
         subtitle: l10n.addAudiobooksHint,
@@ -1251,12 +1253,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     if (audiobooks.isEmpty) {
       if (_showFavoritesOnly) {
         return EmptyState.custom(
+          context: context,
           icon: Icons.favorite_border,
           title: l10n.noFavoriteAudiobooks,
           subtitle: l10n.tapHeartAudiobook,
         );
       }
       return EmptyState.custom(
+        context: context,
         icon: MdiIcons.bookOutline,
         title: l10n.noAudiobooks,
         subtitle: l10n.addAudiobooksHint,
@@ -1890,12 +1894,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         if (artists.isEmpty) {
           if (_showFavoritesOnly) {
             return EmptyState.custom(
+              context: context,
               icon: Icons.favorite_border,
               title: l10n.noFavoriteArtists,
               subtitle: l10n.tapHeartArtist,
             );
           }
           return EmptyState.artists(
+            context: context,
             onRefresh: () => context.read<MusicAssistantProvider>().loadLibrary(),
           );
         }
@@ -2073,12 +2079,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         if (albums.isEmpty) {
           if (_showFavoritesOnly) {
             return EmptyState.custom(
+              context: context,
               icon: Icons.favorite_border,
               title: l10n.noFavoriteAlbums,
               subtitle: l10n.tapHeartAlbum,
             );
           }
           return EmptyState.albums(
+            context: context,
             onRefresh: () => context.read<MusicAssistantProvider>().loadLibrary(),
           );
         }
@@ -2197,12 +2205,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     if (_playlists.isEmpty) {
       if (_showFavoritesOnly) {
         return EmptyState.custom(
+          context: context,
           icon: Icons.favorite_border,
           title: l10n.noFavoritePlaylists,
           subtitle: l10n.tapHeartPlaylist,
         );
       }
-      return EmptyState.playlists(onRefresh: () => _loadPlaylists());
+      return EmptyState.playlists(context: context, onRefresh: () => _loadPlaylists());
     }
 
     return RefreshIndicator(
@@ -2389,6 +2398,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
     if (_favoriteTracks.isEmpty) {
       return EmptyState.custom(
+        context: context,
         icon: Icons.favorite_border,
         title: l10n.noFavoriteTracks,
         subtitle: l10n.longPressTrackHint,

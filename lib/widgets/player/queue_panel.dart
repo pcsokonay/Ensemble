@@ -70,7 +70,7 @@ class QueuePanel extends StatelessWidget {
             child: isLoading
                 ? Center(child: CircularProgressIndicator(color: primaryColor))
                 : queue == null || queue!.items.isEmpty
-                    ? _buildEmptyState()
+                    ? _buildEmptyState(context)
                     : _buildQueueList(),
           ),
         ],
@@ -78,8 +78,8 @@ class QueuePanel extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
-    return EmptyState.queue();
+  Widget _buildEmptyState(BuildContext context) {
+    return EmptyState.queue(context: context);
   }
 
   Widget _buildQueueList() {

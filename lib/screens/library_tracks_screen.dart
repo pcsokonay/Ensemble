@@ -49,7 +49,7 @@ class LibraryTracksScreen extends StatelessWidget {
     }
 
     if (provider.tracks.isEmpty) {
-      return EmptyState.tracks(onRefresh: provider.loadLibrary);
+      return EmptyState.tracks(context: context, onRefresh: provider.loadLibrary);
     }
 
     return ListView.builder(

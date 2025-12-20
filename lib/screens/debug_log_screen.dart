@@ -158,7 +158,7 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
                           style: const TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                         Text(
-                          S.of(context)!.playerInfo(player.available.toString(), player.provider),
+                          S.of(context)!.playerInfo(player.available.toString(), player.provider ?? 'unknown'),
                           style: const TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                         if (isCurrentPlayer)

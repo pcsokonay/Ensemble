@@ -57,6 +57,7 @@ class LibraryArtistsScreen extends StatelessWidget {
 
     if (artists.isEmpty) {
       return EmptyState.artists(
+        context: context,
         onRefresh: () => context.read<MusicAssistantProvider>().loadLibrary(),
       );
     }

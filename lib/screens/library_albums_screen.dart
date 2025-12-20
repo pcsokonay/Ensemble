@@ -55,6 +55,7 @@ class LibraryAlbumsScreen extends StatelessWidget {
 
     if (albums.isEmpty) {
       return EmptyState.albums(
+        context: context,
         onRefresh: () => context.read<MusicAssistantProvider>().loadLibrary(),
       );
     }

@@ -192,7 +192,7 @@ class SearchScreenState extends State<SearchScreen> {
         ),
       ),
       body: !maProvider.isConnected
-          ? DisconnectedState.simple()
+          ? DisconnectedState.simple(context)
           : _buildSearchContent(),
     );
   }
@@ -265,7 +265,7 @@ class SearchScreenState extends State<SearchScreen> {
     final hasResults = artists.isNotEmpty || albums.isNotEmpty || tracks.isNotEmpty;
 
     if (!hasResults) {
-      return EmptyState.search();
+      return EmptyState.search(context: context);
     }
 
     return Column(

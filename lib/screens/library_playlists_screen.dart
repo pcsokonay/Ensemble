@@ -82,7 +82,7 @@ class _LibraryPlaylistsScreenState extends State<LibraryPlaylistsScreen> {
     }
 
     if (_playlists.isEmpty) {
-      return EmptyState.playlists(onRefresh: _loadPlaylists);
+      return EmptyState.playlists(context: context, onRefresh: _loadPlaylists);
     }
 
     return RefreshIndicator(
