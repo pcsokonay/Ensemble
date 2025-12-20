@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../services/debug_logger.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
+import '../l10n/app_localizations.dart';
 
 class DebugLogScreen extends StatefulWidget {
   const DebugLogScreen({super.key});
@@ -42,10 +43,10 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
   void _copyLogs() {
     Clipboard.setData(ClipboardData(text: _logger.getAllLogs()));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Logs copied to clipboard'),
+      SnackBar(
+        content: Text(S.of(context)!.logsCopied),
         backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -72,9 +73,9 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
       _logger.clear();
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Logs cleared'),
-        duration: Duration(seconds: 1),
+      SnackBar(
+        content: Text(S.of(context)!.logsCleared),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -93,7 +94,7 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
         builder: (context) => AlertDialog(
           backgroundColor: const Color(0xFF2a2a2a),
           title: Text(
-            'All Players (${allPlayers.length})',
+            S.of(context)!.allPlayersCount(allPlayers.length),
             style: const TextStyle(color: Colors.white),
           ),
           content: SizedBox(
@@ -153,27 +154,27 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'ID: ${player.playerId}',
+                          S.of(context)!.playerId(player.playerId),
                           style: const TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                         Text(
-                          'Available: ${player.available} | Provider: ${player.provider}',
+                          S.of(context)!.playerInfo(player.available.toString(), player.provider),
                           style: const TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                         if (isCurrentPlayer)
-                          const Text(
-                            '← This device',
-                            style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
+                          Text(
+                            S.of(context)!.thisDevice,
+                            style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
                           ),
                         if (isGhost && !isCorrupt)
-                          const Text(
-                            '⚠️ Ghost player (duplicate)',
-                            style: TextStyle(color: Colors.red, fontSize: 11),
+                          Text(
+                            S.of(context)!.ghostPlayer,
+                            style: const TextStyle(color: Colors.red, fontSize: 11),
                           ),
                         if (isCorrupt)
-                          const Text(
-                            '⚠️ Unavailable/Corrupt',
-                            style: TextStyle(color: Colors.orange, fontSize: 11),
+                          Text(
+                            S.of(context)!.unavailableCorrupt,
+                            style: const TextStyle(color: Colors.orange, fontSize: 11),
                           ),
                       ],
                     ),
@@ -195,15 +196,15 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Player list copied to clipboard!')),
+                    SnackBar(content: Text(S.of(context)!.playerListCopied)),
                   );
                 }
               },
-              child: const Text('Copy List'),
+              child: Text(S.of(context)!.copyList),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
+              child: Text(S.of(context)!.close),
             ),
           ],
         ),
@@ -211,7 +212,7 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading players: $e')),
+          SnackBar(content: Text(S.of(context)!.errorLoadingPlayers(e.toString()))),
         );
       }
     }
@@ -229,9 +230,9 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
           onPressed: () => Navigator.pop(context),
           color: Colors.white,
         ),
-        title: const Text(
-          'Debug Logs',
-          style: TextStyle(
+        title: Text(
+          S.of(context)!.debugLogs,
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.w300,
@@ -256,11 +257,11 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
                   icon: const Icon(Icons.share_rounded),
                   onPressed: _shareBugReport,
                   color: Colors.white,
-                  tooltip: 'Share bug report',
+                  tooltip: S.of(context)!.shareBugReport,
                 ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
-            tooltip: 'More options',
+            tooltip: S.of(context)!.moreOptions,
             onSelected: (value) async {
               switch (value) {
                 case 'show_players':
@@ -275,27 +276,27 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'show_players',
                 child: ListTile(
-                  leading: Icon(Icons.speaker_group_rounded),
-                  title: Text('View All Players'),
+                  leading: const Icon(Icons.speaker_group_rounded),
+                  title: Text(S.of(context)!.viewAllPlayers),
                   dense: true,
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'copy_logs',
                 child: ListTile(
-                  leading: Icon(Icons.copy_rounded),
-                  title: Text('Copy Logs'),
+                  leading: const Icon(Icons.copy_rounded),
+                  title: Text(S.of(context)!.copyLogs),
                   dense: true,
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'clear_logs',
                 child: ListTile(
-                  leading: Icon(Icons.delete_rounded),
-                  title: Text('Clear Logs'),
+                  leading: const Icon(Icons.delete_rounded),
+                  title: Text(S.of(context)!.clearLogs),
                   dense: true,
                 ),
               ),
@@ -317,20 +318,20 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildFilterChip('All', LogLevel.debug),
+                      _buildFilterChip(S.of(context)!.all, LogLevel.debug),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Info+', LogLevel.info),
+                      _buildFilterChip(S.of(context)!.infoPlus, LogLevel.info),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Warnings', LogLevel.warning),
+                      _buildFilterChip(S.of(context)!.warnings, LogLevel.warning),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Errors', LogLevel.error),
+                      _buildFilterChip(S.of(context)!.errors, LogLevel.error),
                     ],
                   ),
                 ),
                 const SizedBox(height: 8),
                 // Stats
                 Text(
-                  'Showing ${_filteredEntries.length} of ${_logger.entries.length} entries',
+                  S.of(context)!.showingEntries(_filteredEntries.length, _logger.entries.length),
                   style: const TextStyle(color: Colors.white54, fontSize: 11),
                 ),
               ],
@@ -338,10 +339,10 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
           ),
           Expanded(
             child: _filteredEntries.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      'No logs yet',
-                      style: TextStyle(
+                      S.of(context)!.noLogsYet,
+                      style: const TextStyle(
                         color: Colors.white54,
                         fontSize: 16,
                       ),

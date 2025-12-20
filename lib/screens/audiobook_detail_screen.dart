@@ -10,6 +10,7 @@ import '../theme/theme_provider.dart';
 import '../services/debug_logger.dart';
 import '../services/recently_played_service.dart';
 import '../constants/hero_tags.dart';
+import '../l10n/app_localizations.dart';
 
 class AudiobookDetailScreen extends StatefulWidget {
   final Audiobook audiobook;
@@ -183,7 +184,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update favorite: $e'),
+            content: Text(S.of(context)!.failedToUpdateFavorite(e.toString())),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -221,7 +222,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
             const SizedBox(height: 16),
             Expanded(
               child: players.isEmpty
-                  ? const Center(child: Text('No players available'))
+                  ? Center(child: Text(S.of(context)!.noPlayersAvailable))
                   : ListView.builder(
                       padding: EdgeInsets.only(bottom: bottomPadding + 16),
                       itemCount: players.length,
@@ -287,7 +288,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_audiobook.name} marked as finished'),
+            content: Text(S.of(context)!.markedAsFinished(_audiobook.name)),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -297,7 +298,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to mark as finished: $e'),
+            content: Text(S.of(context)!.failedToMarkFinished(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -338,7 +339,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_audiobook.name} marked as unplayed'),
+            content: Text(S.of(context)!.markedAsUnplayed(_audiobook.name)),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -348,7 +349,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to mark as unplayed: $e'),
+            content: Text(S.of(context)!.failedToMarkUnplayed(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -362,7 +363,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
 
     if (selectedPlayer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No player selected')),
+        SnackBar(content: Text(S.of(context)!.noPlayerSelected)),
       );
       return;
     }
@@ -392,7 +393,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Playing ${widget.audiobook.name}'),
+            content: Text(S.of(context)!.playing(widget.audiobook.name)),
             duration: const Duration(seconds: 1),
           ),
         );
@@ -402,7 +403,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to play: $e'),
+            content: Text(S.of(context)!.failedToPlay(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -489,7 +490,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 12),
-                          const Text('Mark as Finished'),
+                          Text(S.of(context)!.markAsFinished),
                         ],
                       ),
                     ),
@@ -503,7 +504,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 12),
-                          const Text('Mark as Unplayed'),
+                          Text(S.of(context)!.markAsUnplayed),
                         ],
                       ),
                     ),
@@ -580,7 +581,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
 
                     // Author
                     Text(
-                      'By ${book.authorsString}',
+                      S.of(context)!.byAuthor(book.authorsString),
                       style: textTheme.titleMedium?.copyWith(
                         color: colorScheme.onSurface.withOpacity(0.8),
                       ),
@@ -662,7 +663,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                                 startPositionMs: hasResumePosition ? book.resumePositionMs : null,
                               ),
                               icon: Icon(hasResumePosition ? Icons.play_arrow : Icons.play_arrow),
-                              label: Text(hasResumePosition ? 'Resume' : 'Play'),
+                              label: Text(hasResumePosition ? 'Resume' : S.of(context)!.play),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: colorScheme.primary,
                                 foregroundColor: colorScheme.onPrimary,
@@ -972,7 +973,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                             children: [
                               const Icon(Icons.play_arrow, size: 20),
                               const SizedBox(width: 8),
-                              Text(isInProgress ? 'Resume' : 'Play'),
+                              Text(isInProgress ? 'Resume' : S.of(context)!.play),
                             ],
                           ),
                         ),

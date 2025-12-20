@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
 import '../widgets/common/empty_state.dart';
+import '../l10n/app_localizations.dart';
 
 class LibraryTracksScreen extends StatelessWidget {
   const LibraryTracksScreen({super.key});
@@ -25,7 +26,7 @@ class LibraryTracksScreen extends StatelessWidget {
           color: colorScheme.onBackground,
         ),
         title: Text(
-          'Tracks',
+          S.of(context)!.tracks,
           style: textTheme.headlineSmall?.copyWith(
             color: colorScheme.onBackground,
             fontWeight: FontWeight.w300,
@@ -129,7 +130,7 @@ class LibraryTracksScreen extends StatelessWidget {
 
     if (maProvider.selectedPlayer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No player selected')),
+        SnackBar(content: Text(S.of(context)!.noPlayerSelected)),
       );
       return;
     }

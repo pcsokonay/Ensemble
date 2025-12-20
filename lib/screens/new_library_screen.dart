@@ -18,6 +18,7 @@ import '../services/settings_service.dart';
 import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
 import '../services/sync_service.dart';
+import '../l10n/app_localizations.dart';
 import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
 import 'playlist_details_screen.dart';
@@ -652,6 +653,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = S.of(context)!;
+
     // Use Selector for targeted rebuilds - only rebuild when connection state changes
     return Selector<MusicAssistantProvider, bool>(
       selector: (_, provider) => provider.isConnected,
@@ -727,7 +730,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                           indicatorWeight: 3,
                           labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14),
-                          tabs: _buildTabs(),
+                          tabs: _buildTabs(l10n),
                         ),
                       ),
                       // Favorites + Layout buttons on the right
@@ -784,7 +787,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Connecting...',
+                        l10n.connecting,
                         style: textTheme.bodySmall?.copyWith(
                           color: colorScheme.onPrimaryContainer,
                         ),
@@ -795,7 +798,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
-                  children: _buildTabViews(context),
+                  children: _buildTabViews(context, l10n),
                 ),
               ),
             ],
@@ -859,20 +862,20 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ CONTEXTUAL TABS ============
-  List<Tab> _buildTabs() {
+  List<Tab> _buildTabs(S l10n) {
     switch (_selectedMediaType) {
       case LibraryMediaType.music:
         return [
-          const Tab(text: 'Artists'),
-          const Tab(text: 'Albums'),
-          if (_showFavoritesOnly) const Tab(text: 'Tracks'),
-          const Tab(text: 'Playlists'),
+          Tab(text: l10n.artists),
+          Tab(text: l10n.albums),
+          if (_showFavoritesOnly) Tab(text: l10n.tracks),
+          Tab(text: l10n.playlists),
         ];
       case LibraryMediaType.books:
-        return const [
-          Tab(text: 'Authors'),
-          Tab(text: 'All Books'),
-          Tab(text: 'Series'),
+        return [
+          const Tab(text: 'Authors'),
+          Tab(text: l10n.books),
+          const Tab(text: 'Series'),
         ];
       case LibraryMediaType.podcasts:
         return const [
@@ -881,20 +884,20 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
   }
 
-  List<Widget> _buildTabViews(BuildContext context) {
+  List<Widget> _buildTabViews(BuildContext context, S l10n) {
     switch (_selectedMediaType) {
       case LibraryMediaType.music:
         return [
-          _buildArtistsTab(context),
-          _buildAlbumsTab(context),
-          if (_showFavoritesOnly) _buildTracksTab(context),
-          _buildPlaylistsTab(context),
+          _buildArtistsTab(context, l10n),
+          _buildAlbumsTab(context, l10n),
+          if (_showFavoritesOnly) _buildTracksTab(context, l10n),
+          _buildPlaylistsTab(context, l10n),
         ];
       case LibraryMediaType.books:
         return [
-          _buildBooksAuthorsTab(context),
-          _buildAllBooksTab(context),
-          _buildSeriesTab(context),
+          _buildBooksAuthorsTab(context, l10n),
+          _buildAllBooksTab(context, l10n),
+          _buildSeriesTab(context, l10n),
         ];
       case LibraryMediaType.podcasts:
         return [
@@ -904,9 +907,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ BOOKS TABS ============
-  Widget _buildBooksAuthorsTab(BuildContext context) {
+  Widget _buildBooksAuthorsTab(BuildContext context, S l10n) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     if (_isLoadingAudiobooks) {
       return Center(child: CircularProgressIndicator(color: colorScheme.primary));
@@ -921,14 +923,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       if (_showFavoritesOnly) {
         return EmptyState.custom(
           icon: Icons.favorite_border,
-          title: 'No favorite audiobooks',
-          subtitle: 'Tap the heart on an audiobook to add it to favorites',
+          title: l10n.noFavoriteAudiobooks,
+          subtitle: l10n.tapHeartAudiobook,
         );
       }
       return EmptyState.custom(
         icon: MdiIcons.bookOutline,
-        title: 'No audiobooks',
-        subtitle: 'Add audiobooks to your library to see them here',
+        title: l10n.noAudiobooks,
+        subtitle: l10n.addAudiobooksHint,
         onRefresh: () => _loadAudiobooks(),
       );
     }
@@ -957,7 +959,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               itemCount: sortedAuthors.length,
               padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.withMiniPlayer),
               itemBuilder: (context, index) {
-                return _buildAuthorListTile(sortedAuthors[index], authorMap[sortedAuthors[index]]!);
+                return _buildAuthorListTile(sortedAuthors[index], authorMap[sortedAuthors[index]]!, l10n);
               },
             )
           : GridView.builder(
@@ -974,13 +976,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               ),
               itemCount: sortedAuthors.length,
               itemBuilder: (context, index) {
-                return _buildAuthorCard(sortedAuthors[index], authorMap[sortedAuthors[index]]!);
+                return _buildAuthorCard(sortedAuthors[index], authorMap[sortedAuthors[index]]!, l10n);
               },
             ),
     );
   }
 
-  Widget _buildAuthorListTile(String authorName, List<Audiobook> books) {
+  Widget _buildAuthorListTile(String authorName, List<Audiobook> books, S l10n) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final authorImageUrl = _authorImages[authorName];
@@ -1037,7 +1039,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        '${books.length} ${books.length == 1 ? 'audiobook' : 'audiobooks'}',
+        '${books.length} ${books.length == 1 ? 'audiobook' : l10n.audiobooks}',
         style: textTheme.bodySmall?.copyWith(
           color: colorScheme.onSurface.withOpacity(0.6),
         ),
@@ -1046,7 +1048,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     );
   }
 
-  Widget _buildAuthorCard(String authorName, List<Audiobook> books) {
+  Widget _buildAuthorCard(String authorName, List<Audiobook> books, S l10n) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final authorImageUrl = _authorImages[authorName];
@@ -1233,7 +1235,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     );
   }
 
-  Widget _buildAllBooksTab(BuildContext context) {
+  Widget _buildAllBooksTab(BuildContext context, S l10n) {
     final colorScheme = Theme.of(context).colorScheme;
     final maProvider = context.read<MusicAssistantProvider>();
 
@@ -1250,14 +1252,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       if (_showFavoritesOnly) {
         return EmptyState.custom(
           icon: Icons.favorite_border,
-          title: 'No favorite audiobooks',
-          subtitle: 'Tap the heart on an audiobook to add it to favorites',
+          title: l10n.noFavoriteAudiobooks,
+          subtitle: l10n.tapHeartAudiobook,
         );
       }
       return EmptyState.custom(
         icon: MdiIcons.bookOutline,
-        title: 'No audiobooks',
-        subtitle: 'Add audiobooks to your library to see them here',
+        title: l10n.noAudiobooks,
+        subtitle: l10n.addAudiobooksHint,
         onRefresh: () => _loadAudiobooks(),
       );
     }
@@ -1406,7 +1408,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     );
   }
 
-  Widget _buildSeriesTab(BuildContext context) {
+  Widget _buildSeriesTab(BuildContext context, S l10n) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final maProvider = context.read<MusicAssistantProvider>();
@@ -1420,7 +1422,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             CircularProgressIndicator(color: colorScheme.primary),
             const SizedBox(height: 16),
             Text(
-              'Loading series...',
+              l10n.loading,
               style: TextStyle(
                 color: colorScheme.onSurface.withOpacity(0.6),
                 fontSize: 14,
@@ -1474,7 +1476,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                       const SizedBox(height: 24),
                       FilledButton.tonal(
                         onPressed: _loadSeries,
-                        child: const Text('Load Series'),
+                        child: Text(l10n.loadSeries),
                       ),
                     ],
                   ),
@@ -1498,7 +1500,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               itemCount: _series.length,
               padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.withMiniPlayer),
               itemBuilder: (context, index) {
-                return _buildSeriesListTile(context, _series[index], maProvider);
+                return _buildSeriesListTile(context, _series[index], maProvider, l10n);
               },
             )
           : GridView.builder(
@@ -1513,13 +1515,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               itemCount: _series.length,
               itemBuilder: (context, index) {
                 final series = _series[index];
-                return _buildSeriesCard(context, series, maProvider, maxCoverGridSize: _seriesViewMode == 'grid3' ? 2 : 3);
+                return _buildSeriesCard(context, series, maProvider, l10n, maxCoverGridSize: _seriesViewMode == 'grid3' ? 2 : 3);
               },
             ),
     );
   }
 
-  Widget _buildSeriesListTile(BuildContext context, AudiobookSeries series, MusicAssistantProvider maProvider) {
+  Widget _buildSeriesListTile(BuildContext context, AudiobookSeries series, MusicAssistantProvider maProvider, S l10n) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -1577,7 +1579,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           final count = series.bookCount ?? _seriesBookCounts[series.id];
           if (count == null) return const SizedBox.shrink();
           return Text(
-            '$count ${count == 1 ? 'book' : 'books'}',
+            '$count ${count == 1 ? 'book' : l10n.books}',
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurface.withOpacity(0.7),
             ),
@@ -1600,7 +1602,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     );
   }
 
-  Widget _buildSeriesCard(BuildContext context, AudiobookSeries series, MusicAssistantProvider maProvider, {int maxCoverGridSize = 3}) {
+  Widget _buildSeriesCard(BuildContext context, AudiobookSeries series, MusicAssistantProvider maProvider, S l10n, {int maxCoverGridSize = 3}) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -1662,7 +1664,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               return Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
-                  '$count ${count == 1 ? 'book' : 'books'}',
+                  '$count ${count == 1 ? 'book' : l10n.books}',
                   style: textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurface.withOpacity(0.7),
                   ),
@@ -1868,7 +1870,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ ARTISTS TAB ============
-  Widget _buildArtistsTab(BuildContext context) {
+  Widget _buildArtistsTab(BuildContext context, S l10n) {
     // Use Selector for targeted rebuilds - only rebuild when artists or loading state changes
     return Selector<MusicAssistantProvider, (List<Artist>, bool)>(
       selector: (_, provider) => (provider.artists, provider.isLoading),
@@ -1889,8 +1891,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           if (_showFavoritesOnly) {
             return EmptyState.custom(
               icon: Icons.favorite_border,
-              title: 'No favorite artists',
-              subtitle: 'Tap the heart on an artist to add them to favorites',
+              title: l10n.noFavoriteArtists,
+              subtitle: l10n.tapHeartArtist,
             );
           }
           return EmptyState.artists(
@@ -2051,7 +2053,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ ALBUMS TAB ============
-  Widget _buildAlbumsTab(BuildContext context) {
+  Widget _buildAlbumsTab(BuildContext context, S l10n) {
     // Use Selector for targeted rebuilds - only rebuild when albums or loading state changes
     return Selector<MusicAssistantProvider, (List<Album>, bool)>(
       selector: (_, provider) => (provider.albums, provider.isLoading),
@@ -2072,8 +2074,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           if (_showFavoritesOnly) {
             return EmptyState.custom(
               icon: Icons.favorite_border,
-              title: 'No favorite albums',
-              subtitle: 'Tap the heart on an album to add it to favorites',
+              title: l10n.noFavoriteAlbums,
+              subtitle: l10n.tapHeartAlbum,
             );
           }
           return EmptyState.albums(
@@ -2185,7 +2187,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ PLAYLISTS TAB ============
-  Widget _buildPlaylistsTab(BuildContext context) {
+  Widget _buildPlaylistsTab(BuildContext context, S l10n) {
     final colorScheme = Theme.of(context).colorScheme;
 
     if (_isLoadingPlaylists) {
@@ -2196,8 +2198,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       if (_showFavoritesOnly) {
         return EmptyState.custom(
           icon: Icons.favorite_border,
-          title: 'No favorite playlists',
-          subtitle: 'Tap the heart on a playlist to add it to favorites',
+          title: l10n.noFavoritePlaylists,
+          subtitle: l10n.tapHeartPlaylist,
         );
       }
       return EmptyState.playlists(onRefresh: () => _loadPlaylists());
@@ -2217,7 +2219,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.navBarOnly),
               itemBuilder: (context, index) {
                 final playlist = _playlists[index];
-                return _buildPlaylistTile(context, playlist);
+                return _buildPlaylistTile(context, playlist, l10n);
               },
             )
           : GridView.builder(
@@ -2235,13 +2237,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               itemCount: _playlists.length,
               itemBuilder: (context, index) {
                 final playlist = _playlists[index];
-                return _buildPlaylistGridCard(context, playlist);
+                return _buildPlaylistGridCard(context, playlist, l10n);
               },
             ),
     );
   }
 
-  Widget _buildPlaylistTile(BuildContext context, Playlist playlist) {
+  Widget _buildPlaylistTile(BuildContext context, Playlist playlist, S l10n) {
     final provider = context.read<MusicAssistantProvider>();
     final imageUrl = provider.api?.getImageUrl(playlist, size: 128);
     final colorScheme = Theme.of(context).colorScheme;
@@ -2275,7 +2277,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       ),
       subtitle: Text(
         playlist.trackCount != null
-            ? '${playlist.trackCount} tracks'
+            ? '${playlist.trackCount} ${l10n.tracks}'
             : playlist.owner ?? 'Playlist',
         style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurface.withOpacity(0.7)),
         maxLines: 1,
@@ -2300,7 +2302,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     );
   }
 
-  Widget _buildPlaylistGridCard(BuildContext context, Playlist playlist) {
+  Widget _buildPlaylistGridCard(BuildContext context, Playlist playlist, S l10n) {
     final provider = context.read<MusicAssistantProvider>();
     final imageUrl = provider.api?.getImageUrl(playlist, size: 256);
     final colorScheme = Theme.of(context).colorScheme;
@@ -2364,7 +2366,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           ),
           Text(
             playlist.trackCount != null
-                ? '${playlist.trackCount} tracks'
+                ? '${playlist.trackCount} ${l10n.tracks}'
                 : playlist.owner ?? 'Playlist',
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurface.withOpacity(0.7),
@@ -2378,7 +2380,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ TRACKS TAB (favorites only) ============
-  Widget _buildTracksTab(BuildContext context) {
+  Widget _buildTracksTab(BuildContext context, S l10n) {
     final colorScheme = Theme.of(context).colorScheme;
 
     if (_isLoadingTracks) {
@@ -2388,8 +2390,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     if (_favoriteTracks.isEmpty) {
       return EmptyState.custom(
         icon: Icons.favorite_border,
-        title: 'No favorite tracks',
-        subtitle: 'Long-press a track and tap the heart to add it to favorites',
+        title: l10n.noFavoriteTracks,
+        subtitle: l10n.longPressTrackHint,
       );
     }
 

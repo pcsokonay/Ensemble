@@ -12,6 +12,7 @@ import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
 import '../utils/page_transitions.dart';
 import '../constants/hero_tags.dart';
+import '../l10n/app_localizations.dart';
 import 'audiobook_detail_screen.dart';
 
 class AudiobookAuthorScreen extends StatefulWidget {
@@ -218,7 +219,7 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${_audiobooks.length} ${_audiobooks.length == 1 ? 'audiobook' : 'audiobooks'}',
+                      S.of(context)!.audiobookCount(_audiobooks.length),
                       style: textTheme.bodyLarge?.copyWith(
                         color: colorScheme.onSurface.withOpacity(0.7),
                       ),
@@ -234,7 +235,7 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
                 child: Row(
                   children: [
                     Text(
-                      'Audiobooks',
+                      S.of(context)!.audiobooks,
                       style: textTheme.titleLarge?.copyWith(
                         color: colorScheme.onSurface,
                         fontWeight: FontWeight.bold,

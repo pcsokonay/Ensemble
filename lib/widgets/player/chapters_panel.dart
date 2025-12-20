@@ -3,6 +3,7 @@ import '../../providers/music_assistant_provider.dart';
 import '../../models/media_item.dart' show Audiobook, Chapter;
 import '../../theme/design_tokens.dart';
 import '../common/empty_state.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Panel that displays audiobook chapters for navigation
 class ChaptersPanel extends StatelessWidget {
@@ -58,7 +59,7 @@ class ChaptersPanel extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  'Chapters',
+                  S.of(context)!.chapters,
                   style: TextStyle(
                     color: textColor,
                     fontSize: 18,
@@ -75,7 +76,7 @@ class ChaptersPanel extends StatelessWidget {
           // Chapters list
           Expanded(
             child: chapters.isEmpty
-                ? _buildEmptyState()
+                ? _buildEmptyState(context)
                 : _buildChaptersList(chapters, currentChapterIndex),
           ),
         ],
@@ -83,11 +84,11 @@ class ChaptersPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return EmptyState.custom(
       icon: Icons.bookmark_outline_rounded,
-      title: 'No chapters',
-      subtitle: 'This audiobook has no chapter information',
+      title: S.of(context)!.noChapters,
+      subtitle: S.of(context)!.noChapterInfo,
     );
   }
 

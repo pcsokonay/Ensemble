@@ -10,6 +10,7 @@ import '../models/player.dart';
 import '../services/animation_debugger.dart';
 import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
+import '../l10n/app_localizations.dart';
 import 'animated_icon_button.dart';
 import 'global_player_overlay.dart';
 import 'volume_control.dart';
@@ -400,7 +401,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update favorite: $e'),
+            content: Text(S.of(context)!.failedToUpdateFavorite(e.toString())),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -1443,7 +1444,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                                           } catch (e) {
                                             if (mounted) {
                                               ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('Error seeking: $e')),
+                                                SnackBar(content: Text(S.of(context)!.errorSeeking(e.toString()))),
                                               );
                                             }
                                           } finally {

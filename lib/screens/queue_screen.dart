@@ -4,6 +4,7 @@ import '../providers/music_assistant_provider.dart';
 import '../models/player.dart';
 import '../services/debug_logger.dart';
 import '../widgets/common/empty_state.dart';
+import '../l10n/app_localizations.dart';
 
 class QueueScreen extends StatefulWidget {
   const QueueScreen({super.key});
@@ -51,7 +52,7 @@ class _QueueScreenState extends State<QueueScreen> {
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _error = 'No player selected';
+            _error = S.of(context)!.noPlayerSelected;
           });
         }
       }
@@ -77,7 +78,7 @@ class _QueueScreenState extends State<QueueScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          player != null ? '${player.name} Queue' : 'Queue',
+          player != null ? S.of(context)!.playerQueue(player.name) : S.of(context)!.queue,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -116,7 +117,7 @@ class _QueueScreenState extends State<QueueScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadQueue,
-              child: const Text('Retry'),
+              child: Text(S.of(context)!.retry),
             ),
           ],
         ),
@@ -131,7 +132,7 @@ class _QueueScreenState extends State<QueueScreen> {
             Icon(Icons.speaker_group, size: 64, color: Colors.grey[700]),
             const SizedBox(height: 16),
             Text(
-              'No player selected',
+              S.of(context)!.noPlayerSelected,
               style: TextStyle(color: Colors.grey[600], fontSize: 18),
             ),
           ],
@@ -220,9 +221,9 @@ class _QueueScreenState extends State<QueueScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Removed ${item.track.name}'),
+            content: Text(S.of(context)!.removedItem(item.track.name)),
             action: SnackBarAction(
-              label: 'Undo',
+              label: S.of(context)!.undo,
               onPressed: () {
                 setState(() {
                   _queue!.items.insert(index, item);

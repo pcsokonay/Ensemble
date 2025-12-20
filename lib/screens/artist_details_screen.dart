@@ -12,6 +12,7 @@ import '../services/metadata_service.dart';
 import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
 import '../utils/page_transitions.dart';
+import '../l10n/app_localizations.dart';
 
 class ArtistDetailsScreen extends StatefulWidget {
   final Artist artist;
@@ -222,7 +223,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update favorite: $e'),
+            content: Text(S.of(context)!.failedToUpdateFavorite(e.toString())),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -236,7 +237,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
     if (selectedPlayer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No player selected')),
+        SnackBar(content: Text(S.of(context)!.noPlayerSelected)),
       );
       return;
     }
@@ -246,7 +247,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Starting ${widget.artist.name} radio'),
+            content: Text(S.of(context)!.startingRadio(widget.artist.name)),
             duration: const Duration(seconds: 1),
           ),
         );
@@ -256,7 +257,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to start radio: $e'),
+            content: Text(S.of(context)!.failedToStartRadio(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -287,9 +288,9 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
             ),
             const SizedBox(height: 16),
             if (players.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32.0),
-                child: Text('No players available'),
+              Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Text(S.of(context)!.noPlayersAvailable),
               )
             else
               Flexible(
@@ -311,7 +312,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Starting ${widget.artist.name} radio on ${player.name}'),
+                                content: Text(S.of(context)!.startingRadioOnPlayer(widget.artist.name, player.name)),
                                 duration: const Duration(seconds: 1),
                               ),
                             );
@@ -321,7 +322,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Failed to start radio: $e'),
+                                content: Text(S.of(context)!.failedToStartRadio(e.toString())),
                                 backgroundColor: Colors.red,
                               ),
                             );
@@ -345,7 +346,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
     if (selectedPlayer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No player selected')),
+        SnackBar(content: Text(S.of(context)!.noPlayerSelected)),
       );
       return;
     }
@@ -356,7 +357,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Added ${widget.artist.name} radio to queue'),
+            content: Text(S.of(context)!.addedRadioToQueue(widget.artist.name)),
             duration: const Duration(seconds: 1),
           ),
         );
@@ -366,7 +367,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add to queue: $e'),
+            content: Text(S.of(context)!.failedToAddToQueue(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -442,7 +443,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
       });
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     // CRITICAL FIX: Use select() instead of watch() to reduce rebuilds
@@ -583,7 +584,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                           child: ElevatedButton.icon(
                             onPressed: _startArtistRadio,
                             icon: const Icon(Icons.radio),
-                            label: const Text('Radio'),
+                            label: Text(S.of(context)!.radio),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colorScheme.primary,
                               foregroundColor: colorScheme.onPrimary,
@@ -669,7 +670,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
             SliverFillRemaining(
               child: Center(
                 child: Text(
-                  'No albums found',
+                  S.of(context)!.noAlbumsFound,
                   style: TextStyle(
                     color: colorScheme.onBackground.withOpacity(0.54),
                     fontSize: 16,
@@ -686,7 +687,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                   child: Row(
                     children: [
                       Text(
-                        'In Library',
+                        S.of(context)!.inLibrary,
                         style: textTheme.titleLarge?.copyWith(
                           color: colorScheme.onBackground,
                           fontWeight: FontWeight.bold,

@@ -4,6 +4,7 @@ import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
 import '../widgets/album_card.dart';
 import '../widgets/common/empty_state.dart';
+import '../l10n/app_localizations.dart';
 
 class LibraryAlbumsScreen extends StatelessWidget {
   const LibraryAlbumsScreen({super.key});
@@ -25,7 +26,7 @@ class LibraryAlbumsScreen extends StatelessWidget {
           color: colorScheme.onBackground,
         ),
         title: Text(
-          'Albums',
+          S.of(context)!.albums,
           style: textTheme.headlineSmall?.copyWith(
             color: colorScheme.onBackground,
             fontWeight: FontWeight.w300,

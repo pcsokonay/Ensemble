@@ -11,6 +11,7 @@ import '../services/debug_logger.dart';
 import '../utils/page_transitions.dart';
 import '../constants/hero_tags.dart';
 import 'audiobook_detail_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class AudiobookSeriesScreen extends StatefulWidget {
   final AudiobookSeries series;
@@ -270,6 +271,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final maProvider = context.watch<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -335,8 +337,8 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                   const SizedBox(height: 8),
                   Text(
                     _isLoading
-                        ? 'Loading...'
-                        : '${_audiobooks.length} ${_audiobooks.length == 1 ? 'book' : 'books'}',
+                        ? l10n.loading
+                        : l10n.bookCount(_audiobooks.length),
                     style: textTheme.bodyLarge?.copyWith(
                       color: colorScheme.onSurface.withOpacity(0.7),
                     ),
@@ -353,7 +355,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
               child: Row(
                 children: [
                   Text(
-                    'Books',
+                    l10n.books,
                     style: textTheme.titleLarge?.copyWith(
                       color: colorScheme.onSurface,
                       fontWeight: FontWeight.bold,
@@ -416,7 +418,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: _loadSeriesBooks,
-                      child: const Text('Retry'),
+                      child: Text(l10n.retry),
                     ),
                   ],
                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../theme/design_tokens.dart';
 
 /// A reusable widget for displaying disconnected/offline state.
@@ -21,29 +22,31 @@ class DisconnectedState extends StatelessWidget {
   });
 
   /// Simple disconnected state without action button
-  factory DisconnectedState.simple() => const DisconnectedState(
-        title: 'Not connected to Music Assistant',
+  factory DisconnectedState.simple(BuildContext context) => DisconnectedState(
+        title: S.of(context)!.notConnected,
       );
 
   /// Disconnected state with settings button for navigation
   factory DisconnectedState.withSettingsAction({
+    required BuildContext context,
     required VoidCallback onSettings,
   }) =>
       DisconnectedState(
-        title: 'Not connected to Music Assistant',
-        actionLabel: 'Configure Server',
+        title: S.of(context)!.notConnected,
+        actionLabel: S.of(context)!.configureServer,
         actionIcon: Icons.settings_rounded,
         onAction: onSettings,
       );
 
   /// Full disconnected state with title, subtitle, and action (for home screen)
   factory DisconnectedState.full({
+    required BuildContext context,
     required VoidCallback onSettings,
   }) =>
       DisconnectedState(
-        title: 'Not Connected',
-        subtitle: 'Connect to your Music Assistant server to start listening',
-        actionLabel: 'Configure Server',
+        title: S.of(context)!.notConnectedTitle,
+        subtitle: S.of(context)!.connectHint,
+        actionLabel: S.of(context)!.configureServer,
         actionIcon: Icons.settings_rounded,
         onAction: onSettings,
         iconSize: 80,

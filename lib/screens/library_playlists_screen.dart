@@ -5,6 +5,7 @@ import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
 import '../widgets/common/empty_state.dart';
 import 'playlist_details_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class LibraryPlaylistsScreen extends StatefulWidget {
   const LibraryPlaylistsScreen({super.key});
@@ -59,7 +60,7 @@ class _LibraryPlaylistsScreenState extends State<LibraryPlaylistsScreen> {
           color: colorScheme.onBackground,
         ),
         title: Text(
-          'Playlists',
+          S.of(context)!.playlists,
           style: textTheme.headlineSmall?.copyWith(
             color: colorScheme.onBackground,
             fontWeight: FontWeight.w300,

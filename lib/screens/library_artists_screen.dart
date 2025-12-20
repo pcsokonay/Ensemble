@@ -6,6 +6,7 @@ import '../utils/page_transitions.dart';
 import '../widgets/common/empty_state.dart';
 import '../widgets/artist_avatar.dart';
 import 'artist_details_screen.dart';
+import '../l10n/app_localizations.dart';
 
 class LibraryArtistsScreen extends StatelessWidget {
   const LibraryArtistsScreen({super.key});
@@ -27,7 +28,7 @@ class LibraryArtistsScreen extends StatelessWidget {
           color: colorScheme.onBackground,
         ),
         title: Text(
-          'Artists',
+          S.of(context)!.artists,
           style: textTheme.headlineSmall?.copyWith(
             color: colorScheme.onBackground,
             fontWeight: FontWeight.w300,

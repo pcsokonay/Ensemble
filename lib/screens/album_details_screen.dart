@@ -10,6 +10,7 @@ import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
 import '../services/recently_played_service.dart';
 import '../widgets/global_player_overlay.dart';
+import '../l10n/app_localizations.dart';
 import 'artist_details_screen.dart';
 
 class AlbumDetailsScreen extends StatefulWidget {
@@ -17,7 +18,7 @@ class AlbumDetailsScreen extends StatefulWidget {
   final String? heroTagSuffix;
 
   const AlbumDetailsScreen({
-    super.key, 
+    super.key,
     required this.album,
     this.heroTagSuffix,
   });
@@ -36,7 +37,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
   int? _expandedTrackIndex;
   bool _isDescriptionExpanded = false;
   String? _albumDescription;
-  
+
   String get _heroTagSuffix => widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
 
   @override
@@ -182,7 +183,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update favorite: $e'),
+            content: Text(S.of(context)!.failedToUpdateFavorite(e.toString())),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -268,7 +269,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update favorite: $e'),
+            content: Text(S.of(context)!.failedToUpdateFavorite(e.toString())),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -300,7 +301,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
       // Use the selected player
       final player = maProvider.selectedPlayer;
       if (player == null) {
-        _showError('No player selected');
+        _showError(S.of(context)!.noPlayerSelected);
         return;
       }
 
@@ -326,7 +327,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
       // Use the selected player
       final player = maProvider.selectedPlayer;
       if (player == null) {
-        _showError('No player selected');
+        _showError(S.of(context)!.noPlayerSelected);
         return;
       }
 
@@ -367,9 +368,9 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
             ),
             const SizedBox(height: 16),
             if (players.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32.0),
-                child: Text('No players available'),
+              Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Text(S.of(context)!.noPlayersAvailable),
               )
             else
               Flexible(
@@ -397,9 +398,9 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                           _logger.log('Album added to queue on ${player.name}');
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Album added to queue'),
-                                duration: Duration(seconds: 1),
+                              SnackBar(
+                                content: Text(S.of(context)!.albumAddedToQueue),
+                                duration: const Duration(seconds: 1),
                               ),
                             );
                           }
@@ -447,9 +448,9 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
             ),
             const SizedBox(height: 16),
             if (players.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32.0),
-                child: Text('No players available'),
+              Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Text(S.of(context)!.noPlayersAvailable),
               )
             else
               Flexible(
@@ -476,9 +477,9 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                           );
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Tracks added to queue'),
-                                duration: Duration(seconds: 1),
+                              SnackBar(
+                                content: Text(S.of(context)!.tracksAddedToQueue),
+                                duration: const Duration(seconds: 1),
                               ),
                             );
                           }
@@ -763,7 +764,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                           child: ElevatedButton.icon(
                             onPressed: _isLoading || _tracks.isEmpty ? null : _playAlbum,
                             icon: const Icon(Icons.play_arrow_rounded),
-                            label: const Text('Play'),
+                            label: Text(S.of(context)!.play),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colorScheme.primary,
                               foregroundColor: colorScheme.onPrimary,
@@ -1095,8 +1096,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
             const SizedBox(height: 16),
             Expanded(
               child: players.isEmpty
-                  ? const Center(
-                      child: Text('No players available'),
+                  ? Center(
+                      child: Text(S.of(context)!.noPlayersAvailable),
                     )
                   : ListView.builder(
                       padding: EdgeInsets.only(bottom: bottomPadding + 16),

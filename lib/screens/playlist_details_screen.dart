@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/debug_logger.dart';
@@ -61,7 +62,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
       // Use the selected player
       final player = maProvider.selectedPlayer;
       if (player == null) {
-        _showError('No player selected');
+        _showError(S.of(context)!.noPlayerSelected);
         return;
       }
 
@@ -77,7 +78,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Playing ${widget.playlist.name}'),
+            content: Text(S.of(context)!.playing(widget.playlist.name)),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -195,7 +196,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
                     child: ElevatedButton.icon(
                       onPressed: _isLoading ? null : _playPlaylist,
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Play'),
+                      label: Text(S.of(context)!.play),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF1a1a1a),
@@ -327,7 +328,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
         onPressed: () async {
           final player = maProvider.selectedPlayer;
           if (player == null) {
-            _showError('No player selected');
+            _showError(S.of(context)!.noPlayerSelected);
             return;
           }
 
@@ -336,9 +337,9 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
             await maProvider.playTracks(player.playerId, _tracks, startIndex: index);
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Playing track'),
-                  duration: Duration(seconds: 1),
+                SnackBar(
+                  content: Text(S.of(context)!.playingTrack),
+                  duration: const Duration(seconds: 1),
                 ),
               );
             }
