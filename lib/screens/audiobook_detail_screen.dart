@@ -216,7 +216,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
           children: [
             const SizedBox(height: 16),
             Text(
-              'Play on...',
+              S.of(context)!.playOn,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),

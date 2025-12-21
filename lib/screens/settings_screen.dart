@@ -637,7 +637,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Artist images are automatically fetched from Deezer. Add API keys below for artist biographies and album descriptions.',
+              S.of(context)!.metadataApisDescription,
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.onBackground.withOpacity(0.6),
               ),
@@ -648,8 +648,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               controller: _lastFmApiKeyController,
               style: TextStyle(color: colorScheme.onSurface),
               decoration: InputDecoration(
-                labelText: 'Last.fm API Key',
-                hintText: 'Get free key at last.fm/api',
+                labelText: S.of(context)!.lastFmApiKey,
+                hintText: S.of(context)!.lastFmApiKeyHint,
                 hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.38)),
                 filled: true,
                 fillColor: colorScheme.surfaceVariant.withOpacity(0.3),

@@ -363,7 +363,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
           children: [
             const SizedBox(height: 16),
             Text(
-              'Add album to queue on...',
+              S.of(context)!.addAlbumToQueueOn,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -443,7 +443,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
           children: [
             const SizedBox(height: 16),
             Text(
-              'Add to queue on...',
+              S.of(context)!.addToQueueOn,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -1090,7 +1090,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
           children: [
             const SizedBox(height: 16),
             Text(
-              'Play on...',
+              S.of(context)!.playOn,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),

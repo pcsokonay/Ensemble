@@ -1217,6 +1217,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                 // Must have peek data to render
                 if (t < 0.1 && _peekPlayer != null && (_slideOffset.abs() > 0.01 || _inTransition))
                   _buildPeekContent(
+                    context: context,
                     maProvider: maProvider,
                     peekPlayer: _peekPlayer,
                     peekImageUrl: _peekImageUrl,
@@ -1327,7 +1328,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                       width: titleWidth,
                       child: Text(
                         maProvider.isPlayingAudiobook
-                            ? (maProvider.currentAudiobook?.authorsString ?? 'Unknown Author')
+                            ? (maProvider.currentAudiobook?.authorsString ?? S.of(context)!.unknownAuthor)
                             : currentTrack.artistsString,
                         style: TextStyle(
                           color: textColor.withOpacity(t > 0.5 ? 0.7 : 0.6),
@@ -1388,7 +1389,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            maProvider.currentAudioFormat ?? 'PCM Audio',
+                            maProvider.currentAudioFormat ?? S.of(context)!.pcmAudio,
                             style: TextStyle(
                               color: primaryColor.withOpacity(0.7),
                               fontSize: 12,
@@ -1712,6 +1713,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
   /// Build the peek player content that slides in from the edge during drag
   Widget _buildPeekContent({
+    required BuildContext context,
     required MusicAssistantProvider maProvider,
     required dynamic peekPlayer,
     required String? peekImageUrl,
@@ -1751,8 +1753,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
     // Check if peek player has a track - if not, show device info instead
     final hasTrack = _peekTrack != null && peekImageUrl != null;
-    final peekTrackName = hasTrack ? _peekTrack!.name : (peekPlayer?.name ?? 'Unknown');
-    final peekArtistName = hasTrack ? (_peekTrack!.artistsString ?? '') : 'Swipe to switch device';
+    final peekTrackName = hasTrack ? _peekTrack!.name : (peekPlayer?.name ?? S.of(context)!.unknown);
+    final peekArtistName = hasTrack ? (_peekTrack!.artistsString ?? '') : S.of(context)!.swipeToSwitchDevice;
 
     return Stack(
       children: [

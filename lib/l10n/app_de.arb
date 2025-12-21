@@ -251,5 +251,20 @@
   "ensembleBugReport": "Ensemble Fehlerbericht",
   "byOwner": "Von {owner}",
   "noSeriesAvailable": "Keine Serien in deiner Hörbuch-Bibliothek verfügbar.\nZiehe zum Aktualisieren.",
-  "pullToLoadSeries": "Ziehe nach unten um Serien\nvon Music Assistant zu laden"
+  "pullToLoadSeries": "Ziehe nach unten um Serien\nvon Music Assistant zu laden",
+
+  "search": "Suche",
+  "metadataApisDescription": "Künstlerbilder werden automatisch von Deezer abgerufen. Füge unten API-Schlüssel für Künstlerbiografien und Albenbeschreibungen hinzu.",
+  "lastFmApiKey": "Last.fm API-Schlüssel",
+  "lastFmApiKeyHint": "Kostenlosen Schlüssel auf last.fm/api holen",
+  "swipeToSwitchDevice": "Wischen um Gerät zu wechseln",
+  "chapterNumber": "Kapitel {number}",
+  "pcmAudio": "PCM-Audio",
+  "playOn": "Abspielen auf...",
+  "addAlbumToQueueOn": "Album zur Warteschlange hinzufügen auf...",
+  "addToQueueOn": "Zur Warteschlange hinzufügen auf...",
+  "startRadioOn": "{name} Radio starten auf...",
+  "book": "Buch",
+  "audiobookSingular": "Hörbuch",
+  "trackCount": "{count} {count, plural, =1{Song} other{Songs}}"
 }

@@ -283,7 +283,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Start ${widget.artist.name} radio on...',
+              S.of(context)!.startRadioOn(widget.artist.name),
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),

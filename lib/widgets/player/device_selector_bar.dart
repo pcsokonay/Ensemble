@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../theme/design_tokens.dart';
 
 /// A compact device selector bar shown when no track is playing
@@ -52,7 +53,7 @@ class DeviceSelectorBar extends StatelessWidget {
               children: [
                 // Peek player content (shows when dragging)
                 if (slideOffset.abs() > 0.01 && peekPlayer != null)
-                  _buildPeekContent(),
+                  _buildPeekContent(context),
 
                 // Current player content
                 Transform.translate(
@@ -84,7 +85,7 @@ class DeviceSelectorBar extends StatelessWidget {
                               ),
                               if (hasMultiplePlayers)
                                 Text(
-                                  'Swipe to switch device',
+                                  S.of(context)!.swipeToSwitchDevice,
                                   style: TextStyle(
                                     color: textColor.withOpacity(0.6),
                                     fontSize: 14,
@@ -106,7 +107,7 @@ class DeviceSelectorBar extends StatelessWidget {
   }
 
   /// Build peek player content that slides in from the edge
-  Widget _buildPeekContent() {
+  Widget _buildPeekContent(BuildContext context) {
     final isFromRight = slideOffset < 0;
     final peekProgress = slideOffset.abs();
 
@@ -144,7 +145,7 @@ class DeviceSelectorBar extends StatelessWidget {
                   ),
                   if (hasMultiplePlayers)
                     Text(
-                      'Swipe to switch device',
+                      S.of(context)!.swipeToSwitchDevice,
                       style: TextStyle(
                         color: textColor.withOpacity(0.6),
                         fontSize: 14,

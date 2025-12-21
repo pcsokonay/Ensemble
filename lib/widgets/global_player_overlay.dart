@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/music_assistant_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../theme/theme_provider.dart';
@@ -206,26 +207,26 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                       type: BottomNavigationBarType.fixed,
                       selectedFontSize: 12,
                       unselectedFontSize: 12,
-                      items: const [
+                      items: [
                         BottomNavigationBarItem(
-                          icon: Icon(Icons.home_outlined),
-                          activeIcon: Icon(Icons.home_rounded),
-                          label: 'Home',
+                          icon: const Icon(Icons.home_outlined),
+                          activeIcon: const Icon(Icons.home_rounded),
+                          label: S.of(context)!.home,
                         ),
                         BottomNavigationBarItem(
-                          icon: Icon(Icons.library_music_outlined),
-                          activeIcon: Icon(Icons.library_music_rounded),
-                          label: 'Library',
+                          icon: const Icon(Icons.library_music_outlined),
+                          activeIcon: const Icon(Icons.library_music_rounded),
+                          label: S.of(context)!.library,
                         ),
                         BottomNavigationBarItem(
-                          icon: Icon(Icons.search_rounded),
-                          activeIcon: Icon(Icons.search_rounded),
-                          label: 'Search',
+                          icon: const Icon(Icons.search_rounded),
+                          activeIcon: const Icon(Icons.search_rounded),
+                          label: S.of(context)!.search,
                         ),
                         BottomNavigationBarItem(
-                          icon: Icon(Icons.settings_outlined),
-                          activeIcon: Icon(Icons.settings_rounded),
-                          label: 'Settings',
+                          icon: const Icon(Icons.settings_outlined),
+                          activeIcon: const Icon(Icons.settings_rounded),
+                          label: S.of(context)!.settings,
                         ),
                       ],
                     ),

@@ -1042,7 +1042,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        '${books.length} ${books.length == 1 ? 'audiobook' : l10n.audiobooks}',
+        '${books.length} ${books.length == 1 ? l10n.audiobookSingular : l10n.audiobooks}',
         style: textTheme.bodySmall?.copyWith(
           color: colorScheme.onSurface.withOpacity(0.6),
         ),
@@ -1584,7 +1584,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           final count = series.bookCount ?? _seriesBookCounts[series.id];
           if (count == null) return const SizedBox.shrink();
           return Text(
-            '$count ${count == 1 ? 'book' : l10n.books}',
+            '$count ${count == 1 ? l10n.book : l10n.books}',
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurface.withOpacity(0.7),
             ),
@@ -1669,7 +1669,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               return Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
-                  '$count ${count == 1 ? 'book' : l10n.books}',
+                  '$count ${count == 1 ? l10n.book : l10n.books}',
                   style: textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurface.withOpacity(0.7),
                   ),

@@ -1046,5 +1046,90 @@
     }
   },
   "noSeriesAvailable": "No series available from your audiobook library.\nPull to refresh.",
-  "pullToLoadSeries": "Pull down to load series\nfrom Music Assistant"
+  "pullToLoadSeries": "Pull down to load series\nfrom Music Assistant",
+
+  "search": "Search",
+  "@search": {
+    "description": "Search navigation label"
+  },
+
+  "metadataApisDescription": "Artist images are automatically fetched from Deezer. Add API keys below for artist biographies and album descriptions.",
+  "@metadataApisDescription": {
+    "description": "Description for metadata APIs section"
+  },
+
+  "lastFmApiKey": "Last.fm API Key",
+  "@lastFmApiKey": {
+    "description": "Last.fm API key field label"
+  },
+
+  "lastFmApiKeyHint": "Get free key at last.fm/api",
+  "@lastFmApiKeyHint": {
+    "description": "Hint for Last.fm API key field"
+  },
+
+  "swipeToSwitchDevice": "Swipe to switch device",
+  "@swipeToSwitchDevice": {
+    "description": "Hint for device switching gesture"
+  },
+
+  "chapterNumber": "Chapter {number}",
+  "@chapterNumber": {
+    "description": "Chapter number display",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+
+  "pcmAudio": "PCM Audio",
+  "@pcmAudio": {
+    "description": "PCM audio format label"
+  },
+
+  "playOn": "Play on...",
+  "@playOn": {
+    "description": "Bottom sheet title for selecting player"
+  },
+
+  "addAlbumToQueueOn": "Add album to queue on...",
+  "@addAlbumToQueueOn": {
+    "description": "Bottom sheet title for adding album to queue"
+  },
+
+  "addToQueueOn": "Add to queue on...",
+  "@addToQueueOn": {
+    "description": "Bottom sheet title for adding to queue"
+  },
+
+  "startRadioOn": "Start {name} radio on...",
+  "@startRadioOn": {
+    "description": "Bottom sheet title for starting radio",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "book": "book",
+  "@book": {
+    "description": "Singular form of book"
+  },
+
+  "audiobookSingular": "audiobook",
+  "@audiobookSingular": {
+    "description": "Singular form of audiobook"
+  },
+
+  "trackCount": "{count} {count, plural, =1{track} other{tracks}}",
+  "@trackCount": {
+    "description": "Track count with plural",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }
