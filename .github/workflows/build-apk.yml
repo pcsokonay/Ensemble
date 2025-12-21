@@ -41,6 +41,9 @@ jobs:
       - name: Generate code (Drift database)
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Generate localizations
+        run: flutter gen-l10n
+
       - name: Generate launcher icons
         run: flutter pub run flutter_launcher_icons
 
