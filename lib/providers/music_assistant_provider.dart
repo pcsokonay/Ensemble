@@ -706,42 +706,48 @@ class MusicAssistantProvider with ChangeNotifier {
       _sendspinService!.onStreamEnd = _handleSendspinStreamEnd;
 
       final playerId = await DeviceIdService.getOrCreateDevicePlayerId();
+      _logger.log('Sendspin: Player ID: $playerId');
 
-      // Strategy 1: If server is HTTPS, try external wss:// first
-      final isHttps = _serverUrl!.startsWith('https://') ||
-                      (!_serverUrl!.contains('://') && !_serverUrl!.contains(':'));
+      // Parse server URL to determine connection strategy
+      final serverUri = Uri.parse(_serverUrl!.startsWith('http')
+          ? _serverUrl!
+          : 'https://$_serverUrl');
+      final isLocalIp = _isLocalNetworkHost(serverUri.host);
+      final isHttps = serverUri.scheme == 'https' ||
+                      (!_serverUrl!.contains('://') && !isLocalIp);
 
-      if (isHttps) {
-        _logger.log('Sendspin: Server is HTTPS, trying external connection first');
+      // Strategy 1: For local IPs, connect directly to Sendspin port
+      if (isLocalIp) {
+        final localSendspinUrl = 'ws://${serverUri.host}:8927/sendspin';
+        _logger.log('Sendspin: Local network detected, trying direct connection: $localSendspinUrl');
+        final connected = await _sendspinService!.connectWithUrl(localSendspinUrl);
+        if (connected) {
+          _sendspinConnected = true;
+          _logger.log('✅ Sendspin: Connected via local network');
+          return true;
+        }
+        _logger.log('⚠️ Sendspin: Local connection failed (port 8927 may not be accessible)');
+      }
+
+      // Strategy 2: For external/HTTPS servers, use the proxy at /sendspin
+      if (isHttps || !isLocalIp) {
+        _logger.log('Sendspin: Trying external proxy connection');
         final connected = await _sendspinService!.connect();
         if (connected) {
           _sendspinConnected = true;
-          _logger.log('✅ Sendspin: Connected via external URL');
+          _logger.log('✅ Sendspin: Connected via external proxy');
           return true;
         }
-        _logger.log('⚠️ Sendspin: External connection failed, trying local URL');
+        _logger.log('⚠️ Sendspin: External proxy connection failed');
       }
 
-      // Strategy 2: Get local_ws_url from API and try that
-      final connectionInfo = await _api!.getSendspinConnectionInfo(playerId);
-      if (connectionInfo != null) {
-        final localWsUrl = connectionInfo['local_ws_url'] as String?;
-        if (localWsUrl != null) {
-          _logger.log('Sendspin: Trying local WebSocket URL: $localWsUrl');
-          final connected = await _sendspinService!.connectWithUrl(localWsUrl);
-          if (connected) {
-            _sendspinConnected = true;
-            _logger.log('✅ Sendspin: Connected via local URL');
-            return true;
-          }
-        }
+      // Both strategies failed
+      _logger.log('❌ Sendspin: All connection strategies failed');
+      if (isLocalIp) {
+        _logger.log('ℹ️ Ensure port 8927 is accessible on your Music Assistant server');
+      } else {
+        _logger.log('ℹ️ Ensure /sendspin route is configured in your reverse proxy');
       }
-
-      // Strategy 3: WebRTC fallback (requires TURN servers from Nabucasa)
-      // For now, just log that we'd need WebRTC - implementing full WebRTC
-      // would require additional dependencies (flutter_webrtc)
-      _logger.log('⚠️ Sendspin: WebRTC fallback not yet implemented');
-      _logger.log('ℹ️ For external access, configure /sendspin route in your reverse proxy');
 
       return false;
     } catch (e) {
@@ -2971,5 +2977,26 @@ class MusicAssistantProvider with ChangeNotifier {
     _sendspinService?.dispose();
     _api?.dispose();
     super.dispose();
+  }
+
+  // ============================================================================
+  // UTILITY METHODS
+  // ============================================================================
+
+  /// Check if a hostname is a local/private network address
+  bool _isLocalNetworkHost(String host) {
+    return host.startsWith('192.168.') ||
+        host.startsWith('10.') ||
+        host.startsWith('172.16.') ||
+        host.startsWith('172.17.') ||
+        host.startsWith('172.18.') ||
+        host.startsWith('172.19.') ||
+        host.startsWith('172.2') ||
+        host.startsWith('172.30.') ||
+        host.startsWith('172.31.') ||
+        host == 'localhost' ||
+        host.startsWith('127.') ||
+        host.endsWith('.local') ||
+        host.endsWith('.ts.net'); // Tailscale - treat as local since it's a VPN
   }
 }

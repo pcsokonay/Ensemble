@@ -120,12 +120,11 @@ class SendspinService {
         connected = await _tryConnect(externalUrl, timeout: const Duration(seconds: 5), useProxyAuth: true);
       }
 
-      // Strategy 2: If external failed or server is HTTP, try local connection
-      // Note: We would need local_ws_url from getSendspinConnectionInfo API
-      // For now, skip this step and fall back to WebRTC (handled by provider)
+      // Note: Local network connections (ws://ip:8927/sendspin) are handled
+      // by the provider calling connectWithUrl() directly, not by this method.
 
       if (!connected) {
-        _logger.log('Sendspin: External connection failed, WebRTC fallback needed');
+        _logger.log('Sendspin: External proxy connection failed');
         _updateState(SendspinConnectionState.error);
         return false;
       }

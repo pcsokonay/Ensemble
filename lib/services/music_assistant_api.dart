@@ -2302,89 +2302,15 @@ class MusicAssistantAPI {
     return _eventStreams['sendspin_player']!.stream;
   }
 
-  /// Get Sendspin connection info for a player
-  /// Returns connection details including:
-  /// - local_ws_url: Direct WebSocket URL (e.g., ws://192.168.4.120:8927/sendspin)
-  /// - ice_servers: List of ICE/TURN servers for WebRTC fallback
-  /// - player_id: The player's ID
-  Future<Map<String, dynamic>?> getSendspinConnectionInfo(String playerId) async {
-    try {
-      _logger.log('Sendspin: Getting connection info for player $playerId');
-
-      final response = await _sendCommand(
-        'sendspin/connection_info',
-        args: {
-          'player_id': playerId,
-        },
-      );
-
-      final result = response['result'] as Map<String, dynamic>?;
-      if (result != null) {
-        _logger.log('Sendspin: Got connection info - local_ws_url: ${result['local_ws_url']}');
-        _logger.log('Sendspin: ICE servers count: ${(result['ice_servers'] as List?)?.length ?? 0}');
-      }
-
-      return result;
-    } catch (e) {
-      _logger.log('Sendspin: Error getting connection info: $e');
-      return null;
-    }
-  }
-
-  /// Send WebRTC offer to Sendspin server
-  /// Used when establishing WebRTC connection as fallback
-  Future<Map<String, dynamic>?> sendspinOffer(String playerId, String sdp) async {
-    try {
-      _logger.log('Sendspin: Sending WebRTC offer for player $playerId');
-
-      final response = await _sendCommand(
-        'sendspin/webrtc_offer',
-        args: {
-          'player_id': playerId,
-          'sdp': sdp,
-        },
-      );
-
-      return response['result'] as Map<String, dynamic>?;
-    } catch (e) {
-      _logger.log('Sendspin: Error sending WebRTC offer: $e');
-      return null;
-    }
-  }
-
-  /// Send WebRTC answer to Sendspin server
-  Future<void> sendspinAnswer(String playerId, String sdp) async {
-    try {
-      _logger.log('Sendspin: Sending WebRTC answer for player $playerId');
-
-      await _sendCommand(
-        'sendspin/webrtc_answer',
-        args: {
-          'player_id': playerId,
-          'sdp': sdp,
-        },
-      );
-    } catch (e) {
-      _logger.log('Sendspin: Error sending WebRTC answer: $e');
-      rethrow;
-    }
-  }
-
-  /// Send ICE candidate to Sendspin server
-  Future<void> sendspinIceCandidate(String playerId, Map<String, dynamic> candidate) async {
-    try {
-      await _sendCommand(
-        'sendspin/ice_candidate',
-        args: {
-          'player_id': playerId,
-          'candidate': candidate,
-        },
-      );
-    } catch (e) {
-      _logger.log('Sendspin: Error sending ICE candidate: $e');
-      // Don't rethrow - ICE candidate failures are common and non-fatal
-    }
-  }
+  // NOTE: The following Sendspin API methods were removed because they don't exist in MA:
+  // - getSendspinConnectionInfo (sendspin/connection_info)
+  // - sendspinOffer (sendspin/webrtc_offer)
+  // - sendspinAnswer (sendspin/webrtc_answer)
+  // - sendspinIceCandidate (sendspin/ice_candidate)
+  //
+  // Sendspin connection is handled directly via WebSocket to:
+  // - Local: ws://{server-ip}:8927/sendspin
+  // - External: wss://{server}/sendspin (via MA's proxy with auth)
 
   /// Update Sendspin player state
   /// Similar to updateBuiltinPlayerState but for Sendspin protocol

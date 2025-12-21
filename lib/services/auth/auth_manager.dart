@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'auth_strategy.dart';
 import 'no_auth_strategy.dart';
@@ -84,6 +85,22 @@ class AuthManager {
       }
     }
     return baseUrl;
+  }
+
+  /// Check if a hostname is a local/private IP address
+  bool _isLocalIpAddress(String host) {
+    return host.startsWith('192.168.') ||
+        host.startsWith('10.') ||
+        host.startsWith('172.16.') ||
+        host.startsWith('172.17.') ||
+        host.startsWith('172.18.') ||
+        host.startsWith('172.19.') ||
+        host.startsWith('172.2') ||
+        host.startsWith('172.30.') ||
+        host.startsWith('172.31.') ||
+        host == 'localhost' ||
+        host.startsWith('127.') ||
+        host.endsWith('.local');
   }
 
   /// Try to detect auth strategy for a given URL
@@ -187,15 +204,49 @@ class AuthManager {
 
       _logger.log('Checking MA API at: $apiUrl');
 
-      // Try to get server info - this tells us if auth is required
-      // Note: The command is just 'info', not 'server/info'
-      final response = await http.post(
-        apiUrl,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'command': 'info',
-        }),
-      ).timeout(const Duration(seconds: 5));
+      // Use IOClient to control redirect behavior for local IPs
+      final isLocalIp = _isLocalIpAddress(uri.host);
+      http.Response response;
+
+      if (isLocalIp) {
+        // For local IPs, don't follow redirects - handle them explicitly
+        final client = HttpClient()..followRedirects = false;
+        try {
+          final request = await client.postUrl(apiUrl);
+          request.headers.set('Content-Type', 'application/json');
+          request.write(jsonEncode({'command': 'info'}));
+          final ioResponse = await request.close().timeout(const Duration(seconds: 5));
+
+          // Check for redirect to HTTPS
+          if (ioResponse.statusCode == 308 || ioResponse.statusCode == 301 || ioResponse.statusCode == 302) {
+            final location = ioResponse.headers.value('location');
+            _logger.log('Local IP redirects to: $location');
+            if (location != null && location.startsWith('https://')) {
+              _logger.log('⚠️ Server redirects HTTP to HTTPS - this may cause certificate issues for local IP');
+              // Don't follow the redirect - it will likely fail with cert error
+              // Instead, return null to trigger fallback logic
+              client.close();
+              return null;
+            }
+          }
+
+          final body = await ioResponse.transform(utf8.decoder).join();
+          response = http.Response(body, ioResponse.statusCode);
+          client.close();
+        } catch (e) {
+          client.close();
+          rethrow;
+        }
+      } else {
+        // For non-local URLs, use standard http.post which follows redirects
+        response = await http.post(
+          apiUrl,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'command': 'info',
+          }),
+        ).timeout(const Duration(seconds: 5));
+      }
 
       _logger.log('MA API response: ${response.statusCode}');
       _logger.log('MA API body: ${response.body}');
@@ -255,21 +306,46 @@ class AuthManager {
   /// Test if server is accessible without authentication
   Future<bool> _canConnectWithoutAuth(String serverUrl) async {
     try {
-      // Test root endpoint - Music Assistant doesn't have /api/info
-      final testUrl = serverUrl;
-      _logger.log('No-auth test URL: $testUrl');
+      final uri = Uri.parse(serverUrl);
+      _logger.log('No-auth test URL: $serverUrl');
 
-      final response = await http.get(
-        Uri.parse(testUrl),
-        // Don't follow redirects - we want to see if server requires auth
-      ).timeout(const Duration(seconds: 10));
+      final isLocalIp = _isLocalIpAddress(uri.host);
+      int statusCode;
 
-      _logger.log('No-auth status: ${response.statusCode}');
+      if (isLocalIp) {
+        // For local IPs, don't follow redirects to avoid HTTPS cert issues
+        final client = HttpClient()..followRedirects = false;
+        try {
+          final request = await client.getUrl(uri);
+          final response = await request.close().timeout(const Duration(seconds: 10));
+          statusCode = response.statusCode;
+
+          // Check for redirect to HTTPS
+          if (statusCode == 308 || statusCode == 301 || statusCode == 302) {
+            final location = response.headers.value('location');
+            if (location != null && location.startsWith('https://')) {
+              _logger.log('⚠️ Local IP redirects to HTTPS: $location');
+              client.close();
+              return false; // Can't connect - would need HTTPS which has cert issues
+            }
+          }
+          client.close();
+        } catch (e) {
+          client.close();
+          rethrow;
+        }
+      } else {
+        // For non-local URLs, use standard http.get
+        final response = await http.get(uri).timeout(const Duration(seconds: 10));
+        statusCode = response.statusCode;
+      }
+
+      _logger.log('No-auth status: $statusCode');
 
       // 200 = no auth required
-      // 302/307 = redirect (probably to auth)
+      // 302/307/308 = redirect (probably to auth or HTTPS)
       // 401 = auth required
-      if (response.statusCode == 200) {
+      if (statusCode == 200) {
         return true;
       }
 
