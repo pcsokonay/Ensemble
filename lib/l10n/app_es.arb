@@ -1,0 +1,472 @@
+{
+  "@@locale": "es",
+
+  "appTitle": "Ensemble",
+  "connecting": "Conectando...",
+  "connected": "Conectado",
+  "disconnected": "Desconectado",
+  "serverAddress": "Dirección del servidor",
+  "serverAddressHint": "ej., music.example.com o 192.168.1.100",
+  "yourName": "Tu nombre",
+  "yourFirstName": "Tu nombre de pila",
+  "portOptional": "Puerto (Opcional)",
+  "portHint": "ej., 8095 o dejar en blanco",
+  "portDescription": "Dejar en blanco para proxy inverso o puertos estándar. Introduce 8095 para conexión directa.",
+  "username": "Usuario",
+  "password": "Contraseña",
+  "detectAndConnect": "Detectar y conectar",
+  "connect": "Conectar",
+  "disconnect": "Desconectar",
+  "authServerUrlOptional": "URL del servidor de autenticación (Opcional)",
+  "authServerUrlHint": "ej., auth.example.com (si es diferente del servidor)",
+  "authServerUrlDescription": "Dejar vacío si la autenticación está en el mismo servidor",
+  "detectedAuthType": "Detectado: {authType}",
+  "@detectedAuthType": {
+    "placeholders": {
+      "authType": {
+        "type": "String"
+      }
+    }
+  },
+  "serverRequiresAuth": "Este servidor requiere autenticación",
+  "tailscaleVpnConnection": "Conexión VPN Tailscale",
+  "unencryptedConnection": "Conexión sin cifrar",
+  "usingHttpOverTailscale": "Usando HTTP sobre Tailscale (túnel cifrado)",
+  "httpsFailedUsingHttp": "HTTPS falló, usando HTTP como alternativa",
+  "httpNotEncrypted": "Conexión HTTP - los datos no están cifrados",
+  "pleaseEnterServerAddress": "Por favor, introduce la dirección de tu servidor Music Assistant",
+  "pleaseEnterName": "Por favor, introduce tu nombre",
+  "pleaseEnterValidPort": "Por favor, introduce un número de puerto válido (1-65535)",
+  "pleaseEnterCredentials": "Por favor, introduce usuario y contraseña",
+  "authFailed": "Autenticación fallida. Por favor, verifica tus credenciales.",
+  "maLoginFailed": "Inicio de sesión en Music Assistant fallido. Por favor, verifica tus credenciales.",
+  "connectionFailed": "No se pudo conectar al servidor. Por favor, verifica la dirección e inténtalo de nuevo.",
+  "detectingAuth": "Detectando autenticación...",
+  "cannotDetermineAuth": "No se pueden determinar los requisitos de autenticación. Por favor, verifica la URL del servidor.",
+  "noAuthentication": "Sin autenticación",
+  "httpBasicAuth": "Autenticación HTTP Basic",
+  "authelia": "Authelia",
+  "musicAssistantLogin": "Inicio de sesión de Music Assistant",
+  "pressBackToMinimize": "Presiona atrás de nuevo para minimizar",
+  "recentlyPlayed": "Reproducido recientemente",
+  "discoverArtists": "Descubrir artistas",
+  "discoverAlbums": "Descubrir álbumes",
+  "continueListening": "Continuar escuchando",
+  "discoverAudiobooks": "Descubrir audiolibros",
+  "discoverSeries": "Descubrir series",
+  "favoriteAlbums": "Álbumes favoritos",
+  "favoriteArtists": "Artistas favoritos",
+  "favoriteTracks": "Canciones favoritas",
+  "searchMusic": "Buscar música...",
+  "searchForContent": "Buscar artistas, álbumes o canciones",
+  "retry": "Reintentar",
+  "all": "Todo",
+  "artists": "Artistas",
+  "albums": "Álbumes",
+  "tracks": "Canciones",
+  "playlists": "Listas de reproducción",
+  "audiobooks": "Audiolibros",
+  "searchFailed": "Búsqueda fallida. Por favor, verifica tu conexión.",
+  "queue": "Cola",
+  "playerQueue": "Cola de {playerName}",
+  "@playerQueue": {
+    "placeholders": {
+      "playerName": {
+        "type": "String"
+      }
+    }
+  },
+  "noPlayerSelected": "Ningún reproductor seleccionado",
+  "undo": "Deshacer",
+  "removedItem": "Eliminado {itemName}",
+  "@removedItem": {
+    "placeholders": {
+      "itemName": {
+        "type": "String"
+      }
+    }
+  },
+  "settings": "Ajustes",
+  "debugLogs": "Registros de depuración",
+  "themeMode": "Modo de tema",
+  "light": "Claro",
+  "dark": "Oscuro",
+  "system": "Sistema",
+  "pullToRefresh": "Desliza hacia abajo para actualizar la biblioteca y aplicar los cambios",
+  "viewDebugLogs": "Ver registros de depuración",
+  "viewAllPlayers": "Ver todos los reproductores",
+  "copyLogs": "Copiar registros",
+  "clearLogs": "Borrar registros",
+  "copyList": "Copiar lista",
+  "close": "Cerrar",
+  "allPlayersCount": "Todos los reproductores ({count})",
+  "@allPlayersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "errorLoadingPlayers": "Error al cargar reproductores: {error}",
+  "@errorLoadingPlayers": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "logsCopied": "Registros copiados al portapapeles",
+  "logsCleared": "Registros borrados",
+  "playerListCopied": "Lista de reproductores copiada al portapapeles",
+  "noLogsYet": "Aún no hay registros",
+  "infoPlus": "Info+",
+  "warnings": "Advertencias",
+  "errors": "Errores",
+  "showingEntries": "Mostrando {filtered} de {total} entradas",
+  "@showingEntries": {
+    "placeholders": {
+      "filtered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "thisDevice": "Este dispositivo",
+  "ghostPlayer": "Reproductor fantasma (duplicado)",
+  "unavailableCorrupt": "No disponible/Corrupto",
+  "playerId": "ID: {id}",
+  "@playerId": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "playerInfo": "Disponible: {available} | Proveedor: {provider}",
+  "@playerInfo": {
+    "placeholders": {
+      "available": {
+        "type": "String"
+      },
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "shareBugReport": "Compartir informe de errores",
+  "moreOptions": "Más opciones",
+  "failedToUpdateFavorite": "Error al actualizar favorito: {error}",
+  "@failedToUpdateFavorite": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noPlayersAvailable": "No hay reproductores disponibles",
+  "albumAddedToQueue": "Álbum añadido a la cola",
+  "tracksAddedToQueue": "Canciones añadidas a la cola",
+  "play": "Reproducir",
+  "noPlayersFound": "No se encontraron reproductores",
+  "startingRadio": "Iniciando radio de {name}",
+  "@startingRadio": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToStartRadio": "Error al iniciar radio: {error}",
+  "@failedToStartRadio": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "startingRadioOnPlayer": "Iniciando radio de {name} en {playerName}",
+  "@startingRadioOnPlayer": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "playerName": {
+        "type": "String"
+      }
+    }
+  },
+  "addedRadioToQueue": "Radio de {name} añadida a la cola",
+  "@addedRadioToQueue": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToAddToQueue": "Error al añadir a la cola: {error}",
+  "@failedToAddToQueue": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "radio": "Radio",
+  "inLibrary": "En la biblioteca",
+  "noAlbumsFound": "No se encontraron álbumes",
+  "playing": "Reproduciendo {name}",
+  "@playing": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "playingTrack": "Reproduciendo canción",
+  "markedAsFinished": "{name} marcado como terminado",
+  "@markedAsFinished": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToMarkFinished": "Error al marcar como terminado: {error}",
+  "@failedToMarkFinished": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "markedAsUnplayed": "{name} marcado como no reproducido",
+  "@markedAsUnplayed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToMarkUnplayed": "Error al marcar como no reproducido: {error}",
+  "@failedToMarkUnplayed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToPlay": "Error al reproducir: {error}",
+  "@failedToPlay": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "markAsFinished": "Marcar como terminado",
+  "markAsUnplayed": "Marcar como no reproducido",
+  "byAuthor": "Por {author}",
+  "@byAuthor": {
+    "placeholders": {
+      "author": {
+        "type": "String"
+      }
+    }
+  },
+  "audiobookCount": "{count} audiolibro(s)",
+  "@audiobookCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "loading": "Cargando...",
+  "bookCount": "{count} libro(s)",
+  "@bookCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "books": "Libros",
+  "noFavoriteAudiobooks": "No hay audiolibros favoritos",
+  "tapHeartAudiobook": "Toca el corazón en un audiolibro para añadirlo a favoritos",
+  "noAudiobooks": "No hay audiolibros",
+  "addAudiobooksHint": "Añade audiolibros a tu biblioteca para verlos aquí",
+  "noFavoriteArtists": "No hay artistas favoritos",
+  "tapHeartArtist": "Toca el corazón en un artista para añadirlo a favoritos",
+  "noFavoriteAlbums": "No hay álbumes favoritos",
+  "tapHeartAlbum": "Toca el corazón en un álbum para añadirlo a favoritos",
+  "noFavoritePlaylists": "No hay listas de reproducción favoritas",
+  "tapHeartPlaylist": "Toca el corazón en una lista para añadirla a favoritos",
+  "noFavoriteTracks": "No hay canciones favoritas",
+  "longPressTrackHint": "Mantén presionada una canción y toca el corazón para añadirla a favoritos",
+  "loadSeries": "Cargar series",
+  "notConnected": "No conectado a Music Assistant",
+  "notConnectedTitle": "No conectado",
+  "connectHint": "Conéctate a tu servidor Music Assistant para empezar a escuchar",
+  "configureServer": "Configurar servidor",
+  "noArtistsFound": "No se encontraron artistas",
+  "noTracksFound": "No se encontraron canciones",
+  "noPlaylistsFound": "No se encontraron listas de reproducción",
+  "queueIsEmpty": "La cola está vacía",
+  "noResultsFound": "No se encontraron resultados",
+  "refresh": "Actualizar",
+  "debugConsole": "Consola de depuración",
+  "copy": "Copiar",
+  "clear": "Borrar",
+  "noLogsToCopy": "No hay registros para copiar",
+  "noDebugLogsYet": "Aún no hay registros de depuración. Intenta detectar autenticación.",
+  "showDebug": "Mostrar depuración",
+  "hideDebug": "Ocultar depuración",
+  "chapters": "Capítulos",
+  "noChapters": "Sin capítulos",
+  "noChapterInfo": "Este audiolibro no tiene información de capítulos",
+  "errorSeeking": "Error al buscar: {error}",
+  "@errorSeeking": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "error": "Error: {error}",
+  "@error": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "home": "Inicio",
+  "library": "Biblioteca",
+  "homeScreen": "Pantalla de inicio",
+  "metadataApis": "APIs de metadatos",
+  "theme": "Tema",
+  "materialYou": "Material You",
+  "adaptiveTheme": "Tema adaptativo",
+  "language": "Idioma",
+  "english": "Inglés",
+  "german": "Alemán",
+  "spanish": "Español",
+  "noTracksInPlaylist": "No hay canciones en la lista",
+  "sortAlphabetically": "Ordenar alfabéticamente",
+  "sortByYear": "Ordenar por año",
+  "sortBySeriesOrder": "Ordenar por orden de serie",
+  "listView": "Vista de lista",
+  "gridView": "Vista de cuadrícula",
+  "noBooksInSeries": "No se encontraron libros en esta serie",
+  "artist": "Artista",
+  "showRecentlyPlayedAlbums": "Mostrar álbumes reproducidos recientemente",
+  "showRandomArtists": "Mostrar artistas aleatorios para descubrir",
+  "showRandomAlbums": "Mostrar álbumes aleatorios para descubrir",
+  "showAudiobooksInProgress": "Mostrar audiolibros en progreso",
+  "showRandomAudiobooks": "Mostrar audiolibros aleatorios para descubrir",
+  "showRandomSeries": "Mostrar series de audiolibros aleatorias para descubrir",
+  "showFavoriteAlbums": "Mostrar una fila de tus álbumes favoritos",
+  "showFavoriteArtists": "Mostrar una fila de tus artistas favoritos",
+  "showFavoriteTracks": "Mostrar una fila de tus canciones favoritas",
+  "extractColorsFromArtwork": "Extraer colores de las portadas de álbumes y artistas",
+  "chooseHomeScreenRows": "Elige qué filas mostrar en la pantalla de inicio",
+  "addedToFavorites": "Añadido a favoritos",
+  "removedFromFavorites": "Eliminado de favoritos",
+  "unknown": "Desconocido",
+  "noUpcomingTracks": "No hay canciones próximas",
+  "showAll": "Mostrar todo",
+  "showFavoritesOnly": "Mostrar solo favoritos",
+  "changeView": "Cambiar vista",
+  "authors": "Autores",
+  "series": "Series",
+  "shows": "Programas",
+  "podcasts": "Podcasts",
+  "podcastSupportComingSoon": "Soporte de podcasts próximamente",
+  "playlist": "Lista de reproducción",
+  "connectionError": "Error de conexión",
+  "twoColumnGrid": "Cuadrícula de 2 columnas",
+  "threeColumnGrid": "Cuadrícula de 3 columnas",
+  "fromProviders": "De proveedores",
+  "resume": "Continuar",
+  "about": "Acerca de",
+  "inProgress": "En progreso",
+  "narratedBy": "Narrado por {narrators}",
+  "@narratedBy": {
+    "placeholders": {
+      "narrators": {
+        "type": "String"
+      }
+    }
+  },
+  "unknownNarrator": "Narrador desconocido",
+  "unknownAuthor": "Autor desconocido",
+  "loadingChapters": "Cargando capítulos...",
+  "noChapterInfoAvailable": "No hay información de capítulos disponible",
+  "percentComplete": "{percent}% completado",
+  "@percentComplete": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "theAudioDbApiKey": "Clave API de TheAudioDB",
+  "theAudioDbApiKeyHint": "Usa \"2\" para nivel gratuito o clave premium",
+  "audiobookLibraries": "Bibliotecas de audiolibros",
+  "chooseAudiobookLibraries": "Elige qué bibliotecas de Audiobookshelf incluir",
+  "unknownLibrary": "Biblioteca desconocida",
+  "noSeriesFound": "No se encontraron series",
+  "ensembleBugReport": "Informe de errores de Ensemble",
+  "byOwner": "Por {owner}",
+  "@byOwner": {
+    "placeholders": {
+      "owner": {
+        "type": "String"
+      }
+    }
+  },
+  "noSeriesAvailable": "No hay series disponibles en tu biblioteca de audiolibros.\nDesliza para actualizar.",
+  "pullToLoadSeries": "Desliza hacia abajo para cargar series\ndesde Music Assistant",
+  "search": "Buscar",
+  "metadataApisDescription": "Las imágenes de artistas se obtienen automáticamente de Deezer. Añade claves API a continuación para biografías de artistas y descripciones de álbumes.",
+  "lastFmApiKey": "Clave API de Last.fm",
+  "lastFmApiKeyHint": "Obtén una clave gratuita en last.fm/api",
+  "swipeToSwitchDevice": "Desliza para cambiar de dispositivo",
+  "chapterNumber": "Capítulo {number}",
+  "@chapterNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "pcmAudio": "Audio PCM",
+  "playOn": "Reproducir en...",
+  "addAlbumToQueueOn": "Añadir álbum a la cola en...",
+  "addToQueueOn": "Añadir a la cola en...",
+  "startRadioOn": "Iniciar radio de {name} en...",
+  "@startRadioOn": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "book": "libro",
+  "audiobookSingular": "audiolibro",
+  "trackCount": "{count} {count, plural, =1{canción} other{canciones}}",
+  "@trackCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "materialYouDescription": "Usar colores del sistema (Android 12+)",
+  "playerStateUnavailable": "No disponible",
+  "playerStateOff": "Apagado",
+  "playerStateIdle": "Inactivo",
+  "playerSelected": "Seleccionado"
+}

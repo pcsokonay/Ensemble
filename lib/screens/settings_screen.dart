@@ -411,73 +411,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 16),
 
             // Language picker
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceVariant.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    S.of(context)!.language,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+            Consumer<LocaleProvider>(
+              builder: (context, localeProvider, _) {
+                String getLanguageName(String? code) {
+                  switch (code) {
+                    case 'en':
+                      return 'English';
+                    case 'de':
+                      return 'Deutsch';
+                    case 'es':
+                      return 'Español';
+                    default:
+                      return S.of(context)!.system;
+                  }
+                }
+
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  tileColor: colorScheme.surfaceVariant.withOpacity(0.5),
+                  leading: Icon(Icons.language_rounded, color: colorScheme.onSurfaceVariant),
+                  title: Text(S.of(context)!.language),
+                  subtitle: Text(
+                    getLanguageName(localeProvider.locale?.languageCode),
+                    style: TextStyle(color: colorScheme.primary),
                   ),
-                  const SizedBox(height: 12),
-                  Consumer<LocaleProvider>(
-                    builder: (context, localeProvider, _) {
-                      return SizedBox(
-                        width: double.infinity,
-                        child: SegmentedButton<String?>(
-                          segments: [
-                            ButtonSegment<String?>(
-                              value: null,
-                              label: Text(S.of(context)!.system),
-                              icon: const Icon(Icons.auto_mode_rounded),
-                            ),
-                            const ButtonSegment<String?>(
-                              value: 'en',
-                              label: Text('English'),
-                              icon: Icon(Icons.language_rounded),
-                            ),
-                            const ButtonSegment<String?>(
-                              value: 'de',
-                              label: Text('Deutsch'),
-                              icon: Icon(Icons.language_rounded),
-                            ),
-                          ],
-                          selected: {localeProvider.locale?.languageCode},
-                          onSelectionChanged: (Set<String?> newSelection) {
-                            final code = newSelection.first;
-                            localeProvider.setLocale(code != null ? Locale(code) : null);
-                          },
-                          style: ButtonStyle(
-                            backgroundColor: WidgetStateProperty.resolveWith((states) {
-                              if (states.contains(WidgetState.selected)) {
-                                return colorScheme.primaryContainer;
-                              }
-                              return colorScheme.surfaceVariant.withOpacity(0.5);
-                            }),
-                            foregroundColor: WidgetStateProperty.resolveWith((states) {
-                              if (states.contains(WidgetState.selected)) {
-                                return colorScheme.onPrimaryContainer;
-                              }
-                              return colorScheme.onSurfaceVariant;
-                            }),
-                            side: WidgetStateProperty.all(BorderSide.none),
-                            shape: WidgetStateProperty.all(
-                              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
+                  trailing: Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (dialogContext) {
+                        return AlertDialog(
+                          title: Text(S.of(context)!.language),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              RadioListTile<String?>(
+                                title: Text(S.of(context)!.system),
+                                subtitle: const Text('Auto'),
+                                value: null,
+                                groupValue: localeProvider.locale?.languageCode,
+                                onChanged: (value) {
+                                  localeProvider.setLocale(null);
+                                  Navigator.pop(dialogContext);
+                                },
+                              ),
+                              RadioListTile<String?>(
+                                title: const Text('English'),
+                                value: 'en',
+                                groupValue: localeProvider.locale?.languageCode,
+                                onChanged: (value) {
+                                  localeProvider.setLocale(const Locale('en'));
+                                  Navigator.pop(dialogContext);
+                                },
+                              ),
+                              RadioListTile<String?>(
+                                title: const Text('Deutsch'),
+                                value: 'de',
+                                groupValue: localeProvider.locale?.languageCode,
+                                onChanged: (value) {
+                                  localeProvider.setLocale(const Locale('de'));
+                                  Navigator.pop(dialogContext);
+                                },
+                              ),
+                              RadioListTile<String?>(
+                                title: const Text('Español'),
+                                value: 'es',
+                                groupValue: localeProvider.locale?.languageCode,
+                                onChanged: (value) {
+                                  localeProvider.setLocale(const Locale('es'));
+                                  Navigator.pop(dialogContext);
+                                },
+                              ),
+                            ],
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
             ),
 
             const SizedBox(height: 16),
@@ -496,7 +509,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(color: colorScheme.onSurface),
                     ),
                     subtitle: Text(
-                      'Use system colors (Android 12+)',
+                      S.of(context)!.materialYouDescription,
                       style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
                     ),
                     value: themeProvider.useMaterialTheme,

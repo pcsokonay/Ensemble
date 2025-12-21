@@ -970,6 +970,11 @@
     "description": "German language"
   },
 
+  "spanish": "Spanish",
+  "@spanish": {
+    "description": "Spanish language"
+  },
+
   "noTracksInPlaylist": "No tracks in playlist",
   "sortAlphabetically": "Sort alphabetically",
   "sortByYear": "Sort by year",
@@ -1131,5 +1136,30 @@
         "type": "int"
       }
     }
+  },
+
+  "materialYouDescription": "Use system colors (Android 12+)",
+  "@materialYouDescription": {
+    "description": "Description for Material You theme option"
+  },
+
+  "playerStateUnavailable": "Unavailable",
+  "@playerStateUnavailable": {
+    "description": "Player state when unavailable"
+  },
+
+  "playerStateOff": "Off",
+  "@playerStateOff": {
+    "description": "Player state when powered off"
+  },
+
+  "playerStateIdle": "Idle",
+  "@playerStateIdle": {
+    "description": "Player state when idle"
+  },
+
+  "playerSelected": "Selected",
+  "@playerSelected": {
+    "description": "Label for selected player"
   }
 }

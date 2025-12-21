@@ -4,6 +4,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/timings.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/music_assistant_provider.dart';
 import 'global_player_overlay.dart'; // For isPlayerExpanded and collapsePlayer
 
@@ -182,7 +183,7 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                       child: currentPlayers.isEmpty
                           ? Center(
                               child: Text(
-                                'No players available',
+                                S.of(context)!.noPlayersAvailable,
                                 style: TextStyle(color: colorScheme.onSurface.withOpacity(0.54)),
                               ),
                             )
@@ -304,12 +305,12 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                                   Expanded(
                                                     child: Text(
                                                       !player.available
-                                                          ? 'Unavailable'
+                                                          ? S.of(context)!.playerStateUnavailable
                                                           : !isOn
-                                                              ? 'Off'
+                                                              ? S.of(context)!.playerStateOff
                                                               : hasContent && playerTrack != null
                                                                   ? playerTrack.name
-                                                                  : 'Idle',
+                                                                  : S.of(context)!.playerStateIdle,
                                                       style: TextStyle(
                                                         color: player.available
                                                             ? colorScheme.onSurfaceVariant
@@ -329,7 +330,7 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                                         borderRadius: BorderRadius.circular(4),
                                                       ),
                                                       child: Text(
-                                                        'Selected',
+                                                        S.of(context)!.playerSelected,
                                                         style: TextStyle(
                                                           color: colorScheme.primary,
                                                           fontSize: 10,

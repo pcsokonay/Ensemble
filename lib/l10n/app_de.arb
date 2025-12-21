@@ -195,6 +195,7 @@
   "language": "Sprache",
   "english": "Englisch",
   "german": "Deutsch",
+  "spanish": "Spanisch",
 
   "noTracksInPlaylist": "Keine Songs in Wiedergabeliste",
   "sortAlphabetically": "Alphabetisch sortieren",
@@ -266,5 +267,10 @@
   "startRadioOn": "{name} Radio starten auf...",
   "book": "Buch",
   "audiobookSingular": "Hörbuch",
-  "trackCount": "{count} {count, plural, =1{Song} other{Songs}}"
+  "trackCount": "{count} {count, plural, =1{Song} other{Songs}}",
+  "materialYouDescription": "Systemfarben verwenden (Android 12+)",
+  "playerStateUnavailable": "Nicht verfügbar",
+  "playerStateOff": "Aus",
+  "playerStateIdle": "Inaktiv",
+  "playerSelected": "Ausgewählt"
 }
