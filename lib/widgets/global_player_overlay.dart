@@ -168,34 +168,25 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
       reverseCurve: Curves.easeInCubic,
     );
 
-    // Bounce animation - settle effect with overshoot
+    // Bounce animation - single clean bounce (down and back)
     _bounceController = AnimationController(
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 200),
       vsync: this,
     );
 
-    // TweenSequence for natural settle bounce:
-    // Phase 1: Quick push down (cards landing)
-    // Phase 2: Overshoot up slightly
-    // Phase 3: Settle back to rest
+    // Simple bounce: down 10px then back to rest (no overshoot)
     _bounceAnimation = TweenSequence<double>([
-      // Phase 1 (0-35%): Push down 12px
+      // Phase 1 (0-40%): Quick push down 10px
       TweenSequenceItem<double>(
-        tween: Tween<double>(begin: 0.0, end: 12.0)
+        tween: Tween<double>(begin: 0.0, end: 10.0)
             .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 35,
+        weight: 40,
       ),
-      // Phase 2 (35-65%): Spring back with overshoot to -4px
+      // Phase 2 (40-100%): Return to rest
       TweenSequenceItem<double>(
-        tween: Tween<double>(begin: 12.0, end: -4.0)
+        tween: Tween<double>(begin: 10.0, end: 0.0)
             .chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 30,
-      ),
-      // Phase 3 (65-100%): Settle to rest
-      TweenSequenceItem<double>(
-        tween: Tween<double>(begin: -4.0, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 35,
+        weight: 60,
       ),
     ]).animate(_bounceController);
 

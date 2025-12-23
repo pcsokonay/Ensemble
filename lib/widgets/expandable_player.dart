@@ -219,9 +219,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     AnimationDebugger.recordFrame(_controller.value);
   }
 
+  // Animation durations - asymmetric for snappier collapse
+  static const Duration _expandDuration = Duration(milliseconds: 350);
+  static const Duration _collapseDuration = Duration(milliseconds: 250);
+
   void expand() {
     if (_isVerticalDragging) return;
     AnimationDebugger.startSession('playerExpand');
+    _controller.duration = _expandDuration;
     _controller.forward().then((_) {
       AnimationDebugger.endSession();
     });
@@ -233,6 +238,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Instantly hide queue panel when collapsing to avoid visual glitches
     // during Android's predictive back gesture
     _queuePanelController.value = 0;
+    _controller.duration = _collapseDuration;
     _controller.reverse().then((_) {
       AnimationDebugger.endSession();
     });
@@ -280,10 +286,11 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       shouldExpand = currentValue > 0.5;
     }
 
-    // Animate to target
+    // Animate to target with appropriate duration
     if (shouldExpand) {
       if (currentValue < 1.0) {
         AnimationDebugger.startSession('playerExpand');
+        _controller.duration = _expandDuration;
         _controller.forward().then((_) {
           AnimationDebugger.endSession();
         });
@@ -292,6 +299,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       if (currentValue > 0.0) {
         AnimationDebugger.startSession('playerCollapse');
         _queuePanelController.value = 0;
+        _controller.duration = _collapseDuration;
         _controller.reverse().then((_) {
           AnimationDebugger.endSession();
         });

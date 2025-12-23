@@ -158,6 +158,11 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
     // Dismiss if dragged down enough or with enough velocity
     if (_dragOffset > 100 || velocity > 500) {
       HapticFeedback.lightImpact();
+      // Reset drag offset before dismiss so animation starts from correct position
+      setState(() {
+        _isDragging = false;
+        _dragOffset = 0;
+      });
       dismiss();
     } else {
       // Spring back
