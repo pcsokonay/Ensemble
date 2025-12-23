@@ -132,19 +132,22 @@ class PlayerCard extends StatelessWidget {
               ),
             ),
 
-            // Transport controls - match mini player button sizes
+            // Transport controls - match mini player button sizes exactly
             // Play/Pause and Next only shown when powered with content
             if (player.available && player.powered && trackInfo != null) ...[
-              // Play/Pause
-              IconButton(
-                icon: Icon(
-                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  color: textColor,
-                  size: 34,
+              // Play/Pause - use container like mini player for exact sizing
+              SizedBox(
+                width: 34,
+                height: 34,
+                child: IconButton(
+                  icon: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: textColor,
+                    size: 34,
+                  ),
+                  onPressed: onPlayPause,
+                  padding: EdgeInsets.zero,
                 ),
-                onPressed: onPlayPause,
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(),
               ),
               // Skip next
               IconButton(
@@ -171,7 +174,7 @@ class PlayerCard extends StatelessWidget {
                 constraints: const BoxConstraints(),
               ),
 
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
           ],
         ),
       ),
