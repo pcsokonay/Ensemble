@@ -252,7 +252,15 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Stack(
+    // Handle back gesture at top level - dismiss device list if visible
+    return PopScope(
+      canPop: !_isRevealVisible,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _isRevealVisible) {
+          _dismissPlayerReveal();
+        }
+      },
+      child: Stack(
       children: [
         // The main app content (Navigator, screens, etc.)
         // Add bottom padding to account for bottom nav + mini player
@@ -397,6 +405,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
           },
         ),
       ],
+      ),
     );
   }
 }

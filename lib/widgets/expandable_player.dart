@@ -1234,9 +1234,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         // Only handle tap when collapsed - when expanded, let children handle their own taps
         onTap: isExpanded ? null : expand,
         onVerticalDragStart: (details) {
-          // Start gesture-driven expansion tracking
-          // (unless queue panel is open, then swipe should close it)
-          if (!isQueuePanelOpen) {
+          // For expanded player or queue panel: start tracking immediately
+          // For collapsed player: defer decision until we know swipe direction
+          if (isExpanded || isQueuePanelOpen) {
             _handleVerticalDragStart(details);
           }
         },
@@ -1249,10 +1249,22 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
             return;
           }
 
-          // Collapsed + swipe down → show player reveal (not gesture-driven)
-          if (!isExpanded && delta > 5 && widget.onRevealPlayers != null && !_isVerticalDragging) {
-            widget.onRevealPlayers!();
-            return;
+          // Collapsed + not yet tracking: decide based on direction
+          if (!isExpanded && !_isVerticalDragging) {
+            if (delta > 5 && widget.onRevealPlayers != null) {
+              // Swipe down → show player reveal
+              widget.onRevealPlayers!();
+              return;
+            } else if (delta < -5) {
+              // Swipe up → start expand tracking
+              _handleVerticalDragStart(DragStartDetails(
+                globalPosition: details.globalPosition,
+                localPosition: details.localPosition,
+              ));
+            } else {
+              // Not enough movement yet, wait for more
+              return;
+            }
           }
 
           // Gesture-driven expand/collapse

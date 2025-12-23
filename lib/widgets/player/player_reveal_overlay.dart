@@ -180,15 +180,8 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Handle Android back button - dismiss instead of navigating back
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
-          dismiss();
-        }
-      },
-      child: Consumer<MusicAssistantProvider>(
+    // Back gesture is handled at GlobalPlayerOverlay level
+    return Consumer<MusicAssistantProvider>(
       builder: (context, maProvider, child) {
         final allPlayers = maProvider.availablePlayers;
         final selectedPlayer = maProvider.selectedPlayer;
@@ -307,7 +300,6 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
           },
         );
       },
-      ),
     );
   }
 }
