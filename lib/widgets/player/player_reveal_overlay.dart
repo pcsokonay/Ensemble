@@ -48,7 +48,7 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
     super.initState();
 
     _revealController = AnimationController(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 150),
       vsync: this,
     );
 
@@ -146,8 +146,9 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
   void _handleVerticalDragUpdate(DragUpdateDetails details) {
     setState(() {
       _isDragging = true;
-      _dragOffset += details.primaryDelta ?? 0;
-      // Clamp to prevent dragging up too much
+      // Negate delta so swipe down = cards move down (toward dismissal)
+      _dragOffset -= details.primaryDelta ?? 0;
+      // Clamp: allow moving down (positive) freely, limit moving up to 20px
       _dragOffset = _dragOffset.clamp(-20.0, double.infinity);
     });
   }
@@ -228,7 +229,7 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                 Positioned(
                   left: 12,
                   right: 12,
-                  bottom: widget.miniPlayerBottom + widget.miniPlayerHeight + 8 + _dragOffset,
+                  bottom: widget.miniPlayerBottom + widget.miniPlayerHeight + 8 - _dragOffset,
                   child: GestureDetector(
                     onVerticalDragUpdate: _handleVerticalDragUpdate,
                     onVerticalDragEnd: _handleVerticalDragEnd,

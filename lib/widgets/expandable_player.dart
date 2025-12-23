@@ -221,7 +221,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
   // Animation durations - asymmetric for snappier collapse
   static const Duration _expandDuration = Duration(milliseconds: 350);
-  static const Duration _collapseDuration = Duration(milliseconds: 250);
+  static const Duration _collapseDuration = Duration(milliseconds: 200);
 
   void expand() {
     if (_isVerticalDragging) return;
