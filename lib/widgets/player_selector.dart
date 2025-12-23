@@ -64,27 +64,8 @@ class PlayerSelector extends StatelessWidget {
     MusicAssistantProvider provider,
     List players,
   ) {
-    // Collapse player if expanded before showing sheet
-    if (GlobalPlayerOverlay.isPlayerExpanded) {
-      GlobalPlayerOverlay.collapsePlayer();
-    }
-
-    // Slide mini player down out of the way
-    GlobalPlayerOverlay.hidePlayer();
-
-    // Show the bottom sheet
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      isDismissible: true,
-      builder: (context) {
-        return _PlayerSelectorSheet();
-      },
-    ).whenComplete(() {
-      // Slide mini player back up when sheet is dismissed
-      GlobalPlayerOverlay.showPlayer();
-    });
+    // Use the new player reveal animation
+    GlobalPlayerOverlay.showPlayerReveal();
   }
 }
 

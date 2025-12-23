@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/music_assistant_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../theme/theme_provider.dart';
 import 'expandable_player.dart';
+import 'player/player_reveal_overlay.dart';
 
 /// Cached color with contrast adjustment
 /// Avoids expensive HSL conversions during scroll
@@ -111,12 +113,47 @@ class GlobalPlayerOverlay extends StatefulWidget {
   static void showPlayer() {
     _overlayStateKey.currentState?._setHidden(false);
   }
+
+  /// Show the player reveal overlay with bounce animation
+  static void showPlayerReveal() {
+    _overlayStateKey.currentState?._showPlayerReveal();
+  }
+
+  /// Hide the player reveal overlay (no animation - used as callback from overlay)
+  static void hidePlayerReveal() {
+    _overlayStateKey.currentState?._hidePlayerReveal();
+  }
+
+  /// Dismiss the player reveal overlay with animation (for back gesture)
+  static void dismissPlayerReveal() {
+    _overlayStateKey.currentState?._dismissPlayerReveal();
+  }
+
+  /// Trigger the bounce animation on mini player (called when overlay dismiss starts)
+  static void triggerBounce() {
+    _overlayStateKey.currentState?._triggerBounce();
+  }
+
+  /// Check if the player reveal is currently visible
+  static bool get isPlayerRevealVisible =>
+      _overlayStateKey.currentState?._isRevealVisible ?? false;
 }
 
 class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _slideController;
   late Animation<double> _slideAnimation;
+
+  // Controller for player reveal animation with bounce
+  late AnimationController _bounceController;
+  late Animation<double> _bounceAnimation;
+
+  // State for player reveal overlay
+  bool _isRevealVisible = false;
+  double _bounceOffset = 0.0;
+
+  // Key for the reveal overlay
+  final _revealKey = GlobalKey<PlayerRevealOverlayState>();
 
   @override
   void initState() {
@@ -130,11 +167,31 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
+
+    // Bounce animation - quick dip down then back up
+    _bounceController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _bounceAnimation = CurvedAnimation(
+      parent: _bounceController,
+      curve: Curves.easeOut,
+    );
+
+    _bounceController.addListener(() {
+      setState(() {
+        // Quick dip: goes down 14px at peak (0.5), then back to 0
+        final t = _bounceAnimation.value;
+        // Sine curve: 0 -> 1 -> 0 as t goes 0 -> 0.5 -> 1
+        _bounceOffset = 14.0 * (t < 0.5 ? t * 2 : (1.0 - t) * 2);
+      });
+    });
   }
 
   @override
   void dispose() {
     _slideController.dispose();
+    _bounceController.dispose();
     super.dispose();
   }
 
@@ -144,6 +201,41 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     } else {
       _slideController.reverse();
     }
+  }
+
+  void _showPlayerReveal() {
+    if (_isRevealVisible) return;
+    if (GlobalPlayerOverlay.isPlayerExpanded) {
+      GlobalPlayerOverlay.collapsePlayer();
+    }
+    HapticFeedback.mediumImpact();
+    _bounceController.reset();
+    setState(() {
+      _isRevealVisible = true;
+    });
+    _bounceController.forward();
+  }
+
+  void _hidePlayerReveal() {
+    if (!_isRevealVisible) return;
+    setState(() {
+      _isRevealVisible = false;
+      _bounceOffset = 0;
+    });
+  }
+
+  /// Dismiss with animation (for back gesture) - calls overlay's dismiss method
+  void _dismissPlayerReveal() {
+    if (!_isRevealVisible) return;
+    // Call the overlay's dismiss method which has the slide animation
+    // Note: dismiss() triggers the bounce animation internally
+    _revealKey.currentState?.dismiss();
+  }
+
+  /// Trigger bounce animation on mini player
+  void _triggerBounce() {
+    _bounceController.reset();
+    _bounceController.forward();
   }
 
   @override
@@ -259,7 +351,16 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             },
           ),
         ),
-        // Global player overlay - slides down when hidden, renders ON TOP of bottom nav
+        // Player reveal overlay - renders BELOW mini player so cards slide behind it
+        if (_isRevealVisible)
+          PlayerRevealOverlay(
+            key: _revealKey,
+            onDismiss: _hidePlayerReveal,
+            miniPlayerBottom: BottomSpacing.navBarHeight + MediaQuery.of(context).padding.bottom + 12,
+            miniPlayerHeight: 64,
+          ),
+
+        // Global player overlay - renders ON TOP so cards slide behind it
         // Use Selector instead of Consumer to avoid rebuilds during animation
         Selector<MusicAssistantProvider, ({bool isConnected, bool hasPlayer})>(
           selector: (_, provider) => (
@@ -279,6 +380,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                 return ExpandablePlayer(
                   key: globalPlayerKey,
                   slideOffset: _slideAnimation.value,
+                  bounceOffset: _bounceOffset,
+                  onRevealPlayers: _showPlayerReveal,
                 );
               },
             );

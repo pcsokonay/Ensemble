@@ -25,9 +25,17 @@ class ExpandablePlayer extends StatefulWidget {
   /// Slide offset for hiding the mini player (0.0 = visible, 1.0 = hidden below screen)
   final double slideOffset;
 
+  /// Bounce offset for the player reveal animation (moves mini player down slightly)
+  final double bounceOffset;
+
+  /// Callback when swipe-down gesture triggers player reveal
+  final VoidCallback? onRevealPlayers;
+
   const ExpandablePlayer({
     super.key,
     this.slideOffset = 0.0,
+    this.bounceOffset = 0.0,
+    this.onRevealPlayers,
   });
 
   @override
@@ -850,9 +858,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final bottomOffset = bottomNavSpace + _collapsedMargin;
     final width = screenSize.width - (_collapsedMargin * 2);
 
-    // Apply slide offset for hiding
+    // Apply slide offset for hiding and bounce offset for reveal animation
     final slideDownAmount = widget.slideOffset * (_collapsedHeight + bottomOffset + 20);
-    final adjustedBottomOffset = bottomOffset - slideDownAmount;
+    final bounceDownAmount = widget.bounceOffset;
+    final adjustedBottomOffset = bottomOffset - slideDownAmount - bounceDownAmount;
 
     final availablePlayers = _getAvailablePlayersSorted(maProvider);
     final hasMultiplePlayers = availablePlayers.length > 1;
@@ -861,7 +870,13 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       left: _collapsedMargin,
       right: _collapsedMargin,
       bottom: adjustedBottomOffset,
-      child: DeviceSelectorBar(
+      child: GestureDetector(
+        onVerticalDragUpdate: (details) {
+          if (details.primaryDelta! > 5 && widget.onRevealPlayers != null) {
+            widget.onRevealPlayers!();
+          }
+        },
+        child: DeviceSelectorBar(
         selectedPlayer: selectedPlayer,
         peekPlayer: _peekPlayer,
         hasMultiplePlayers: hasMultiplePlayers,
@@ -896,6 +911,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
           _handleHorizontalDragEnd(details, maProvider);
         },
+      ),
       ),
     );
   }
@@ -954,10 +970,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final expandedHeight = screenSize.height - bottomNavSpace;
 
     // Apply slide offset to hide mini player (slides down off-screen)
+    // Apply bounce offset for reveal animation (small downward movement)
     // Only apply when collapsed (t == 0), don't affect expanded state
     final slideDownAmount = widget.slideOffset * (_collapsedHeight + collapsedBottomOffset + 20);
+    final bounceDownAmount = widget.bounceOffset;
     final slideAdjustedBottomOffset = t < 0.1
-        ? collapsedBottomOffset - slideDownAmount
+        ? collapsedBottomOffset - slideDownAmount - bounceDownAmount
         : _lerpDouble(collapsedBottomOffset, expandedBottomOffset, t);
 
     final collapsedWidth = screenSize.width - (_collapsedMargin * 2);
@@ -1114,10 +1132,13 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         // Only handle tap when collapsed - when expanded, let children handle their own taps
         onTap: isExpanded ? null : expand,
         onVerticalDragUpdate: (details) {
-          if (details.primaryDelta! < -10 && !isExpanded) {
+          if (details.primaryDelta! < -5 && !isExpanded) {
             expand();
-          } else if (details.primaryDelta! > 10 && isExpanded && !isQueuePanelOpen) {
+          } else if (details.primaryDelta! > 5 && isExpanded && !isQueuePanelOpen) {
             collapse();
+          } else if (details.primaryDelta! > 5 && !isExpanded && widget.onRevealPlayers != null) {
+            // Swipe down on collapsed player - show player reveal
+            widget.onRevealPlayers!();
           }
         },
         onHorizontalDragStart: (details) {

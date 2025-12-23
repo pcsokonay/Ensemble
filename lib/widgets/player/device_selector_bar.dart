@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
-import '../../theme/design_tokens.dart';
 
 /// A compact device selector bar shown when no track is playing
 class DeviceSelectorBar extends StatelessWidget {
@@ -58,17 +57,26 @@ class DeviceSelectorBar extends StatelessWidget {
                 // Current player content
                 Transform.translate(
                   offset: Offset(slideOffset * width, 0),
-                  child: Padding(
-                    padding: Spacing.paddingH16,
-                    child: Row(
-                      children: [
-                        Icon(
-                          _getPlayerIcon(selectedPlayer.name),
-                          color: textColor,
-                          size: IconSizes.md,
+                  child: Row(
+                    children: [
+                      // Speaker icon - same size as album art for consistent text alignment
+                      SizedBox(
+                        width: height,
+                        height: height,
+                        child: Container(
+                          color: Color.lerp(backgroundColor, Colors.black, 0.15),
+                          child: Center(
+                            child: Icon(
+                              _getPlayerIcon(selectedPlayer.name),
+                              color: textColor.withOpacity(0.4),
+                              size: 28,
+                            ),
+                          ),
                         ),
-                        Spacing.hGap12,
-                        Expanded(
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,8 +102,8 @@ class DeviceSelectorBar extends StatelessWidget {
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -118,17 +126,26 @@ class DeviceSelectorBar extends StatelessWidget {
 
     return Transform.translate(
       offset: Offset(peekBaseOffset, 0),
-      child: Padding(
-        padding: Spacing.paddingH16,
-        child: Row(
-          children: [
-            Icon(
-              _getPlayerIcon(peekPlayer.name),
-              color: textColor,
-              size: IconSizes.md,
+      child: Row(
+        children: [
+          // Speaker icon - same size as album art for consistent text alignment
+          SizedBox(
+            width: height,
+            height: height,
+            child: Container(
+              color: Color.lerp(backgroundColor, Colors.black, 0.15),
+              child: Center(
+                child: Icon(
+                  _getPlayerIcon(peekPlayer.name),
+                  color: textColor.withOpacity(0.4),
+                  size: 28,
+                ),
+              ),
             ),
-            Spacing.hGap12,
-            Expanded(
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,8 +171,8 @@ class DeviceSelectorBar extends StatelessWidget {
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

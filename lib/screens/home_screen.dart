@@ -62,6 +62,12 @@ class _HomeScreenState extends State<HomeScreen> {
           onPopInvokedWithResult: (didPop, result) {
             if (didPop) return;
 
+            // If player reveal (device list) is visible, dismiss it first (with animation)
+            if (GlobalPlayerOverlay.isPlayerRevealVisible) {
+              GlobalPlayerOverlay.dismissPlayerReveal();
+              return;
+            }
+
             // If global player is expanded, collapse it first
             if (GlobalPlayerOverlay.isPlayerExpanded) {
               GlobalPlayerOverlay.collapsePlayer();

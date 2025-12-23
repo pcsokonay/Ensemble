@@ -2239,6 +2239,26 @@ class MusicAssistantProvider with ChangeNotifier {
     await Future.wait(
       players.map((player) => _preloadPlayerTrack(player)),
     );
+
+    // After preloading, update _currentTrack from cache if it has better data
+    // This fixes the issue where mini player shows wrong info but device list is correct
+    if (_selectedPlayer != null && _currentTrack != null) {
+      final cachedTrack = _cacheService.getCachedTrackForPlayer(_selectedPlayer!.playerId);
+      if (cachedTrack != null && cachedTrack.uri == _currentTrack!.uri) {
+        final cachedHasImage = cachedTrack.metadata?['images'] != null;
+        final currentHasImage = _currentTrack!.metadata?['images'] != null;
+        final cachedHasArtist = cachedTrack.artistsString.isNotEmpty &&
+            cachedTrack.artistsString != 'Unknown Artist';
+        final currentHasArtist = _currentTrack!.artistsString.isNotEmpty &&
+            _currentTrack!.artistsString != 'Unknown Artist';
+
+        if ((cachedHasImage && !currentHasImage) || (cachedHasArtist && !currentHasArtist)) {
+          _currentTrack = cachedTrack;
+          _logger.log('🎵 Updated currentTrack from cache with better metadata');
+          notifyListeners();
+        }
+      }
+    }
   }
 
   void _startPlayerStatePolling() {
@@ -2313,12 +2333,56 @@ class MusicAssistantProvider with ChangeNotifier {
       final queue = await getQueue(_selectedPlayer!.playerId);
 
       if (queue != null && queue.currentItem != null) {
+        final queueTrack = queue.currentItem!.track;
         final trackChanged = _currentTrack == null ||
-            _currentTrack!.uri != queue.currentItem!.track.uri ||
-            _currentTrack!.name != queue.currentItem!.track.name;
+            _currentTrack!.uri != queueTrack.uri ||
+            _currentTrack!.name != queueTrack.name;
 
         if (trackChanged) {
-          _currentTrack = queue.currentItem!.track;
+          // Check if cached track has better metadata (images, proper artist info)
+          // This prevents losing album art and artist data when resuming the app
+          final cachedTrack = _cacheService.getCachedTrackForPlayer(_selectedPlayer!.playerId);
+          final cachedHasImage = cachedTrack?.metadata?['images'] != null;
+          final queueHasImage = queueTrack.metadata?['images'] != null;
+          // Also check for malformed artist names (e.g., "Artist - Title" format in name)
+          final cachedHasProperArtist = cachedTrack?.artistsString.isNotEmpty == true &&
+              cachedTrack?.artistsString != 'Unknown Artist' &&
+              !cachedTrack!.name.contains(' - '); // Proper track doesn't have artist in name
+          final queueHasProperArtist = queueTrack.artistsString.isNotEmpty &&
+              queueTrack.artistsString != 'Unknown Artist' &&
+              !queueTrack.name.contains(' - ');
+
+          // Also check if _currentTrack (set from cache in selectPlayer) has good data
+          final currentHasImage = _currentTrack?.metadata?['images'] != null;
+          final currentHasProperArtist = _currentTrack?.artistsString.isNotEmpty == true &&
+              _currentTrack?.artistsString != 'Unknown Artist' &&
+              !(_currentTrack?.name.contains(' - ') ?? false);
+
+          // Match by URI - name might differ if queue has malformed data
+          final isSameTrackAsCached = cachedTrack?.uri == queueTrack.uri;
+          final cachedHasBetterData = (cachedHasImage && !queueHasImage) ||
+              (cachedHasProperArtist && !queueHasProperArtist);
+
+          // Queue track has bad metadata if it lacks image AND lacks proper artist
+          final queueHasBadMetadata = !queueHasImage && !queueHasProperArtist;
+          // Current track (from cache at selectPlayer) has good metadata
+          final currentHasGoodMetadata = currentHasImage || currentHasProperArtist;
+
+          if (isSameTrackAsCached && cachedHasBetterData) {
+            // Use cached track which has better metadata
+            _currentTrack = cachedTrack;
+            _logger.log('🎵 Using cached track with better metadata for ${cachedTrack!.name}');
+          } else if (queueHasBadMetadata && currentHasGoodMetadata) {
+            // Queue has bad data, but _currentTrack (set from cache) is good - keep it
+            _logger.log('🎵 Keeping currentTrack - queue has bad metadata but current is good');
+            // Don't change _currentTrack, keep the good data
+          } else {
+            _currentTrack = queueTrack;
+            // Update cache if queue track has good metadata
+            if (queueHasImage || queueHasProperArtist) {
+              _cacheService.setCachedTrackForPlayer(_selectedPlayer!.playerId, queueTrack);
+            }
+          }
           stateChanged = true;
 
           // Clear audiobook context if switched to a different media item
