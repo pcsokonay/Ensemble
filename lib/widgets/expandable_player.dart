@@ -115,31 +115,16 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
-    // TweenSequence for phased expand animation with settle bounce
-    _expandAnimation = TweenSequence<double>([
-      // Phase 1 (0-40%): Quick acceleration
-      TweenSequenceItem<double>(
-        tween: Tween<double>(begin: 0.0, end: 0.5)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 40,
-      ),
-      // Phase 2 (40-75%): Consistent cruise
-      TweenSequenceItem<double>(
-        tween: Tween<double>(begin: 0.5, end: 0.92)
-            .chain(CurveTween(curve: Curves.linear)),
-        weight: 35,
-      ),
-      // Phase 3 (75-100%): Settle with slight overshoot
-      TweenSequenceItem<double>(
-        tween: Tween<double>(begin: 0.92, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeOutBack)),
-        weight: 25,
-      ),
-    ]).animate(_controller);
+    // Simple curved animation - performant and smooth
+    _expandAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
 
     // Notify listeners of expansion progress changes
     _controller.addListener(_notifyExpansionProgress);
@@ -220,7 +205,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   }
 
   // Animation durations - asymmetric for snappier collapse
-  static const Duration _expandDuration = Duration(milliseconds: 350);
+  static const Duration _expandDuration = Duration(milliseconds: 280);
   static const Duration _collapseDuration = Duration(milliseconds: 200);
 
   void expand() {

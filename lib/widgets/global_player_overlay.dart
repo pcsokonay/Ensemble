@@ -168,31 +168,22 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
       reverseCurve: Curves.easeInCubic,
     );
 
-    // Bounce animation - single clean bounce (down and back)
+    // Bounce animation - quick dip down then back up
     _bounceController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-
-    // Simple bounce: down 10px then back to rest (no overshoot)
-    _bounceAnimation = TweenSequence<double>([
-      // Phase 1 (0-40%): Quick push down 10px
-      TweenSequenceItem<double>(
-        tween: Tween<double>(begin: 0.0, end: 10.0)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 40,
-      ),
-      // Phase 2 (40-100%): Return to rest
-      TweenSequenceItem<double>(
-        tween: Tween<double>(begin: 10.0, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 60,
-      ),
-    ]).animate(_bounceController);
+    _bounceAnimation = CurvedAnimation(
+      parent: _bounceController,
+      curve: Curves.easeOut,
+    );
 
     _bounceController.addListener(() {
       setState(() {
-        _bounceOffset = _bounceAnimation.value;
+        // Quick dip: goes down 10px at peak (0.5), then back to 0
+        final t = _bounceAnimation.value;
+        // Sine curve: 0 -> 1 -> 0 as t goes 0 -> 0.5 -> 1
+        _bounceOffset = 10.0 * (t < 0.5 ? t * 2 : (1.0 - t) * 2);
       });
     });
   }
