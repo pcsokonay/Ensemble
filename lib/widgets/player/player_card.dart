@@ -149,12 +149,12 @@ class PlayerCard extends StatelessWidget {
                   padding: EdgeInsets.zero,
                 ),
               ),
-              // Skip next - minimal gap before power
+              // Skip next
               IconButton(
                 icon: Icon(
                   Icons.skip_next_rounded,
                   color: textColor,
-                  size: 24,
+                  size: 28,
                 ),
                 onPressed: onSkipNext,
                 padding: const EdgeInsets.symmetric(horizontal: 2),
