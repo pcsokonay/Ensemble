@@ -135,9 +135,9 @@ class PlayerCard extends StatelessWidget {
             // Transport controls - compact sizing to align with mini player
             // Play/Pause and Next only shown when powered with content
             if (player.available && player.powered && trackInfo != null) ...[
-              // Play/Pause - nudged right to close gap with power
+              // Play/Pause - slight nudge right
               Transform.translate(
-                offset: const Offset(6, 0),
+                offset: const Offset(3, 0),
                 child: SizedBox(
                   width: 28,
                   height: 28,
