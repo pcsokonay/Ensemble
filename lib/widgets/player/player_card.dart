@@ -132,45 +132,45 @@ class PlayerCard extends StatelessWidget {
               ),
             ),
 
-            // Transport controls - match mini player button sizes exactly
+            // Transport controls - compact sizing to align with mini player
             // Play/Pause and Next only shown when powered with content
             if (player.available && player.powered && trackInfo != null) ...[
-              // Play/Pause - use container like mini player for exact sizing
+              // Play/Pause - smaller to reduce total width
               SizedBox(
-                width: 34,
-                height: 34,
+                width: 28,
+                height: 28,
                 child: IconButton(
                   icon: Icon(
                     isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                     color: textColor,
-                    size: 34,
+                    size: 28,
                   ),
                   onPressed: onPlayPause,
                   padding: EdgeInsets.zero,
                 ),
               ),
-              // Skip next
+              // Skip next - minimal gap before power
               IconButton(
                 icon: Icon(
                   Icons.skip_next_rounded,
                   color: textColor,
-                  size: 28,
+                  size: 24,
                 ),
                 onPressed: onSkipNext,
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
                 constraints: const BoxConstraints(),
               ),
             ],
-            // Power button - always shown when available
+            // Power button - smallest, always shown when available
             if (player.available)
               IconButton(
                 icon: Icon(
                   Icons.power_settings_new_rounded,
                   color: player.powered ? textColor : textColor.withOpacity(0.5),
-                  size: 28,
+                  size: 20,
                 ),
                 onPressed: onPower,
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 constraints: const BoxConstraints(),
               ),
 
