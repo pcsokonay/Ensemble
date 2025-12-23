@@ -157,7 +157,7 @@ class PlayerCard extends StatelessWidget {
                   size: 28,
                 ),
                 onPressed: onSkipNext,
-                padding: const EdgeInsets.symmetric(horizontal: 2),
+                padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
             ],
@@ -170,7 +170,7 @@ class PlayerCard extends StatelessWidget {
                   size: 20,
                 ),
                 onPressed: onPower,
-                padding: const EdgeInsets.symmetric(horizontal: 2),
+                padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
 
