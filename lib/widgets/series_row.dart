@@ -373,6 +373,8 @@ class _SeriesCard extends StatelessWidget {
                     ? CachedNetworkImage(
                         imageUrl: coverUrl,
                         fit: BoxFit.cover,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
                         placeholder: (_, __) => Container(
                           color: colorScheme.surfaceContainerHighest,
                         ),

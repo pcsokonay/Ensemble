@@ -100,6 +100,8 @@ class _ArtistAvatarState extends State<ArtistAvatar> {
           width: widget.radius * 2,
           height: widget.radius * 2,
           fit: BoxFit.cover,
+          fadeInDuration: Duration.zero,
+          fadeOutDuration: Duration.zero,
           placeholder: (context, url) => Container(
             color: colorScheme.surfaceVariant,
             child: Icon(Icons.person_rounded, color: colorScheme.onSurfaceVariant),

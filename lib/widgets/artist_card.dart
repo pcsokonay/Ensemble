@@ -122,7 +122,8 @@ class _ArtistCardState extends State<ArtistCard> {
                                   fit: BoxFit.cover,
                                   memCacheWidth: 256,
                                   memCacheHeight: 256,
-                                  fadeInDuration: const Duration(milliseconds: 150),
+                                  fadeInDuration: Duration.zero,
+                                  fadeOutDuration: Duration.zero,
                                   placeholder: (context, url) => const SizedBox(),
                                   errorWidget: (context, url, error) {
                                     // Try fallback on error (only for MA URLs, not fallback URLs)
