@@ -201,11 +201,11 @@ class SearchScreenState extends State<SearchScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     // Show cached results even while searching - only show spinner if no cached results
-    final hasResults = _searchResults['artists']?.isNotEmpty == true ||
-                       _searchResults['albums']?.isNotEmpty == true ||
-                       _searchResults['tracks']?.isNotEmpty == true;
+    final hasCachedResults = _searchResults['artists']?.isNotEmpty == true ||
+                             _searchResults['albums']?.isNotEmpty == true ||
+                             _searchResults['tracks']?.isNotEmpty == true;
 
-    if (_isSearching && !hasResults) {
+    if (_isSearching && !hasCachedResults) {
       return Center(
         child: CircularProgressIndicator(color: colorScheme.primary),
       );
