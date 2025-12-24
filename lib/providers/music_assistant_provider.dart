@@ -3207,9 +3207,17 @@ class MusicAssistantProvider with ChangeNotifier {
       }
 
       // Extract tracks from queue items
+      // playTracks needs either: providerMappings with available entries, OR provider+itemId
       final tracks = cachedQueue.items
           .map((item) => item.track)
-          .where((track) => track.uri != null && track.uri!.isNotEmpty)
+          .where((track) {
+            // Check for providerMappings with at least one available entry
+            if (track.providerMappings != null && track.providerMappings!.isNotEmpty) {
+              return track.providerMappings!.any((m) => m.available);
+            }
+            // Fallback: provider + itemId can be used to construct URI
+            return track.provider.isNotEmpty && track.itemId.isNotEmpty;
+          })
           .toList();
 
       if (tracks.isEmpty) {

@@ -110,7 +110,8 @@ class MediaItem {
       'media_type': mediaType.name,
       if (sortName != null) 'sort_name': sortName,
       if (uri != null) 'uri': uri,
-      if (providerMappings != null) 'provider_mappings': providerMappings,
+      if (providerMappings != null)
+        'provider_mappings': providerMappings!.map((m) => m.toJson()).toList(),
       if (metadata != null) 'metadata': metadata,
       if (favorite != null) 'favorite': favorite,
       if (position != null) 'position': position,
