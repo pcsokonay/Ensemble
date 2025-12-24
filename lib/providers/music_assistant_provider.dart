@@ -1620,24 +1620,16 @@ class MusicAssistantProvider with ChangeNotifier {
   // ============================================================================
 
   Future<List<Album>> getRecentAlbumsWithCache({bool forceRefresh = false}) async {
-    // Try local database first for instant results
-    if (!forceRefresh) {
-      final localAlbums = await RecentlyPlayedService.instance.getRecentAlbums(
+    // Always fetch from API to ensure we have full album data with images
+    // Local/cached data is used by getCachedRecentAlbums() for instant display
+    if (_api == null) {
+      // Fallback when offline: try memory cache, then local database
+      final cached = _cacheService.getCachedRecentAlbums();
+      if (cached != null && cached.isNotEmpty) return cached;
+      return RecentlyPlayedService.instance.getRecentAlbums(
         limit: LibraryConstants.defaultRecentLimit,
       );
-      if (localAlbums.isNotEmpty) {
-        _logger.log('📦 Using ${localAlbums.length} local recently played albums');
-        return localAlbums;
-      }
     }
-
-    // Fall back to memory cache
-    if (_cacheService.isRecentAlbumsCacheValid(forceRefresh: forceRefresh)) {
-      _logger.log('📦 Using cached recent albums');
-      return _cacheService.getCachedRecentAlbums()!;
-    }
-
-    if (_api == null) return _cacheService.getCachedRecentAlbums() ?? [];
 
     try {
       _logger.log('🔄 Fetching fresh recent albums from MA...');
@@ -1646,7 +1638,12 @@ class MusicAssistantProvider with ChangeNotifier {
       return albums;
     } catch (e) {
       _logger.log('❌ Failed to fetch recent albums: $e');
-      return _cacheService.getCachedRecentAlbums() ?? [];
+      // Fallback on error: try memory cache, then local database
+      final cached = _cacheService.getCachedRecentAlbums();
+      if (cached != null && cached.isNotEmpty) return cached;
+      return RecentlyPlayedService.instance.getRecentAlbums(
+        limit: LibraryConstants.defaultRecentLimit,
+      );
     }
   }
 
