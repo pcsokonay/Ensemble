@@ -55,21 +55,14 @@ class _ArtistRowState extends State<ArtistRow> with AutomaticKeepAliveClientMixi
       }
     }
 
-    // 2. Load fresh data (silent background refresh if we had cache)
+    // 2. Load fresh data (always update - fresh data may have images that cached data lacks)
     try {
       final freshArtists = await widget.loadArtists();
       if (mounted && freshArtists.isNotEmpty) {
-        // Only update if data actually changed
-        final hasChanged = _artists.isEmpty ||
-            _artists.length != freshArtists.length ||
-            (_artists.isNotEmpty && freshArtists.isNotEmpty &&
-             _artists.first.itemId != freshArtists.first.itemId);
-        if (hasChanged) {
-          setState(() {
-            _artists = freshArtists;
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _artists = freshArtists;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       // Silent failure - keep showing cached data
