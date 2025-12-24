@@ -553,10 +553,12 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                         height: 200,
                         color: colorScheme.surfaceVariant,
                         child: imageUrl != null
-                            ? Image.network(
-                                imageUrl,
+                            ? CachedNetworkImage(
+                                imageUrl: imageUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(
+                                fadeInDuration: Duration.zero,
+                                fadeOutDuration: Duration.zero,
+                                errorWidget: (_, __, ___) => Icon(
                                   Icons.person_rounded,
                                   size: 100,
                                   color: colorScheme.onSurfaceVariant,
@@ -877,12 +879,14 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                 child: Container(
                   color: colorScheme.surfaceVariant,
                   child: imageUrl != null
-                      ? Image.network(
-                          imageUrl,
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          errorBuilder: (_, __, ___) => Center(
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          errorWidget: (_, __, ___) => Center(
                             child: Icon(
                               Icons.album_rounded,
                               size: 64,
@@ -984,10 +988,12 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
           height: 56,
           color: colorScheme.surfaceVariant,
           child: imageUrl != null
-              ? Image.network(
-                  imageUrl,
+              ? CachedNetworkImage(
+                  imageUrl: imageUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Icon(
+                  fadeInDuration: Duration.zero,
+                  fadeOutDuration: Duration.zero,
+                  errorWidget: (_, __, ___) => Icon(
                     Icons.album_rounded,
                     color: colorScheme.onSurfaceVariant,
                   ),
