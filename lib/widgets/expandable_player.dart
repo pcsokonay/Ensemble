@@ -1444,7 +1444,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                           fontSize: titleFontSize,
                           fontWeight: t > 0.5 ? FontWeight.w600 : FontWeight.w500,
                           letterSpacing: t > 0.5 ? -0.5 : 0,
-                          height: 1.2,
+                          height: t > 0.5 ? 1.2 : null, // Only use line height when expanded
                         ),
                         textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
                         maxLines: t > 0.5 ? 2 : 1,
@@ -1935,7 +1935,6 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                 color: textColor,
                 fontSize: titleFontSize,
                 fontWeight: FontWeight.w500,
-                height: 1.2,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1986,7 +1985,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         child: Icon(
           icon,
           color: colorScheme.onSurfaceVariant,
-          size: size * 0.5,
+          size: 28, // Match DeviceSelectorBar icon size
         ),
       ),
     );
