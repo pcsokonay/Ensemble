@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/debug_logger.dart';
@@ -63,6 +64,8 @@ class _ArtistRowState extends State<ArtistRow> with AutomaticKeepAliveClientMixi
           _artists = freshArtists;
           _isLoading = false;
         });
+        // Pre-cache images for smooth hero animations
+        _precacheArtistImages(freshArtists);
       }
     } catch (e) {
       // Silent failure - keep showing cached data
@@ -70,6 +73,29 @@ class _ArtistRowState extends State<ArtistRow> with AutomaticKeepAliveClientMixi
 
     if (mounted && _isLoading) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  /// Pre-cache artist images so hero animations are smooth on first tap
+  void _precacheArtistImages(List<Artist> artists) {
+    if (!mounted) return;
+    final maProvider = context.read<MusicAssistantProvider>();
+
+    // Only precache first ~10 visible items to avoid excessive network/memory use
+    final artistsToCache = artists.take(10);
+
+    for (final artist in artistsToCache) {
+      final imageUrl = maProvider.api?.getImageUrl(artist, size: 256);
+      if (imageUrl != null) {
+        // Use CachedNetworkImageProvider to warm the cache
+        precacheImage(
+          CachedNetworkImageProvider(imageUrl),
+          context,
+        ).catchError((_) {
+          // Silently ignore precache errors
+          return false;
+        });
+      }
     }
   }
 
