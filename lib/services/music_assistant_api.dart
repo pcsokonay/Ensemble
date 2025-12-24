@@ -1069,16 +1069,14 @@ class MusicAssistantAPI {
         return [];
       }
 
-      // Batch fetch track details using parallel requests (max 5 concurrent)
-      final seenAlbumIds = <String>{};
-      final albums = <Album>[];
+      // Step 1: Fetch tracks in batches and collect unique album URIs
+      final seenAlbumUris = <String>{};
+      final albumUris = <String>[];
 
-      // Process in batches to avoid overwhelming the server
       const batchSize = LibraryConstants.recentAlbumsBatchSize;
-      for (var i = 0; i < trackUris.length && albums.length < limit; i += batchSize) {
+      for (var i = 0; i < trackUris.length && albumUris.length < limit; i += batchSize) {
         final batch = trackUris.skip(i).take(batchSize).toList();
 
-        // Fetch batch in parallel
         final futures = batch.map((uri) => _sendCommand(
           'music/item_by_uri',
           args: {'uri': uri},
@@ -1087,27 +1085,52 @@ class MusicAssistantAPI {
         final results = await Future.wait(futures, eagerError: false);
 
         for (final trackResponse in results) {
-          if (albums.length >= limit) break;
+          if (albumUris.length >= limit) break;
 
           try {
             final fullTrack = trackResponse['result'] as Map<String, dynamic>?;
             final albumData = fullTrack?['album'] as Map<String, dynamic>?;
+            final albumUri = albumData?['uri'] as String?;
 
-            if (albumData != null) {
-              final albumId = albumData['item_id']?.toString() ?? albumData['uri']?.toString();
-              if (albumId != null && !seenAlbumIds.contains(albumId)) {
-                seenAlbumIds.add(albumId);
-                albums.add(Album.fromJson(albumData));
-              }
+            if (albumUri != null && !seenAlbumUris.contains(albumUri)) {
+              seenAlbumUris.add(albumUri);
+              albumUris.add(albumUri);
             }
           } catch (_) {
-            // Skip tracks that fail to parse
             continue;
           }
         }
       }
 
-      _logger.log('📚 Fetched ${albums.length} recent albums using ${(trackUris.length / batchSize).ceil()} batch requests');
+      if (albumUris.isEmpty) {
+        return [];
+      }
+
+      // Step 2: Fetch full album details (with images) for each album URI
+      final albums = <Album>[];
+      for (var i = 0; i < albumUris.length; i += batchSize) {
+        final batch = albumUris.skip(i).take(batchSize).toList();
+
+        final futures = batch.map((uri) => _sendCommand(
+          'music/item_by_uri',
+          args: {'uri': uri},
+        ).timeout(const Duration(seconds: 5), onTimeout: () => <String, dynamic>{'result': null}));
+
+        final results = await Future.wait(futures, eagerError: false);
+
+        for (final albumResponse in results) {
+          try {
+            final albumData = albumResponse['result'] as Map<String, dynamic>?;
+            if (albumData != null) {
+              albums.add(Album.fromJson(albumData));
+            }
+          } catch (_) {
+            continue;
+          }
+        }
+      }
+
+      _logger.log('📚 Fetched ${albums.length} recent albums with full details');
       return albums;
     } catch (e) {
       _logger.log('❌ Error getting recent albums: $e');
