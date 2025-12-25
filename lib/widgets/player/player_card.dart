@@ -12,12 +12,17 @@ class PlayerCard extends StatelessWidget {
   final String? albumArtUrl;
   final bool isSelected;
   final bool isPlaying;
+  final bool isGrouped;
   final Color backgroundColor;
   final Color textColor;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final VoidCallback? onPlayPause;
   final VoidCallback? onSkipNext;
   final VoidCallback? onPower;
+
+  // Pastel yellow for grouped players
+  static const Color groupBorderColor = Color(0xFFFFF59D);
 
   const PlayerCard({
     super.key,
@@ -26,9 +31,11 @@ class PlayerCard extends StatelessWidget {
     this.albumArtUrl,
     required this.isSelected,
     required this.isPlaying,
+    this.isGrouped = false,
     required this.backgroundColor,
     required this.textColor,
     required this.onTap,
+    this.onLongPress,
     this.onPlayPause,
     this.onSkipNext,
     this.onPower,
@@ -43,11 +50,15 @@ class PlayerCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
         height: cardHeight,
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(borderRadius),
+          border: isGrouped
+              ? Border.all(color: groupBorderColor, width: 2.5)
+              : null,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),

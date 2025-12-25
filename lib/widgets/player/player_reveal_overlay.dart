@@ -269,6 +269,7 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                 albumArtUrl: albumArtUrl,
                                 isSelected: false,
                                 isPlaying: isPlaying,
+                                isGrouped: player.isGrouped,
                                 backgroundColor: cardBgColor,
                                 textColor: cardTextColor,
                                 onTap: () {
@@ -276,6 +277,17 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                   maProvider.selectPlayer(player);
                                   dismiss();
                                 },
+                                onLongPress: player.available ? () {
+                                  HapticFeedback.mediumImpact();
+                                  debugPrint('🔗 Long-press on ${player.name} (${player.playerId})');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Syncing ${player.name}...'),
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                  maProvider.togglePlayerSync(player.playerId);
+                                } : null,
                                 onPlayPause: () {
                                   if (isPlaying) {
                                     maProvider.pausePlayer(player.playerId);
