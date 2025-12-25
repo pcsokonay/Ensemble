@@ -1354,7 +1354,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
             border: selectedPlayer.isGrouped && t < 0.5
-                ? Border.all(color: _groupBorderColor, width: 2.5)
+                ? Border.all(color: _groupBorderColor, width: 1.5)
                 : null,
           ),
           child: Material(

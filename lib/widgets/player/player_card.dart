@@ -57,7 +57,7 @@ class PlayerCard extends StatelessWidget {
           color: backgroundColor,
           borderRadius: BorderRadius.circular(borderRadius),
           border: isGrouped
-              ? Border.all(color: groupBorderColor, width: 2.5)
+              ? Border.all(color: groupBorderColor, width: 1.5)
               : null,
           boxShadow: [
             BoxShadow(

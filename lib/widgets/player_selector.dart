@@ -259,7 +259,7 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                           : colorScheme.surfaceVariant.withOpacity(0.3),
                                       borderRadius: BorderRadius.circular(16),
                                       border: isGrouped
-                                          ? Border.all(color: groupBorderColor, width: 2.5)
+                                          ? Border.all(color: groupBorderColor, width: 1.5)
                                           : null,
                                     ),
                                     child: Row(
