@@ -482,13 +482,13 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                             Icon(
                               Icons.lightbulb_outline,
                               size: 16,
-                              color: colorScheme.inverseOnSurface,
+                              color: colorScheme.onInverseSurface,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               S.of(context)!.pullToSelectPlayers,
                               style: TextStyle(
-                                color: colorScheme.inverseOnSurface,
+                                color: colorScheme.onInverseSurface,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
