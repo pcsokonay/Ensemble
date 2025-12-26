@@ -194,22 +194,22 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
       }
     });
 
-    // Double bounce for hint
+    // Double bounce for hint - larger movement to draw attention
     _doubleBounceController = AnimationController(
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
     _doubleBounceController.addListener(() {
       final t = Curves.easeOut.transform(_doubleBounceController.value);
-      // Double bounce: first bounce full (10px), second bounce smaller (6px)
+      // Double bounce: first bounce full (20px), second bounce smaller (12px)
       if (t < 0.25) {
-        _bounceOffsetNotifier.value = 10.0 * (t * 4);           // 0 -> 10
+        _bounceOffsetNotifier.value = 20.0 * (t * 4);           // 0 -> 20
       } else if (t < 0.5) {
-        _bounceOffsetNotifier.value = 10.0 * ((0.5 - t) * 4);   // 10 -> 0
+        _bounceOffsetNotifier.value = 20.0 * ((0.5 - t) * 4);   // 20 -> 0
       } else if (t < 0.75) {
-        _bounceOffsetNotifier.value = 6.0 * ((t - 0.5) * 4);    // 0 -> 6
+        _bounceOffsetNotifier.value = 12.0 * ((t - 0.5) * 4);   // 0 -> 12
       } else {
-        _bounceOffsetNotifier.value = 6.0 * ((1.0 - t) * 4);    // 6 -> 0
+        _bounceOffsetNotifier.value = 12.0 * ((1.0 - t) * 4);   // 12 -> 0
       }
     });
 
