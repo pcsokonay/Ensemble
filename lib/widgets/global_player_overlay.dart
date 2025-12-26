@@ -160,6 +160,9 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   bool _isHintModeActive = false;
   Timer? _hintBounceTimer;
 
+  // Track if player reveal was triggered from onboarding (for showing extra hints)
+  bool _isOnboardingReveal = false;
+
   // Bounce offset for mini player (used by both single and double bounce)
   final _bounceOffsetNotifier = ValueNotifier<double>(0.0);
 
@@ -248,6 +251,9 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     }
     HapticFeedback.mediumImpact();
 
+    // Track if coming from hint mode (for onboarding hints in player selector)
+    final wasInHintMode = _isHintModeActive;
+
     // End hint mode if active (user learned the gesture!)
     _hintBounceTimer?.cancel();
     _hintBounceTimer = null;
@@ -260,6 +266,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
 
     setState(() {
       _isRevealVisible = true;
+      _isOnboardingReveal = wasInHintMode;
     });
   }
 
@@ -268,6 +275,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     _bounceOffsetNotifier.value = 0;
     setState(() {
       _isRevealVisible = false;
+      _isOnboardingReveal = false;
     });
   }
 
@@ -458,9 +466,50 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
                 child: Container(
-                  color: Colors.black.withOpacity(0.1),
+                  // Darker during hint mode for better focus
+                  color: Colors.black.withOpacity(_isHintModeActive ? 0.4 : 0.1),
                 ),
               ),
+            ),
+          ),
+
+        // Welcome message during hint mode - positioned above mini player
+        if (_isHintModeActive)
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: BottomSpacing.navBarHeight + BottomSpacing.miniPlayerHeight + MediaQuery.of(context).padding.bottom + 24,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  S.of(context)!.welcomeToEnsemble,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  S.of(context)!.welcomeMessage,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                TextButton(
+                  onPressed: _endHintMode,
+                  child: Text(
+                    S.of(context)!.skip,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -471,6 +520,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             onDismiss: _hidePlayerReveal,
             miniPlayerBottom: BottomSpacing.navBarHeight + MediaQuery.of(context).padding.bottom + 12,
             miniPlayerHeight: 64,
+            showOnboardingHints: _isOnboardingReveal,
           ),
 
         // Global player overlay - renders ON TOP so cards slide behind it

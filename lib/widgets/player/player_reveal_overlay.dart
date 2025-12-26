@@ -18,12 +18,14 @@ class PlayerRevealOverlay extends StatefulWidget {
   final VoidCallback onDismiss;
   final double miniPlayerBottom; // Bottom position of mini player
   final double miniPlayerHeight;
+  final bool showOnboardingHints; // Show additional hints for first-time users
 
   const PlayerRevealOverlay({
     super.key,
     required this.onDismiss,
     required this.miniPlayerBottom,
     required this.miniPlayerHeight,
+    this.showOnboardingHints = false,
   });
 
   @override
@@ -355,6 +357,34 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                             ),
                           );
                         }),
+                        // Dismissal hint for onboarding - shown below player cards
+                        if (widget.showOnboardingHints && players.isNotEmpty)
+                          Builder(
+                            builder: (context) {
+                              // Calculate slide offset to match the bottommost card
+                              const baseOffset = 80.0;
+                              final hintDistanceToTravel = baseOffset + (1 * (cardHeight + cardSpacing));
+                              final hintSlideOffset = hintDistanceToTravel * (1.0 - t);
+
+                              return Transform.translate(
+                                offset: Offset(0, hintSlideOffset),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 16),
+                                  child: Material(
+                                    type: MaterialType.transparency,
+                                    child: Text(
+                                      S.of(context)!.dismissPlayerHint,
+                                      style: TextStyle(
+                                        color: colorScheme.onSurface.withOpacity(0.6),
+                                        fontSize: 14,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                       ],
                     ),
                   ),

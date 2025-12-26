@@ -1236,5 +1236,25 @@
   "holdToSync": "Tap and hold a player to sync",
   "@holdToSync": {
     "description": "Hint for long-press to sync players"
+  },
+
+  "welcomeToEnsemble": "Welcome to Ensemble",
+  "@welcomeToEnsemble": {
+    "description": "Welcome message title for onboarding"
+  },
+
+  "welcomeMessage": "By default your phone is the selected player.\nPull the mini player down to select another player.",
+  "@welcomeMessage": {
+    "description": "Welcome message body explaining how to select players"
+  },
+
+  "skip": "Skip",
+  "@skip": {
+    "description": "Button to skip onboarding or hints"
+  },
+
+  "dismissPlayerHint": "Swipe down, tap outside, or press back to return",
+  "@dismissPlayerHint": {
+    "description": "Hint explaining how to dismiss the player selector"
   }
 }
