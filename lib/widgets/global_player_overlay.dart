@@ -449,7 +449,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && !_hintTriggered && _showHints) {
                 // Delay before showing hint to let UI settle
-                Future.delayed(const Duration(milliseconds: 1500), () {
+                Future.delayed(const Duration(milliseconds: 3500), () {
                   if (mounted) _triggerPullHint();
                 });
               }
@@ -489,7 +489,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                   left: 0,
                   right: 0,
                   // Position half-overlapping mini player top edge
-                  bottom: BottomSpacing.navBarHeight + BottomSpacing.miniPlayerHeight + MediaQuery.of(context).padding.bottom - 12 - bounceOffset,
+                  bottom: BottomSpacing.navBarHeight + BottomSpacing.miniPlayerHeight + MediaQuery.of(context).padding.bottom - 7 - bounceOffset,
                   child: AnimatedOpacity(
                     opacity: opacity,
                     duration: const Duration(milliseconds: 300),
