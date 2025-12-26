@@ -272,8 +272,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     // Trigger bounce animation
     _bounceController.reset();
     _bounceController.forward().then((_) {
-      // Fade out hint after bounce completes
-      Future.delayed(const Duration(milliseconds: 800), () {
+      // Fade out hint after lingering
+      Future.delayed(const Duration(milliseconds: 2500), () {
         if (mounted) {
           _hintOpacityNotifier.value = 0.0;
         }
@@ -440,8 +440,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             // Trigger pull hint when player first becomes available (every app launch)
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && !_hintTriggered && _showHints) {
-                // Small delay to let UI settle
-                Future.delayed(const Duration(milliseconds: 500), () {
+                // Delay before showing hint to let UI settle
+                Future.delayed(const Duration(milliseconds: 1500), () {
                   if (mounted) _triggerPullHint();
                 });
               }
@@ -486,12 +486,15 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                     opacity: opacity,
                     duration: const Duration(milliseconds: 300),
                     child: Center(
-                      child: Text(
-                        S.of(context)!.pullToSelectPlayers,
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: Text(
+                          S.of(context)!.pullToSelectPlayers,
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ),

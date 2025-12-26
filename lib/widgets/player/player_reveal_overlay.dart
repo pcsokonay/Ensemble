@@ -255,12 +255,15 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                 offset: Offset(0, hintSlideOffset),
                                 child: Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
-                                  child: Text(
-                                    S.of(context)!.holdToSync,
-                                    style: TextStyle(
-                                      color: colorScheme.onSurface.withOpacity(0.7),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
+                                  child: Material(
+                                    type: MaterialType.transparency,
+                                    child: Text(
+                                      S.of(context)!.holdToSync,
+                                      style: TextStyle(
+                                        color: colorScheme.onSurface.withOpacity(0.7),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
                                 ),
