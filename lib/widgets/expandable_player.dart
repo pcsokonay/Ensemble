@@ -1569,12 +1569,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     child: SizedBox(
                       width: titleWidth,
                       child: Text(
-                        // Show "Now Playing" when device reveal visible and collapsed
-                        (widget.isDeviceRevealVisible && t < 0.5)
-                            ? S.of(context)!.nowPlaying
-                            : maProvider.isPlayingAudiobook
-                                ? (maProvider.currentAudiobook?.authorsString ?? S.of(context)!.unknownAuthor)
-                                : currentTrack.artistsString,
+                        // Always show artist/author (was showing "Now Playing" when device reveal visible)
+                        maProvider.isPlayingAudiobook
+                            ? (maProvider.currentAudiobook?.authorsString ?? S.of(context)!.unknownAuthor)
+                            : currentTrack.artistsString,
                         style: TextStyle(
                           color: textColor.withOpacity(t > 0.5 ? 0.7 : MiniPlayerLayout.secondaryTextOpacity),
                           fontSize: artistFontSize,
