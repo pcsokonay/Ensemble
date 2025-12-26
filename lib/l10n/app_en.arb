@@ -1233,7 +1233,7 @@
     "description": "Hint shown when mini player bounces"
   },
 
-  "holdToSync": "Hold a player to sync",
+  "holdToSync": "Tap and hold a player to sync",
   "@holdToSync": {
     "description": "Hint for long-press to sync players"
   }

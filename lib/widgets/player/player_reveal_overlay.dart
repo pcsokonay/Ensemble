@@ -137,20 +137,8 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
 
   /// Animate dismissal and call callback when done
   void dismiss() {
-    // Trigger settle bounce on mini player when cards are ~70% collapsed
-    // This creates the effect of cards "landing" on the mini player
-    bool bounceFired = false;
-    void checkBounce() {
-      if (!bounceFired && _revealController.value < 0.3) {
-        bounceFired = true;
-        GlobalPlayerOverlay.triggerBounce();
-      }
-    }
-
     _revealController.duration = const Duration(milliseconds: 150);
-    _revealController.addListener(checkBounce);
     _revealController.reverse().then((_) {
-      _revealController.removeListener(checkBounce);
       widget.onDismiss();
     });
   }

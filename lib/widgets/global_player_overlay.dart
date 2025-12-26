@@ -131,11 +131,6 @@ class GlobalPlayerOverlay extends StatefulWidget {
     _overlayStateKey.currentState?._dismissPlayerReveal();
   }
 
-  /// Trigger the bounce animation on mini player (called when overlay dismiss starts)
-  static void triggerBounce() {
-    _overlayStateKey.currentState?._triggerBounce();
-  }
-
   /// Check if the player reveal is currently visible
   static bool get isPlayerRevealVisible =>
       _overlayStateKey.currentState?._isRevealVisible ?? false;
@@ -146,21 +141,18 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   late AnimationController _slideController;
   late Animation<double> _slideAnimation;
 
-  // Controller for player reveal animation with bounce
-  late AnimationController _bounceController;
-  late Animation<double> _bounceAnimation;
-
   // State for player reveal overlay
   bool _isRevealVisible = false;
-
-  // Use ValueNotifier instead of setState for bounce offset
-  // This prevents full widget tree rebuilds during animation
-  final _bounceOffsetNotifier = ValueNotifier<double>(0.0);
 
   // Hint system state
   bool _showHints = true;
   bool _hintTriggered = false; // Prevent multiple triggers per session
   final _hintOpacityNotifier = ValueNotifier<double>(0.0);
+
+  // Hint-only bounce animation (separate from device selector)
+  late AnimationController _hintBounceController;
+  late Animation<double> _hintBounceAnimation;
+  final _hintBounceOffsetNotifier = ValueNotifier<double>(0.0);
 
   // Key for the reveal overlay
   final _revealKey = GlobalKey<PlayerRevealOverlayState>();
@@ -178,29 +170,28 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
       reverseCurve: Curves.easeInCubic,
     );
 
-    // Bounce animation - double bounce for hint visibility
-    _bounceController = AnimationController(
+    // Hint-only bounce animation - double bounce for hint visibility
+    _hintBounceController = AnimationController(
       duration: const Duration(milliseconds: 900),
       vsync: this,
     );
-    _bounceAnimation = CurvedAnimation(
-      parent: _bounceController,
+    _hintBounceAnimation = CurvedAnimation(
+      parent: _hintBounceController,
       curve: Curves.easeOut,
     );
 
-    // Use ValueNotifier instead of setState to avoid full widget rebuilds
-    // This isolates the rebuild to only the widgets that depend on bounce offset
-    _bounceController.addListener(() {
-      final t = _bounceAnimation.value;
+    // Use ValueNotifier for hint bounce to avoid full widget rebuilds
+    _hintBounceController.addListener(() {
+      final t = _hintBounceAnimation.value;
       // Double bounce: first bounce full (10px), second bounce smaller (6px)
       if (t < 0.25) {
-        _bounceOffsetNotifier.value = 10.0 * (t * 4);           // 0 -> 10
+        _hintBounceOffsetNotifier.value = 10.0 * (t * 4);           // 0 -> 10
       } else if (t < 0.5) {
-        _bounceOffsetNotifier.value = 10.0 * ((0.5 - t) * 4);   // 10 -> 0
+        _hintBounceOffsetNotifier.value = 10.0 * ((0.5 - t) * 4);   // 10 -> 0
       } else if (t < 0.75) {
-        _bounceOffsetNotifier.value = 6.0 * ((t - 0.5) * 4);    // 0 -> 6
+        _hintBounceOffsetNotifier.value = 6.0 * ((t - 0.5) * 4);    // 0 -> 6
       } else {
-        _bounceOffsetNotifier.value = 6.0 * ((1.0 - t) * 4);    // 6 -> 0
+        _hintBounceOffsetNotifier.value = 6.0 * ((1.0 - t) * 4);    // 6 -> 0
       }
     });
 
@@ -215,8 +206,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   @override
   void dispose() {
     _slideController.dispose();
-    _bounceController.dispose();
-    _bounceOffsetNotifier.dispose();
+    _hintBounceController.dispose();
+    _hintBounceOffsetNotifier.dispose();
     _hintOpacityNotifier.dispose();
     super.dispose();
   }
@@ -235,7 +226,6 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
       GlobalPlayerOverlay.collapsePlayer();
     }
     HapticFeedback.mediumImpact();
-    _bounceController.reset();
 
     // Hide the hint immediately if it's showing
     _hintOpacityNotifier.value = 0.0;
@@ -243,12 +233,10 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     setState(() {
       _isRevealVisible = true;
     });
-    _bounceController.forward();
   }
 
   void _hidePlayerReveal() {
     if (!_isRevealVisible) return;
-    _bounceOffsetNotifier.value = 0;
     setState(() {
       _isRevealVisible = false;
     });
@@ -262,12 +250,6 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     _revealKey.currentState?.dismiss();
   }
 
-  /// Trigger bounce animation on mini player
-  void _triggerBounce() {
-    _bounceController.reset();
-    _bounceController.forward();
-  }
-
   /// Trigger the pull-to-select hint with bounce animation
   /// Called when player first becomes available - shows on every app launch
   void _triggerPullHint() {
@@ -277,9 +259,9 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     // Show hint text
     _hintOpacityNotifier.value = 1.0;
 
-    // Trigger bounce animation
-    _bounceController.reset();
-    _bounceController.forward().then((_) {
+    // Trigger hint-only bounce animation
+    _hintBounceController.reset();
+    _hintBounceController.forward().then((_) {
       // Fade out hint after lingering
       Future.delayed(const Duration(milliseconds: 2500), () {
         if (mounted) {
@@ -455,60 +437,58 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
               }
             });
 
-            // Combine slide and bounce animations with ValueListenableBuilder
-            // This prevents full widget tree rebuilds - only ExpandablePlayer updates
-            return ValueListenableBuilder<double>(
-              valueListenable: _bounceOffsetNotifier,
-              builder: (context, bounceOffset, _) {
-                return AnimatedBuilder(
-                  animation: _slideAnimation,
-                  builder: (context, _) {
-                    return ExpandablePlayer(
-                      key: globalPlayerKey,
-                      slideOffset: _slideAnimation.value,
-                      bounceOffset: bounceOffset,
-                      onRevealPlayers: _showPlayerReveal,
-                      isDeviceRevealVisible: _isRevealVisible,
-                    );
-                  },
+            // Slide animation for hiding player
+            return AnimatedBuilder(
+              animation: _slideAnimation,
+              builder: (context, _) {
+                return ExpandablePlayer(
+                  key: globalPlayerKey,
+                  slideOffset: _slideAnimation.value,
+                  bounceOffset: 0.0, // No bounce on player - only hint bounces
+                  onRevealPlayers: _showPlayerReveal,
+                  isDeviceRevealVisible: _isRevealVisible,
                 );
               },
             );
           },
         ),
 
-        // Pull hint - positioned half-overlapping mini player top, bounces with it
+        // Pull hint - toast pill at bottom of screen with its own bounce animation
         ValueListenableBuilder<double>(
           valueListenable: _hintOpacityNotifier,
           builder: (context, opacity, _) {
             if (opacity == 0) return const SizedBox.shrink();
             return ValueListenableBuilder<double>(
-              valueListenable: _bounceOffsetNotifier,
+              valueListenable: _hintBounceOffsetNotifier,
               builder: (context, bounceOffset, _) {
                 return Positioned(
-                  left: 0,
-                  right: 0,
-                  // Position half-overlapping mini player top edge
-                  bottom: BottomSpacing.navBarHeight + BottomSpacing.miniPlayerHeight + MediaQuery.of(context).padding.bottom - 7 - bounceOffset,
+                  left: 16,
+                  right: 16,
+                  // Position as a toast pill above the nav bar
+                  bottom: BottomSpacing.navBarHeight + MediaQuery.of(context).padding.bottom + 16 + bounceOffset,
                   child: AnimatedOpacity(
                     opacity: opacity,
                     duration: const Duration(milliseconds: 300),
                     child: Center(
-                      child: Material(
-                        type: MaterialType.transparency,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: colorScheme.inverseSurface,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.lightbulb_outline,
                               size: 16,
-                              color: colorScheme.onSurfaceVariant,
+                              color: colorScheme.inverseOnSurface,
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             Text(
                               S.of(context)!.pullToSelectPlayers,
                               style: TextStyle(
-                                color: colorScheme.onSurfaceVariant,
+                                color: colorScheme.inverseOnSurface,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
