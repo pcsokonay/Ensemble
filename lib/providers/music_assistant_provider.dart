@@ -51,6 +51,7 @@ class MusicAssistantProvider with ChangeNotifier {
   List<Artist> _artists = [];
   List<Album> _albums = [];
   List<Track> _tracks = [];
+  List<Track> _cachedFavoriteTracks = []; // Cached for instant display before full library loads
   bool _isLoading = false;
 
   // Player state
@@ -224,6 +225,9 @@ class MusicAssistantProvider with ChangeNotifier {
     // Load cached library from SyncService for instant favorites display
     await _loadLibraryFromCache();
 
+    // Load cached favorite tracks from database (tracks aren't in SyncService)
+    await _loadFavoriteTracksFromDatabase();
+
     // Load cached home rows from database for instant discover/recent display
     await _cacheService.loadHomeRowsFromDatabase();
 
@@ -360,6 +364,38 @@ class MusicAssistantProvider with ChangeNotifier {
         _logger.log('⚠️ Error persisting playback state: $e');
       }
     }();
+  }
+
+  /// Persist favorite tracks to database (fire-and-forget)
+  void _persistFavoriteTracks(List<Track> tracks) {
+    () async {
+      try {
+        if (!DatabaseService.instance.isInitialized) return;
+        final tracksJson = jsonEncode(tracks.map((t) => t.toJson()).toList());
+        await DatabaseService.instance.saveHomeRowCache('favorite_tracks', tracksJson);
+        _logger.log('💾 Persisted ${tracks.length} favorite tracks to database');
+      } catch (e) {
+        _logger.log('⚠️ Error persisting favorite tracks: $e');
+      }
+    }();
+  }
+
+  /// Load cached favorite tracks from database
+  Future<void> _loadFavoriteTracksFromDatabase() async {
+    try {
+      if (!DatabaseService.instance.isInitialized) return;
+
+      final data = await DatabaseService.instance.getHomeRowCache('favorite_tracks');
+      if (data == null) return;
+
+      final items = (jsonDecode(data.itemsJson) as List)
+          .map((json) => Track.fromJson(json as Map<String, dynamic>))
+          .toList();
+      _cachedFavoriteTracks = items;
+      _logger.log('📦 Loaded ${items.length} cached favorite tracks from database');
+    } catch (e) {
+      _logger.log('⚠️ Error loading favorite tracks: $e');
+    }
   }
 
   /// Persist players to database for app restart persistence
@@ -1842,8 +1878,18 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Get favorite tracks from the library
   Future<List<Track>> getFavoriteTracks() async {
-    // Filter from loaded library - favorites are already loaded
-    return _tracks.where((t) => t.favorite == true).toList();
+    // If full tracks list is loaded, filter from it
+    if (_tracks.isNotEmpty) {
+      final favTracks = _tracks.where((t) => t.favorite == true).toList();
+      // Update cache if we have new data
+      if (favTracks.isNotEmpty && favTracks.length != _cachedFavoriteTracks.length) {
+        _cachedFavoriteTracks = favTracks;
+        _persistFavoriteTracks(favTracks);
+      }
+      return favTracks;
+    }
+    // Otherwise return cached favorites (for instant display before full library loads)
+    return _cachedFavoriteTracks;
   }
 
   // ============================================================================

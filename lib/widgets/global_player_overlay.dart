@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -155,6 +156,10 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   // State for player reveal overlay
   bool _isRevealVisible = false;
 
+  // State for interactive hint mode (blur backdrop + wait for user action)
+  bool _isHintModeActive = false;
+  Timer? _hintBounceTimer;
+
   // Bounce offset for mini player (used by both single and double bounce)
   final _bounceOffsetNotifier = ValueNotifier<double>(0.0);
 
@@ -194,22 +199,18 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
       }
     });
 
-    // Double bounce for hint - larger movement to draw attention
+    // Hint bounce - single gentle bounce to draw attention
     _doubleBounceController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
     _doubleBounceController.addListener(() {
       final t = Curves.easeOut.transform(_doubleBounceController.value);
-      // Double bounce: both bounces equal (20px)
-      if (t < 0.25) {
-        _bounceOffsetNotifier.value = 20.0 * (t * 4);           // 0 -> 20
-      } else if (t < 0.5) {
-        _bounceOffsetNotifier.value = 20.0 * ((0.5 - t) * 4);   // 20 -> 0
-      } else if (t < 0.75) {
-        _bounceOffsetNotifier.value = 20.0 * ((t - 0.5) * 4);   // 0 -> 20
+      // Single bounce: up 20px then back down
+      if (t < 0.5) {
+        _bounceOffsetNotifier.value = 20.0 * (t * 2);           // 0 -> 20
       } else {
-        _bounceOffsetNotifier.value = 20.0 * ((1.0 - t) * 4);   // 20 -> 0
+        _bounceOffsetNotifier.value = 20.0 * ((1.0 - t) * 2);   // 20 -> 0
       }
     });
 
@@ -223,6 +224,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
 
   @override
   void dispose() {
+    _hintBounceTimer?.cancel();
     _slideController.dispose();
     _singleBounceController.dispose();
     _doubleBounceController.dispose();
@@ -246,8 +248,11 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     }
     HapticFeedback.mediumImpact();
 
-    // Hide the hint immediately if it's showing
+    // End hint mode if active (user learned the gesture!)
+    _hintBounceTimer?.cancel();
+    _hintBounceTimer = null;
     _hintOpacityNotifier.value = 0.0;
+    _isHintModeActive = false;
 
     // Trigger single bounce on expand
     _singleBounceController.reset();
@@ -279,24 +284,42 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     _singleBounceController.forward();
   }
 
-  /// Trigger the pull-to-select hint with double bounce animation
-  /// Called when player first becomes available - shows on every app launch
+  /// Trigger interactive hint mode with blur backdrop
+  /// User must swipe down (reveals players) or tap backdrop (dismisses) to continue
   void _triggerPullHint() {
     if (_hintTriggered || !_showHints) return;
     _hintTriggered = true;
 
+    // Activate hint mode (shows blur backdrop)
+    setState(() {
+      _isHintModeActive = true;
+    });
+
     // Show hint text
     _hintOpacityNotifier.value = 1.0;
 
-    // Trigger double bounce animation on mini player
+    // Trigger initial bounce
     _doubleBounceController.reset();
-    _doubleBounceController.forward().then((_) {
-      // Fade out hint after lingering
-      Future.delayed(const Duration(milliseconds: 2500), () {
-        if (mounted) {
-          _hintOpacityNotifier.value = 0.0;
-        }
-      });
+    _doubleBounceController.forward();
+
+    // Repeat bounce every 2 seconds until user acts
+    _hintBounceTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (_isHintModeActive && mounted) {
+        _doubleBounceController.reset();
+        _doubleBounceController.forward();
+      }
+    });
+  }
+
+  /// End hint mode (called when user taps backdrop to skip)
+  void _endHintMode() {
+    if (!_isHintModeActive) return;
+    _hintBounceTimer?.cancel();
+    _hintBounceTimer = null;
+    _hintOpacityNotifier.value = 0.0;
+    _bounceOffsetNotifier.value = 0.0;
+    setState(() {
+      _isHintModeActive = false;
     });
   }
 
@@ -305,12 +328,16 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Handle back gesture at top level - dismiss device list if visible
+    // Handle back gesture at top level - dismiss hint mode or device list if visible
     return PopScope(
-      canPop: !_isRevealVisible,
+      canPop: !_isRevealVisible && !_isHintModeActive,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _isRevealVisible) {
-          _dismissPlayerReveal();
+        if (!didPop) {
+          if (_isHintModeActive) {
+            _endHintMode();
+          } else if (_isRevealVisible) {
+            _dismissPlayerReveal();
+          }
         }
       },
       child: Stack(
@@ -421,10 +448,13 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             },
           ),
         ),
-        // Blur backdrop when device selector is open
-        if (_isRevealVisible)
+        // Blur backdrop when hint mode or device selector is open
+        if (_isRevealVisible || _isHintModeActive)
           Positioned.fill(
-            child: IgnorePointer(
+            child: GestureDetector(
+              // Tappable during hint mode to dismiss, ignored during reveal
+              behavior: _isHintModeActive ? HitTestBehavior.opaque : HitTestBehavior.translucent,
+              onTap: _isHintModeActive ? _endHintMode : null,
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
                 child: Container(
@@ -461,8 +491,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             // This ensures hint only shows after the mini player has settled
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && !_hintTriggered && _showHints && state.hasTrack) {
-                // Short delay to let final animations complete
-                Future.delayed(const Duration(milliseconds: 500), () {
+                // Longer delay before hint - let user settle in first
+                Future.delayed(const Duration(milliseconds: 1500), () {
                   if (mounted) _triggerPullHint();
                 });
               }
