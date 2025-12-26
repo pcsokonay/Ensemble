@@ -225,6 +225,7 @@
     }
   },
   "playingTrack": "Reproduciendo canción",
+  "nowPlaying": "Reproduciendo ahora",
   "markedAsFinished": "{name} marcado como terminado",
   "@markedAsFinished": {
     "placeholders": {

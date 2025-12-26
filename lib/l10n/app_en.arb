@@ -635,6 +635,11 @@
     "description": "Status when playing track"
   },
 
+  "nowPlaying": "Now playing",
+  "@nowPlaying": {
+    "description": "Label shown when device selector is open to indicate current player"
+  },
+
   "markedAsFinished": "{name} marked as finished",
   "@markedAsFinished": {
     "description": "Audiobook marked finished",

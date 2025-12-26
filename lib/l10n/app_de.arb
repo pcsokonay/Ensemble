@@ -126,6 +126,7 @@
 
   "playing": "Spiele {name}",
   "playingTrack": "Spiele Song",
+  "nowPlaying": "Wird gespielt",
 
   "markedAsFinished": "{name} als beendet markiert",
   "failedToMarkFinished": "Konnte nicht als beendet markieren: {error}",
