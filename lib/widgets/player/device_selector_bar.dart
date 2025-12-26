@@ -67,6 +67,7 @@ class DeviceSelectorBar extends StatelessWidget {
                   textColor: textColor,
                   width: width,
                   slideOffset: slideOffset,
+                  isHint: swipeHint != null,
                 ),
               ],
             ),
@@ -97,6 +98,7 @@ class DeviceSelectorBar extends StatelessWidget {
         textColor: textColor,
         width: width,
         slideOffset: 0, // No additional slide - Transform handles positioning
+        isHint: swipeHint != null,
       ),
     );
   }

@@ -48,6 +48,9 @@ class MiniPlayerContent extends StatelessWidget {
   /// Horizontal slide offset for swipe animation (-1 to 1)
   final double slideOffset;
 
+  /// Whether secondary text is a hint (shows lightbulb icon)
+  final bool isHint;
+
   /// Whether to show the progress bar overlay (for playing state)
   final bool showProgress;
 
@@ -64,6 +67,7 @@ class MiniPlayerContent extends StatelessWidget {
     required this.textColor,
     required this.width,
     this.slideOffset = 0.0,
+    this.isHint = false,
     this.showProgress = false,
     this.progress = 0.0,
   });
@@ -136,21 +140,44 @@ class MiniPlayerContent extends StatelessWidget {
             ),
           ),
 
-          // Secondary text line
+          // Secondary text line (with optional hint icon)
           if (hasSecondaryLine)
             Positioned(
               left: MiniPlayerLayout.textLeft + slidePixels,
               top: MiniPlayerLayout.secondaryTop,
               right: MiniPlayerLayout.textRightPadding - slidePixels,
-              child: Text(
-                secondaryText!,
-                style: TextStyle(
-                  color: textColor.withOpacity(MiniPlayerLayout.secondaryTextOpacity),
-                  fontSize: MiniPlayerLayout.secondaryFontSize,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: isHint
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline,
+                          size: 14,
+                          color: textColor.withOpacity(MiniPlayerLayout.secondaryTextOpacity),
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            secondaryText!,
+                            style: TextStyle(
+                              color: textColor.withOpacity(MiniPlayerLayout.secondaryTextOpacity),
+                              fontSize: MiniPlayerLayout.secondaryFontSize,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      secondaryText!,
+                      style: TextStyle(
+                        color: textColor.withOpacity(MiniPlayerLayout.secondaryTextOpacity),
+                        fontSize: MiniPlayerLayout.secondaryFontSize,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
             ),
         ],
       ),
