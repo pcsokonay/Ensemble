@@ -473,36 +473,37 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             },
           ),
         ),
-        // Blur backdrop when hint mode or device selector is open
-        if (_isRevealVisible || _isHintModeActive)
+        // Blur backdrop for device selector (reveal mode) - static, no animation
+        if (_isRevealVisible && !_isHintModeActive)
           Positioned.fill(
             child: GestureDetector(
-              // Only tappable to dismiss during reveal mode, not hint mode (use skip button)
-              behavior: _isRevealVisible ? HitTestBehavior.opaque : HitTestBehavior.translucent,
-              onTap: _isRevealVisible ? _dismissPlayerReveal : null,
-              child: TweenAnimationBuilder<double>(
-                // Hint mode: hold solid for 2s, then fade to 0.5 over 1s
-                // Reveal mode: instant 0.5 (no animation)
-                key: ValueKey(_isHintModeActive ? 'hint' : 'reveal'),
-                tween: Tween<double>(
-                  begin: _isHintModeActive ? 1.0 : 0.5,
-                  end: 0.5,
+              behavior: HitTestBehavior.opaque,
+              onTap: _dismissPlayerReveal,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
+                child: Container(
+                  color: colorScheme.surface.withOpacity(0.5),
                 ),
-                duration: _isHintModeActive ? const Duration(seconds: 3) : Duration.zero,
-                // Hold at start for first 2/3 (2s), then ease out for last 1/3 (1s)
-                curve: _isHintModeActive
-                    ? const Interval(0.67, 1.0, curve: Curves.easeOut)
-                    : Curves.linear,
-                builder: (context, opacity, child) {
-                  return BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
-                    child: Container(
-                      // Use theme surface color instead of black
-                      color: colorScheme.surface.withOpacity(opacity),
-                    ),
-                  );
-                },
               ),
+            ),
+          ),
+
+        // Blur backdrop for hint/welcome mode - animated fade from solid to semi-transparent
+        if (_isHintModeActive)
+          Positioned.fill(
+            child: TweenAnimationBuilder<double>(
+              // Hold solid for 2s, then fade to 0.5 over 1s
+              tween: Tween<double>(begin: 1.0, end: 0.5),
+              duration: const Duration(seconds: 3),
+              curve: const Interval(0.67, 1.0, curve: Curves.easeOut),
+              builder: (context, opacity, child) {
+                return BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
+                  child: Container(
+                    color: colorScheme.surface.withOpacity(opacity),
+                  ),
+                );
+              },
             ),
           ),
 
