@@ -1238,6 +1238,11 @@
     "description": "Hint for long-press to sync players"
   },
 
+  "selectPlayerHint": "Tap a player to start listening",
+  "@selectPlayerHint": {
+    "description": "First-time hint for selecting a player in device selector"
+  },
+
   "welcomeToEnsemble": "Welcome to Ensemble",
   "@welcomeToEnsemble": {
     "description": "Welcome message title for onboarding"

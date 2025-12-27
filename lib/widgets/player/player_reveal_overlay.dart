@@ -242,15 +242,22 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Hold to sync hint - shown when hints are enabled
-                        // Slides in with the player cards instead of fading
-                        if (_showHints && players.isNotEmpty)
+                        // Hint above player list - different for onboarding vs regular use
+                        // Onboarding: show first-time hint (how to select)
+                        // Regular: show sync hint (tap and hold to sync)
+                        if (players.isNotEmpty && (_showHints || widget.showOnboardingHints))
                           Builder(
                             builder: (context) {
                               // Calculate slide offset to match the topmost card
                               const baseOffset = 80.0;
                               final hintDistanceToTravel = baseOffset + (players.length * (cardHeight + cardSpacing));
                               final hintSlideOffset = hintDistanceToTravel * (1.0 - t);
+
+                              // Show different hint for onboarding vs regular use
+                              final isOnboarding = widget.showOnboardingHints;
+                              final hintText = isOnboarding
+                                  ? S.of(context)!.selectPlayerHint
+                                  : S.of(context)!.holdToSync;
 
                               return Transform.translate(
                                 offset: Offset(0, hintSlideOffset),
@@ -262,13 +269,13 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          Icons.lightbulb_outline,
+                                          isOnboarding ? Icons.touch_app_outlined : Icons.lightbulb_outline,
                                           size: 18,
                                           color: colorScheme.onSurface.withOpacity(0.7),
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          S.of(context)!.holdToSync,
+                                          hintText,
                                           style: TextStyle(
                                             color: colorScheme.onSurface.withOpacity(0.7),
                                             fontSize: 16,

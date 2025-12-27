@@ -477,9 +477,9 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
         if (_isRevealVisible || _isHintModeActive)
           Positioned.fill(
             child: GestureDetector(
-              // Tappable during hint mode to dismiss, ignored during reveal
-              behavior: _isHintModeActive ? HitTestBehavior.opaque : HitTestBehavior.translucent,
-              onTap: _isHintModeActive ? _endHintMode : null,
+              // Only tappable to dismiss during reveal mode, not hint mode (use skip button)
+              behavior: _isRevealVisible ? HitTestBehavior.opaque : HitTestBehavior.translucent,
+              onTap: _isRevealVisible ? _dismissPlayerReveal : null,
               child: TweenAnimationBuilder<double>(
                 // Hint mode: hold black for 2s, then fade to 0.5 over 1s
                 // Reveal mode: instant 0.5 (no animation)
