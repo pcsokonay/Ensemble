@@ -170,6 +170,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   bool _showHints = true;
   bool _hasCompletedOnboarding = false; // First-use welcome screen
   bool _hintTriggered = false; // Prevent multiple triggers per session
+  bool _settingsLoaded = false; // True once settings have been loaded from storage
   bool _waitingForConnection = false; // Waiting for connection to show mini player hints
   bool _miniPlayerHintsReady = false; // True once connected with player (can show hints)
   final _hintOpacityNotifier = ValueNotifier<double>(0.0);
@@ -236,12 +237,15 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   Future<void> _loadHintSettings() async {
     _showHints = await SettingsService.getShowHints();
     _hasCompletedOnboarding = await SettingsService.getHasCompletedOnboarding();
-    // Mark that we need to show welcome after first connection (if first use)
-    if (!_hasCompletedOnboarding && mounted && !_hintTriggered) {
-      setState(() {
+    if (!mounted) return;
+
+    setState(() {
+      _settingsLoaded = true;
+      // Mark that we need to show welcome after first connection (if first use)
+      if (!_hasCompletedOnboarding && !_hintTriggered) {
         _waitingForConnection = true;
-      });
-    }
+      }
+    });
   }
 
   @override
@@ -395,13 +399,16 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     final provider = context.watch<MusicAssistantProvider>();
     final isReadyForWelcome = provider.isConnected && provider.selectedPlayer != null;
 
-    // Show solid backdrop when waiting for connection AND now connected (covers home screen)
-    final shouldShowPreemptiveBackdrop = _waitingForConnection &&
-        !_isHintModeActive &&
-        isReadyForWelcome;
+    // Show solid backdrop when:
+    // 1. Settings not loaded yet AND connected (covers uncertainty period during async load)
+    // 2. OR waiting for connection AND connected (first-use case after settings loaded)
+    // This keeps the grey "Connecting..." background visible until welcome is ready
+    final shouldShowPreemptiveBackdrop = !_isHintModeActive &&
+        isReadyForWelcome &&
+        (!_settingsLoaded || _waitingForConnection);
 
     // Trigger welcome screen start if we just became ready
-    if (shouldShowPreemptiveBackdrop && !_hintTriggered) {
+    if (shouldShowPreemptiveBackdrop && !_hintTriggered && _settingsLoaded && _waitingForConnection) {
       // Schedule for post-frame to avoid setState during build
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _waitingForConnection && !_hintTriggered) {
