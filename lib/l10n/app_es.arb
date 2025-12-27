@@ -475,6 +475,7 @@
   "playerStateUnavailable": "No disponible",
   "playerStateOff": "Apagado",
   "playerStateIdle": "Inactivo",
+  "playerStateExternalSource": "Fuente Externa",
   "playerSelected": "Seleccionado",
   "actionQueuedForSync": "Se sincronizará cuando esté en línea",
   "pendingOfflineActions": "{count} sincronización pendiente",

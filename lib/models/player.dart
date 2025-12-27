@@ -14,6 +14,8 @@ class Player {
   final double? elapsedTimeLastUpdated; // Unix timestamp when elapsed_time was last updated
   final List<String>? groupMembers; // List of player IDs in sync group (includes self)
   final String? syncedTo; // Player ID this player is synced to (null if leader or not synced)
+  final String? activeSource; // The currently active source for this player
+  final bool isExternalSource; // True when an external source (optical, Spotify, etc.) is active
 
   Player({
     required this.playerId,
@@ -29,6 +31,8 @@ class Player {
     this.elapsedTimeLastUpdated,
     this.groupMembers,
     this.syncedTo,
+    this.activeSource,
+    this.isExternalSource = false,
   });
 
   /// Create a copy of this Player with some fields replaced
@@ -46,6 +50,8 @@ class Player {
     double? elapsedTimeLastUpdated,
     List<String>? groupMembers,
     String? syncedTo,
+    String? activeSource,
+    bool? isExternalSource,
   }) {
     return Player(
       playerId: playerId ?? this.playerId,
@@ -61,6 +67,8 @@ class Player {
       elapsedTimeLastUpdated: elapsedTimeLastUpdated ?? this.elapsedTimeLastUpdated,
       groupMembers: groupMembers ?? this.groupMembers,
       syncedTo: syncedTo ?? this.syncedTo,
+      activeSource: activeSource ?? this.activeSource,
+      isExternalSource: isExternalSource ?? this.isExternalSource,
     );
   }
 
@@ -185,6 +193,49 @@ class Player {
     // Parse synced_to - the player ID this player is synced to
     final syncedTo = json['synced_to'] as String?;
 
+    // Parse active_source - the currently active source for this player
+    final activeSource = json['active_source'] as String?;
+
+    // Detect external source (optical, Spotify, AirPlay, etc.)
+    // External sources have non-MA URIs and often media_type='unknown'
+    bool isExternalSource = false;
+    if (json.containsKey('current_media')) {
+      final currentMedia = json['current_media'] as Map<String, dynamic>?;
+      if (currentMedia != null) {
+        final uri = currentMedia['uri'] as String?;
+        final mediaType = currentMedia['media_type'] as String?;
+
+        // External source indicators:
+        // 1. URI is a simple identifier like 'optical', 'line_in', 'bluetooth', 'hdmi'
+        // 2. URI starts with external protocols: 'spotify://', 'airplay://', etc.
+        // 3. Media type is 'unknown' (MA doesn't recognize the source)
+        if (uri != null) {
+          final uriLower = uri.toLowerCase();
+          // Simple external source identifiers (no :// or /)
+          final isSimpleExternalId = !uri.contains('://') && !uri.contains('/') &&
+              (uriLower == 'optical' || uriLower == 'line_in' || uriLower == 'bluetooth' ||
+               uriLower == 'hdmi' || uriLower == 'tv' || uriLower == 'aux' ||
+               uriLower == 'coaxial' || uriLower == 'toslink');
+          // External streaming protocols
+          final isExternalProtocol = uriLower.startsWith('spotify://') ||
+              uriLower.startsWith('airplay://') ||
+              uriLower.startsWith('cast://') ||
+              uriLower.startsWith('bluetooth://');
+
+          isExternalSource = isSimpleExternalId || isExternalProtocol;
+        }
+
+        // Also check media_type - 'unknown' often indicates external source
+        if (!isExternalSource && mediaType == 'unknown') {
+          // If media_type is unknown and URI doesn't look like MA content, it's external
+          final uri = currentMedia['uri'] as String?;
+          if (uri != null && !uri.startsWith('library://') && !uri.contains('://track/')) {
+            isExternalSource = true;
+          }
+        }
+      }
+    }
+
     return Player(
       playerId: json['player_id'] as String,
       name: json['name'] as String,
@@ -199,6 +250,8 @@ class Player {
       elapsedTimeLastUpdated: elapsedTimeLastUpdated,
       groupMembers: groupMembers,
       syncedTo: syncedTo,
+      activeSource: activeSource,
+      isExternalSource: isExternalSource,
     );
   }
 
@@ -217,6 +270,8 @@ class Player {
       if (elapsedTimeLastUpdated != null) 'elapsed_time_last_updated': elapsedTimeLastUpdated,
       if (groupMembers != null) 'group_members': groupMembers,
       if (syncedTo != null) 'synced_to': syncedTo,
+      if (activeSource != null) 'active_source': activeSource,
+      'is_external_source': isExternalSource,
     };
   }
 }

@@ -1596,6 +1596,37 @@ class MusicAssistantProvider with ChangeNotifier {
 
       if (currentMedia != null) {
         final mediaType = currentMedia['media_type'] as String?;
+        final uri = currentMedia['uri'] as String?;
+
+        // Check for external source (optical, Spotify, etc.) - skip caching stale metadata
+        bool isExternalSource = false;
+        if (uri != null) {
+          final uriLower = uri.toLowerCase();
+          // Simple external source identifiers (no :// or /)
+          final isSimpleExternalId = !uri.contains('://') && !uri.contains('/') &&
+              (uriLower == 'optical' || uriLower == 'line_in' || uriLower == 'bluetooth' ||
+               uriLower == 'hdmi' || uriLower == 'tv' || uriLower == 'aux' ||
+               uriLower == 'coaxial' || uriLower == 'toslink');
+          // External streaming protocols
+          final isExternalProtocol = uriLower.startsWith('spotify://') ||
+              uriLower.startsWith('airplay://') ||
+              uriLower.startsWith('cast://') ||
+              uriLower.startsWith('bluetooth://');
+          isExternalSource = isSimpleExternalId || isExternalProtocol;
+
+          // Also treat unknown media type with non-MA URIs as external
+          if (!isExternalSource && mediaType == 'unknown' &&
+              !uri.startsWith('library://') && !uri.contains('://track/')) {
+            isExternalSource = true;
+          }
+        }
+
+        if (isExternalSource) {
+          _logger.log('📡 External source detected for $playerName (uri: $uri) - skipping metadata cache');
+          // Clear cached track for this player to avoid showing stale data
+          _cacheService.clearCachedTrackForPlayer(playerId);
+          return; // Skip further processing for external sources
+        }
 
         // Clear audiobook context when switching to music (track) playback
         if (mediaType == 'track' && _currentAudiobook != null) {

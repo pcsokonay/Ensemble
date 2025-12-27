@@ -202,17 +202,23 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                               // but still have track info - treat as "has content" for display
                               final isIdle = player.state == 'idle';
 
+                              // Check for external source (optical, Spotify, etc.)
+                              final isExternalSource = player.isExternalSource;
+
                               // Get track info - use current track for selected player, cache for others
-                              final playerTrack = isSelected
-                                  ? currentTrack
-                                  : maProvider.getCachedTrackForPlayer(player.playerId);
+                              // Skip track info for external sources
+                              final playerTrack = isExternalSource
+                                  ? null
+                                  : (isSelected
+                                      ? currentTrack
+                                      : maProvider.getCachedTrackForPlayer(player.playerId));
 
-                              // Player has content if playing, paused, or idle with cached track
-                              final hasContent = isPlaying || isPaused || (isIdle && playerTrack != null);
+                              // Player has content if playing, paused, or idle with cached track (but not external source)
+                              final hasContent = !isExternalSource && (isPlaying || isPaused || (isIdle && playerTrack != null));
 
-                              // Get album art for any player with content
+                              // Get album art for any player with content (skip for external source)
                               String? albumArtUrl;
-                              if (playerTrack != null && isOn && hasContent) {
+                              if (!isExternalSource && playerTrack != null && isOn && hasContent) {
                                 albumArtUrl = maProvider.getImageUrl(
                                   playerTrack.album ?? playerTrack,
                                   size: 128,
@@ -321,11 +327,13 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                                           ? colorScheme.onSurface.withOpacity(0.24)
                                                           : !isOn
                                                               ? colorScheme.onSurface.withOpacity(0.3)
-                                                              : isPlaying
-                                                                  ? Colors.green
-                                                                  : hasContent
-                                                                      ? Colors.orange // paused or idle with content
-                                                                      : colorScheme.onSurfaceVariant.withOpacity(0.5),
+                                                              : isExternalSource
+                                                                  ? Colors.cyan // external source (optical, Spotify, etc.)
+                                                                  : isPlaying
+                                                                      ? Colors.green
+                                                                      : hasContent
+                                                                          ? Colors.orange // paused or idle with content
+                                                                          : colorScheme.onSurfaceVariant.withOpacity(0.5),
                                                     ),
                                                   ),
                                                   const SizedBox(width: 6),
@@ -335,9 +343,11 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                                           ? S.of(context)!.playerStateUnavailable
                                                           : !isOn
                                                               ? S.of(context)!.playerStateOff
-                                                              : hasContent && playerTrack != null
-                                                                  ? playerTrack.name
-                                                                  : S.of(context)!.playerStateIdle,
+                                                              : isExternalSource
+                                                                  ? S.of(context)!.playerStateExternalSource
+                                                                  : hasContent && playerTrack != null
+                                                                      ? playerTrack.name
+                                                                      : S.of(context)!.playerStateIdle,
                                                       style: TextStyle(
                                                         color: player.available
                                                             ? colorScheme.onSurfaceVariant
@@ -400,8 +410,8 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                             ],
                                           ),
                                         ),
-                                        // Play/Pause button
-                                        if (player.available && isOn)
+                                        // Play/Pause button (hidden for external sources - controls don't work)
+                                        if (player.available && isOn && !isExternalSource)
                                           IconButton(
                                             icon: Icon(
                                               isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,

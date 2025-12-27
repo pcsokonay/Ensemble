@@ -259,6 +259,11 @@ class CacheService {
     _playerTrackCache[playerId] = track;
   }
 
+  /// Clear cached track for a player (e.g., when external source is active)
+  void clearCachedTrackForPlayer(String playerId) {
+    _playerTrackCache.remove(playerId);
+  }
+
   // ============================================================================
   // CLEAR ALL
   // ============================================================================

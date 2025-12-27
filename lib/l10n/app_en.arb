@@ -1193,6 +1193,11 @@
     "description": "Player state when idle"
   },
 
+  "playerStateExternalSource": "External Source",
+  "@playerStateExternalSource": {
+    "description": "Player state when playing from external source (optical, Spotify, etc.)"
+  },
+
   "playerSelected": "Selected",
   "@playerSelected": {
     "description": "Label for selected player"
