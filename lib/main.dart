@@ -348,7 +348,16 @@ class _SystemUIWrapperState extends State<SystemUIWrapper> {
   }
 }
 
-/// Startup widget that checks if user is logged in and auto-connects
+/// Startup widget that checks if user is logged in and auto-connects.
+///
+/// CRITICAL: This widget is the single source of truth for the startup transition.
+/// It loads settings FIRST (before connection), then waits for the appropriate
+/// conditions before showing HomeScreen. This eliminates the race condition between
+/// AppStartup and GlobalPlayerOverlay that caused the home screen flash.
+///
+/// For first-time users: Holds dark screen until connected + player selected,
+/// so the welcome overlay can appear seamlessly.
+/// For returning users: Transitions as soon as connection is established.
 class AppStartup extends StatefulWidget {
   const AppStartup({super.key});
 
@@ -361,9 +370,32 @@ class _AppStartupState extends State<AppStartup> {
   String? _savedServerUrl;
   bool _connectionAttempted = false;
 
+  // Welcome system state - loaded FIRST before connection check
+  bool _settingsLoaded = false;
+  bool _hasCompletedOnboarding = true; // Default to true (no welcome needed)
+
   @override
   void initState() {
     super.initState();
+    _loadSettingsFirst();
+  }
+
+  /// Load settings BEFORE checking connection.
+  /// This ensures we know if this is a first-time user before transitioning.
+  Future<void> _loadSettingsFirst() async {
+    // Load onboarding state first - this is critical for determining
+    // when to transition to HomeScreen
+    _hasCompletedOnboarding = await SettingsService.getHasCompletedOnboarding();
+
+    if (!mounted) return;
+
+    setState(() {
+      _settingsLoaded = true;
+    });
+
+    _logger.log('🚀 AppStartup: Settings loaded, hasCompletedOnboarding=$_hasCompletedOnboarding');
+
+    // Now check connection
     _checkAndConnect();
   }
 
@@ -388,14 +420,30 @@ class _AppStartupState extends State<AppStartup> {
       // Just wait for it to complete or timeout
       _logger.log('🚀 AppStartup: Waiting for provider auto-connection to $serverUrl');
 
+      // For first-time users, we need to wait for both connection AND player selection
+      // so the welcome overlay can appear immediately without home screen flash.
+      // For returning users, just wait for connection.
+      final needsWelcome = !_hasCompletedOnboarding;
+
       // Give the provider time to connect (it restores credentials and connects in _initialize)
       // Check connection state periodically
       for (var i = 0; i < 20; i++) {
         await Future.delayed(const Duration(milliseconds: 250));
-        if (provider.isConnected) {
-          _logger.log('🚀 AppStartup: Connection established');
-          break;
+
+        if (needsWelcome) {
+          // First-time user: wait for connection + player selection
+          if (provider.isConnected && provider.selectedPlayer != null) {
+            _logger.log('🚀 AppStartup: First-time user ready (connected + player selected)');
+            break;
+          }
+        } else {
+          // Returning user: just wait for connection
+          if (provider.isConnected) {
+            _logger.log('🚀 AppStartup: Connection established');
+            break;
+          }
         }
+
         if (provider.connectionState == MAConnectionState.error) {
           _logger.log('🚀 AppStartup: Connection failed with error');
           break;
@@ -422,7 +470,8 @@ class _AppStartupState extends State<AppStartup> {
   @override
   Widget build(BuildContext context) {
     // Show loading while checking settings or connecting
-    if (!_connectionAttempted || _isConnecting) {
+    // CRITICAL: Don't transition until settings are loaded - this prevents the race
+    if (!_settingsLoaded || !_connectionAttempted || _isConnecting) {
       return Scaffold(
         backgroundColor: const Color(0xFF1a1a1a),
         body: Center(

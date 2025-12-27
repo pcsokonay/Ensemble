@@ -167,11 +167,14 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   final _bounceOffsetNotifier = ValueNotifier<double>(0.0);
 
   // Hint system state
+  // NOTE: AppStartup now handles the settings loading gate. It waits for:
+  // - First-time users: connected + player selected before showing HomeScreen
+  // - Returning users: connected before showing HomeScreen
+  // This eliminates the race condition that caused home screen flash.
   bool _showHints = true;
   bool _hasCompletedOnboarding = false; // First-use welcome screen
   bool _hintTriggered = false; // Prevent multiple triggers per session
   bool _settingsLoaded = false; // True once settings have been loaded from storage
-  bool _waitingForConnection = false; // Waiting for connection to show mini player hints
   bool _miniPlayerHintsReady = false; // True once connected with player (can show hints)
   final _hintOpacityNotifier = ValueNotifier<double>(0.0);
 
@@ -241,11 +244,18 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
 
     setState(() {
       _settingsLoaded = true;
-      // Mark that we need to show welcome after first connection (if first use)
-      if (!_hasCompletedOnboarding && !_hintTriggered) {
-        _waitingForConnection = true;
-      }
     });
+
+    // If first-time user and already connected (AppStartup waited for us),
+    // start welcome screen immediately - no race condition possible
+    if (!_hasCompletedOnboarding && !_hintTriggered) {
+      final provider = context.read<MusicAssistantProvider>();
+      if (provider.isConnected && provider.selectedPlayer != null) {
+        _miniPlayerHintsReady = true;
+        _startWelcomeScreen();
+        _startMiniPlayerBounce();
+      }
+    }
   }
 
   @override
@@ -255,14 +265,16 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     _checkConnectionForMiniPlayerHints();
   }
 
-  /// Check connection state and start welcome screen if appropriate
+  /// Check connection state and start welcome screen if appropriate.
+  /// NOTE: AppStartup now gates the transition, so by the time we get here,
+  /// if it's a first-time user, we're already connected with a player.
   void _checkConnectionForMiniPlayerHints() {
-    if (!_waitingForConnection || _hintTriggered || !mounted) return;
+    if (_hintTriggered || !mounted || !_settingsLoaded) return;
+    if (_hasCompletedOnboarding) return; // Not first-time user
 
     final provider = context.read<MusicAssistantProvider>();
     if (provider.isConnected && provider.selectedPlayer != null) {
       // Connected with a player - start welcome screen now
-      _waitingForConnection = false;
       _miniPlayerHintsReady = true;
       _startWelcomeScreen();
       // Start the bounce animation now that mini player is visible
@@ -394,31 +406,12 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Watch provider state synchronously to catch connection changes immediately
-    // This ensures the preemptive backdrop renders in the same frame as home screen
-    final provider = context.watch<MusicAssistantProvider>();
-    final isReadyForWelcome = provider.isConnected && provider.selectedPlayer != null;
-
-    // Show solid backdrop when:
-    // 1. Settings not loaded yet AND connected (covers uncertainty period during async load)
-    // 2. OR waiting for connection AND connected (first-use case after settings loaded)
-    // This keeps the grey "Connecting..." background visible until welcome is ready
-    final shouldShowPreemptiveBackdrop = !_isHintModeActive &&
-        isReadyForWelcome &&
-        (!_settingsLoaded || _waitingForConnection);
-
-    // Trigger welcome screen start if we just became ready
-    if (shouldShowPreemptiveBackdrop && !_hintTriggered && _settingsLoaded && _waitingForConnection) {
-      // Schedule for post-frame to avoid setState during build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _waitingForConnection && !_hintTriggered) {
-          _waitingForConnection = false;
-          _miniPlayerHintsReady = true;
-          _startWelcomeScreen();
-          _startMiniPlayerBounce();
-        }
-      });
-    }
+    // NOTE: Preemptive backdrop logic removed.
+    // AppStartup now handles the gate - it waits for:
+    // - First-time users: connected + player selected before showing HomeScreen
+    // - Returning users: connected before showing HomeScreen
+    // This eliminates the race condition. When we get here, if it's a first-time
+    // user, the welcome screen will start immediately via _loadHintSettings().
 
     // Handle back gesture at top level - dismiss hint mode or device list if visible
     return PopScope(
@@ -563,15 +556,10 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             ),
           ),
 
-        // Preemptive solid backdrop - shows instantly when transitioning to welcome
-        // This covers the home screen before the animated welcome starts
-        // Uses synchronous provider.watch() check from build method for immediate response
-        if (shouldShowPreemptiveBackdrop)
-          Positioned.fill(
-            child: Container(
-              color: colorScheme.surface,
-            ),
-          ),
+        // NOTE: Preemptive backdrop removed - AppStartup now handles the gate.
+        // The dark "Connecting..." screen stays visible until first-time users
+        // are connected with a player selected, so the welcome overlay appears
+        // immediately with no gap.
 
         // Blur backdrop for hint/welcome mode - animated fade from solid to semi-transparent
         if (_isHintModeActive)
