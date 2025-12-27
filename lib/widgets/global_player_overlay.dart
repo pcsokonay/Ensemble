@@ -170,7 +170,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   bool _showHints = true;
   bool _hasCompletedOnboarding = false; // First-use welcome screen
   bool _hintTriggered = false; // Prevent multiple triggers per session
-  bool _waitingForConnection = false; // Defer welcome until connected
+  bool _waitingForConnection = false; // Waiting for connection to show mini player hints
+  bool _miniPlayerHintsReady = false; // True once connected with player (can show hints)
   final _hintOpacityNotifier = ValueNotifier<double>(0.0);
 
   // Welcome content fade-in animation
@@ -235,29 +236,49 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   Future<void> _loadHintSettings() async {
     _showHints = await SettingsService.getShowHints();
     _hasCompletedOnboarding = await SettingsService.getHasCompletedOnboarding();
-    // Mark that we need to show welcome when connected (if first use)
+    // Start welcome screen immediately on first use (don't wait for connection)
     if (!_hasCompletedOnboarding && mounted && !_hintTriggered) {
       _waitingForConnection = true;
+      _startWelcomeScreen();
     }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Check if we should start the welcome screen now that we have connection
-    _checkConnectionForWelcome();
+    // Check if we should enable mini player hints now that we have connection
+    _checkConnectionForMiniPlayerHints();
   }
 
-  /// Check connection state and start welcome screen if appropriate
-  void _checkConnectionForWelcome() {
-    if (!_waitingForConnection || _hintTriggered || !mounted) return;
+  /// Check connection state and enable mini player hints if appropriate
+  void _checkConnectionForMiniPlayerHints() {
+    if (!_waitingForConnection || _miniPlayerHintsReady || !mounted) return;
 
     final provider = context.read<MusicAssistantProvider>();
     if (provider.isConnected && provider.selectedPlayer != null) {
-      // Connected with a player - start welcome screen
+      // Connected with a player - enable mini player hints
       _waitingForConnection = false;
-      _startWelcomeScreen();
+      _miniPlayerHintsReady = true;
+      if (mounted) setState(() {});
+      // Start the bounce animation now that mini player is visible
+      _startMiniPlayerBounce();
     }
+  }
+
+  /// Start the bounce animation for mini player hints
+  void _startMiniPlayerBounce() {
+    if (!_isHintModeActive || !mounted) return;
+    _doubleBounceController.reset();
+    _doubleBounceController.forward();
+
+    // Repeat bounce every 2 seconds
+    _hintBounceTimer?.cancel();
+    _hintBounceTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (_isHintModeActive && mounted) {
+        _doubleBounceController.reset();
+        _doubleBounceController.forward();
+      }
+    });
   }
 
   /// Start the welcome screen with fade-in animation
@@ -270,24 +291,10 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
       _isHintModeActive = true;
     });
 
-    // Fade in welcome content
+    // Fade in welcome content (logo + title)
     _welcomeFadeController.forward();
 
-    // Start bounce animation after fade completes
-    _welcomeFadeController.addStatusListener((status) {
-      if (status == AnimationStatus.completed && mounted) {
-        _doubleBounceController.reset();
-        _doubleBounceController.forward();
-
-        // Repeat bounce every 2 seconds
-        _hintBounceTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-          if (_isHintModeActive && mounted) {
-            _doubleBounceController.reset();
-            _doubleBounceController.forward();
-          }
-        });
-      }
-    });
+    // Mini player bounce is started separately once connected via _startMiniPlayerBounce()
   }
 
   @override
@@ -403,14 +410,21 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
           child: widget.child,
         ),
         // Global persistent bottom navigation bar - positioned at bottom
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: ListenableBuilder(
-            listenable: navigationProvider,
-            builder: (context, _) {
-              return Consumer<ThemeProvider>(
+        // Only show when connected (hides on login screen)
+        Selector<MusicAssistantProvider, bool>(
+          selector: (_, provider) => provider.isConnected,
+          builder: (context, isConnected, child) {
+            if (!isConnected) return const SizedBox.shrink();
+            return child!;
+          },
+          child: Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ListenableBuilder(
+              listenable: navigationProvider,
+              builder: (context, _) {
+                return Consumer<ThemeProvider>(
                 builder: (context, themeProvider, _) {
                   // Use adaptive primary color for bottom nav when adaptive theme is enabled
                   final sourceColor = themeProvider.adaptiveTheme
@@ -499,7 +513,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                   );
                 },
               );
-            },
+              },
+            ),
           ),
         ),
         // Blur backdrop for device selector (reveal mode) - static, no animation
@@ -573,8 +588,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             ),
           ),
 
-        // Bottom section: Hint text and Skip button (positioned relative to mini player)
-        if (_isHintModeActive)
+        // Bottom section: Hint text and Skip button (only show once mini player is visible)
+        if (_isHintModeActive && _miniPlayerHintsReady)
           Positioned(
             left: 24,
             right: 24,
@@ -634,11 +649,11 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             hasTrack: provider.currentTrack != null,
           ),
           builder: (context, state, child) {
-            // Check if we should start welcome screen now that we're connected
-            if (state.isConnected && state.hasPlayer && _waitingForConnection && !_hintTriggered) {
+            // Check if we should enable mini player hints now that we're connected
+            if (state.isConnected && state.hasPlayer && _waitingForConnection && !_miniPlayerHintsReady) {
               // Use post-frame callback to avoid setState during build
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                _checkConnectionForWelcome();
+                _checkConnectionForMiniPlayerHints();
               });
             }
 
