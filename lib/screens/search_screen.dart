@@ -434,6 +434,65 @@ class SearchScreenState extends State<SearchScreen> {
     return false;
   }
 
+  /// Extract artists from tracks/albums that match the query but aren't in direct results
+  /// This enables cross-referencing: searching "Yesterday Beatles" will include The Beatles artist
+  List<Artist> _extractCrossReferencedArtists(
+    String query,
+    List<Artist> directArtists,
+    List<Album> albums,
+    List<Track> tracks,
+  ) {
+    if (query.isEmpty) return [];
+
+    final queryLower = query.toLowerCase();
+    final queryWords = queryLower.split(RegExp(r'\s+'));
+
+    // Create a set of existing artist identifiers to avoid duplicates
+    final existingArtistKeys = <String>{};
+    for (final artist in directArtists) {
+      existingArtistKeys.add('${artist.provider}:${artist.itemId}');
+    }
+
+    // Collect unique artists from tracks and albums
+    final candidateArtists = <String, Artist>{};
+
+    for (final track in tracks) {
+      if (track.artists != null) {
+        for (final artist in track.artists!) {
+          final key = '${artist.provider}:${artist.itemId}';
+          if (!existingArtistKeys.contains(key) && !candidateArtists.containsKey(key)) {
+            candidateArtists[key] = artist;
+          }
+        }
+      }
+    }
+
+    for (final album in albums) {
+      if (album.artists != null) {
+        for (final artist in album.artists!) {
+          final key = '${artist.provider}:${artist.itemId}';
+          if (!existingArtistKeys.contains(key) && !candidateArtists.containsKey(key)) {
+            candidateArtists[key] = artist;
+          }
+        }
+      }
+    }
+
+    // Filter candidates: only include if artist name contains any query word
+    final crossRefArtists = <Artist>[];
+    for (final artist in candidateArtists.values) {
+      final artistLower = artist.name.toLowerCase();
+      for (final word in queryWords) {
+        if (word.length >= 3 && artistLower.contains(word)) {
+          crossRefArtists.add(artist);
+          break;
+        }
+      }
+    }
+
+    return crossRefArtists;
+  }
+
   List<_ListItem> _buildListItems(
     List<MediaItem> artists,
     List<MediaItem> albums,
@@ -468,6 +527,19 @@ class SearchScreenState extends State<SearchScreen> {
       for (final audiobook in audiobooks) {
         final score = _calculateRelevanceScore(audiobook, query);
         scoredItems.add(_ListItem.audiobook(audiobook, relevanceScore: score));
+      }
+
+      // Smart cross-referencing: Add artists from matched tracks/albums
+      // if the artist name matches the query but wasn't in direct results
+      final crossRefArtists = _extractCrossReferencedArtists(
+        query,
+        artists.cast<Artist>(),
+        albums.cast<Album>(),
+        tracks.cast<Track>(),
+      );
+      for (final artist in crossRefArtists) {
+        // Give cross-referenced artists a lower score (25) since they're indirect matches
+        scoredItems.add(_ListItem.artist(artist, relevanceScore: 25));
       }
 
       // Sort by relevance score descending
