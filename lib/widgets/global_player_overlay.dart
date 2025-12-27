@@ -481,7 +481,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
               behavior: _isRevealVisible ? HitTestBehavior.opaque : HitTestBehavior.translucent,
               onTap: _isRevealVisible ? _dismissPlayerReveal : null,
               child: TweenAnimationBuilder<double>(
-                // Hint mode: hold black for 2s, then fade to 0.5 over 1s
+                // Hint mode: hold solid for 2s, then fade to 0.5 over 1s
                 // Reveal mode: instant 0.5 (no animation)
                 key: ValueKey(_isHintModeActive ? 'hint' : 'reveal'),
                 tween: Tween<double>(
@@ -497,7 +497,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                   return BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
                     child: Container(
-                      color: Colors.black.withOpacity(opacity),
+                      // Use theme surface color instead of black
+                      color: colorScheme.surface.withOpacity(opacity),
                     ),
                   );
                 },
