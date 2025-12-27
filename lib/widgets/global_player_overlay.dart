@@ -459,9 +459,10 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
           child: widget.child,
         ),
         // Global persistent bottom navigation bar - positioned at bottom
-        // Hide when not connected OR when showing welcome screen
-        // Note: Can't use Selector here because shouldShowWelcomeBackdrop is local state
-        if (provider.isConnected && !shouldShowWelcomeBackdrop)
+        // Hide when: not connected, no player selected, OR showing welcome screen
+        // For first-time users, selectedPlayer becomes non-null at the same time
+        // as shouldShowWelcomeBackdrop becomes true, preventing any gap.
+        if (provider.isConnected && provider.selectedPlayer != null && !shouldShowWelcomeBackdrop)
           Positioned(
             left: 0,
             right: 0,
