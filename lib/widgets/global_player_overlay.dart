@@ -459,15 +459,10 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
           child: widget.child,
         ),
         // Global persistent bottom navigation bar - positioned at bottom
-        // Only show when connected AND not showing welcome screen
-        Selector<MusicAssistantProvider, bool>(
-          selector: (_, provider) => provider.isConnected,
-          builder: (context, isConnected, child) {
-            // Hide during welcome screen to prevent flash
-            if (!isConnected || shouldShowWelcomeBackdrop) return const SizedBox.shrink();
-            return child!;
-          },
-          child: Positioned(
+        // Hide when not connected OR when showing welcome screen
+        // Note: Can't use Selector here because shouldShowWelcomeBackdrop is local state
+        if (provider.isConnected && !shouldShowWelcomeBackdrop)
+          Positioned(
             left: 0,
             right: 0,
             bottom: 0,
@@ -566,7 +561,6 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
               },
             ),
           ),
-        ),
         // Blur backdrop for device selector (reveal mode) - static, no animation
         if (_isRevealVisible && !_isHintModeActive)
           Positioned.fill(
@@ -596,7 +590,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                 return BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
                   child: Container(
-                    color: colorScheme.surface.withOpacity(opacity),
+                    // Use same dark color as connection screen for seamless transition
+                    color: const Color(0xFF1a1a1a).withOpacity(opacity),
                   ),
                 );
               },
