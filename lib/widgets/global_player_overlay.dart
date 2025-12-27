@@ -170,6 +170,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   bool _showHints = true;
   bool _hasCompletedOnboarding = false; // First-use welcome screen
   bool _hintTriggered = false; // Prevent multiple triggers per session
+  bool _waitingForConnection = false; // Defer welcome until connected
   final _hintOpacityNotifier = ValueNotifier<double>(0.0);
 
   // Welcome content fade-in animation
@@ -234,8 +235,27 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   Future<void> _loadHintSettings() async {
     _showHints = await SettingsService.getShowHints();
     _hasCompletedOnboarding = await SettingsService.getHasCompletedOnboarding();
-    // Show welcome screen only on first use (not completed onboarding yet)
+    // Mark that we need to show welcome when connected (if first use)
     if (!_hasCompletedOnboarding && mounted && !_hintTriggered) {
+      _waitingForConnection = true;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Check if we should start the welcome screen now that we have connection
+    _checkConnectionForWelcome();
+  }
+
+  /// Check connection state and start welcome screen if appropriate
+  void _checkConnectionForWelcome() {
+    if (!_waitingForConnection || _hintTriggered || !mounted) return;
+
+    final provider = context.read<MusicAssistantProvider>();
+    if (provider.isConnected && provider.selectedPlayer != null) {
+      // Connected with a player - start welcome screen
+      _waitingForConnection = false;
       _startWelcomeScreen();
     }
   }
@@ -614,6 +634,14 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             hasTrack: provider.currentTrack != null,
           ),
           builder: (context, state, child) {
+            // Check if we should start welcome screen now that we're connected
+            if (state.isConnected && state.hasPlayer && _waitingForConnection && !_hintTriggered) {
+              // Use post-frame callback to avoid setState during build
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _checkConnectionForWelcome();
+              });
+            }
+
             // Only show player if connected and has a selected player
             if (!state.isConnected || !state.hasPlayer) {
               return const SizedBox.shrink();
