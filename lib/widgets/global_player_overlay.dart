@@ -459,11 +459,12 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
           child: widget.child,
         ),
         // Global persistent bottom navigation bar - positioned at bottom
-        // Only show when connected (hides on login screen)
+        // Only show when connected AND not showing welcome screen
         Selector<MusicAssistantProvider, bool>(
           selector: (_, provider) => provider.isConnected,
           builder: (context, isConnected, child) {
-            if (!isConnected) return const SizedBox.shrink();
+            // Hide during welcome screen to prevent flash
+            if (!isConnected || shouldShowWelcomeBackdrop) return const SizedBox.shrink();
             return child!;
           },
           child: Positioned(
