@@ -236,10 +236,9 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   Future<void> _loadHintSettings() async {
     _showHints = await SettingsService.getShowHints();
     _hasCompletedOnboarding = await SettingsService.getHasCompletedOnboarding();
-    // Start welcome screen immediately on first use (don't wait for connection)
+    // Mark that we need to show welcome after first connection (if first use)
     if (!_hasCompletedOnboarding && mounted && !_hintTriggered) {
       _waitingForConnection = true;
-      _startWelcomeScreen();
     }
   }
 
@@ -250,16 +249,16 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     _checkConnectionForMiniPlayerHints();
   }
 
-  /// Check connection state and enable mini player hints if appropriate
+  /// Check connection state and start welcome screen if appropriate
   void _checkConnectionForMiniPlayerHints() {
-    if (!_waitingForConnection || _miniPlayerHintsReady || !mounted) return;
+    if (!_waitingForConnection || _hintTriggered || !mounted) return;
 
     final provider = context.read<MusicAssistantProvider>();
     if (provider.isConnected && provider.selectedPlayer != null) {
-      // Connected with a player - enable mini player hints
+      // Connected with a player - start welcome screen now
       _waitingForConnection = false;
       _miniPlayerHintsReady = true;
-      if (mounted) setState(() {});
+      _startWelcomeScreen();
       // Start the bounce animation now that mini player is visible
       _startMiniPlayerBounce();
     }
