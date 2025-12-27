@@ -12,6 +12,8 @@ import '../widgets/common/disconnected_state.dart';
 import '../widgets/artist_avatar.dart';
 import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
+import 'playlist_details_screen.dart';
+import 'audiobook_detail_screen.dart';
 import '../l10n/app_localizations.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -22,7 +24,7 @@ class SearchScreen extends StatefulWidget {
 }
 
 // Helper enum and class for ListView.builder item types
-enum _ListItemType { header, artist, album, track, spacer }
+enum _ListItemType { header, artist, album, track, playlist, audiobook, spacer }
 
 class _ListItem {
   final _ListItemType type;
@@ -49,6 +51,16 @@ class _ListItem {
         headerTitle = null,
         headerCount = null;
 
+  _ListItem.playlist(this.mediaItem)
+      : type = _ListItemType.playlist,
+        headerTitle = null,
+        headerCount = null;
+
+  _ListItem.audiobook(this.mediaItem)
+      : type = _ListItemType.audiobook,
+        headerTitle = null,
+        headerCount = null;
+
   _ListItem.spacer()
       : type = _ListItemType.spacer,
         mediaItem = null,
@@ -65,10 +77,12 @@ class SearchScreenState extends State<SearchScreen> {
     'artists': [],
     'albums': [],
     'tracks': [],
+    'playlists': [],
+    'audiobooks': [],
   };
   bool _isSearching = false;
   bool _hasSearched = false;
-  String _activeFilter = 'all'; // 'all', 'artists', 'albums', 'tracks'
+  String _activeFilter = 'all'; // 'all', 'artists', 'albums', 'tracks', 'playlists', 'audiobooks'
   String? _searchError;
 
   @override
@@ -108,7 +122,7 @@ class SearchScreenState extends State<SearchScreen> {
   Future<void> _performSearch(String query, {bool keepFocus = false}) async {
     if (query.isEmpty) {
       setState(() {
-        _searchResults = {'artists': [], 'albums': [], 'tracks': []};
+        _searchResults = {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
         _hasSearched = false;
         _searchError = null;
       });
@@ -176,7 +190,7 @@ class SearchScreenState extends State<SearchScreen> {
                     onPressed: () {
                       _searchController.clear();
                       setState(() {
-                        _searchResults = {'artists': [], 'albums': [], 'tracks': []};
+                        _searchResults = {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
                         _hasSearched = false;
                         _searchError = null;
                       });
@@ -203,7 +217,9 @@ class SearchScreenState extends State<SearchScreen> {
     // Show cached results even while searching - only show spinner if no cached results
     final hasCachedResults = _searchResults['artists']?.isNotEmpty == true ||
                              _searchResults['albums']?.isNotEmpty == true ||
-                             _searchResults['tracks']?.isNotEmpty == true;
+                             _searchResults['tracks']?.isNotEmpty == true ||
+                             _searchResults['playlists']?.isNotEmpty == true ||
+                             _searchResults['audiobooks']?.isNotEmpty == true;
 
     if (_isSearching && !hasCachedResults) {
       return Center(
@@ -266,8 +282,11 @@ class SearchScreenState extends State<SearchScreen> {
     final artists = _searchResults['artists'] as List<MediaItem>? ?? [];
     final albums = _searchResults['albums'] as List<MediaItem>? ?? [];
     final tracks = _searchResults['tracks'] as List<MediaItem>? ?? [];
+    final playlists = _searchResults['playlists'] as List<MediaItem>? ?? [];
+    final audiobooks = _searchResults['audiobooks'] as List<MediaItem>? ?? [];
 
-    final hasResults = artists.isNotEmpty || albums.isNotEmpty || tracks.isNotEmpty;
+    final hasResults = artists.isNotEmpty || albums.isNotEmpty || tracks.isNotEmpty ||
+                       playlists.isNotEmpty || audiobooks.isNotEmpty;
 
     if (!hasResults) {
       return EmptyState.search(context: context);
@@ -293,6 +312,14 @@ class SearchScreenState extends State<SearchScreen> {
               ],
               if (tracks.isNotEmpty) ...[
                 _buildFilterChip(S.of(context)!.tracks, 'tracks'),
+                const SizedBox(width: 8),
+              ],
+              if (playlists.isNotEmpty) ...[
+                _buildFilterChip(S.of(context)!.playlists, 'playlists'),
+                const SizedBox(width: 8),
+              ],
+              if (audiobooks.isNotEmpty) ...[
+                _buildFilterChip(S.of(context)!.audiobooks, 'audiobooks'),
               ],
             ],
           ),
@@ -302,7 +329,7 @@ class SearchScreenState extends State<SearchScreen> {
         Expanded(
           child: Builder(
             builder: (context) {
-              final listItems = _buildListItems(artists, albums, tracks);
+              final listItems = _buildListItems(artists, albums, tracks, playlists, audiobooks);
               return ListView.builder(
                 padding: EdgeInsets.fromLTRB(16, 8, 16, BottomSpacing.navBarOnly),
                 cacheExtent: 500, // Prebuild items off-screen for smoother scrolling
@@ -320,6 +347,10 @@ class SearchScreenState extends State<SearchScreen> {
                       return _buildAlbumTile(item.mediaItem! as Album);
                     case _ListItemType.track:
                       return _buildTrackTile(item.mediaItem! as Track);
+                    case _ListItemType.playlist:
+                      return _buildPlaylistTile(item.mediaItem! as Playlist);
+                    case _ListItemType.audiobook:
+                      return _buildAudiobookTile(item.mediaItem! as Audiobook);
                     case _ListItemType.spacer:
                       return const SizedBox(height: 24);
                   }
@@ -336,6 +367,8 @@ class SearchScreenState extends State<SearchScreen> {
     List<MediaItem> artists,
     List<MediaItem> albums,
     List<MediaItem> tracks,
+    List<MediaItem> playlists,
+    List<MediaItem> audiobooks,
   ) {
     final items = <_ListItem>[];
 
@@ -368,6 +401,28 @@ class SearchScreenState extends State<SearchScreen> {
       }
       for (final track in tracks) {
         items.add(_ListItem.track(track));
+      }
+      items.add(_ListItem.spacer());
+    }
+
+    // Add playlists section
+    if ((_activeFilter == 'all' || _activeFilter == 'playlists') && playlists.isNotEmpty) {
+      if (_activeFilter == 'all') {
+        items.add(_ListItem.header(S.of(context)!.playlists, playlists.length));
+      }
+      for (final playlist in playlists) {
+        items.add(_ListItem.playlist(playlist));
+      }
+      items.add(_ListItem.spacer());
+    }
+
+    // Add audiobooks section
+    if ((_activeFilter == 'all' || _activeFilter == 'audiobooks') && audiobooks.isNotEmpty) {
+      if (_activeFilter == 'all') {
+        items.add(_ListItem.header(S.of(context)!.audiobooks, audiobooks.length));
+      }
+      for (final audiobook in audiobooks) {
+        items.add(_ListItem.audiobook(audiobook));
       }
     }
 
@@ -556,6 +611,128 @@ class SearchScreenState extends State<SearchScreen> {
               )
             : null,
         onTap: () => _playTrack(track),
+      ),
+    );
+  }
+
+  Widget _buildPlaylistTile(Playlist playlist) {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final imageUrl = maProvider.getImageUrl(playlist, size: 128);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return RepaintBoundary(
+      child: ListTile(
+        key: ValueKey(playlist.uri ?? playlist.itemId),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceVariant,
+            borderRadius: BorderRadius.circular(8),
+            image: imageUrl != null
+                ? DecorationImage(
+                    image: CachedNetworkImageProvider(imageUrl),
+                    fit: BoxFit.cover,
+                  )
+                : null,
+          ),
+          child: imageUrl == null
+              ? Icon(Icons.queue_music_rounded, color: colorScheme.onSurfaceVariant)
+              : null,
+        ),
+        title: Text(
+          playlist.name,
+          style: TextStyle(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w500,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          playlist.owner ?? S.of(context)!.playlist,
+          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: playlist.trackCount != null
+            ? Text(
+                S.of(context)!.trackCount(playlist.trackCount!),
+                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
+              )
+            : null,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PlaylistDetailsScreen(
+                playlist: playlist,
+                initialImageUrl: imageUrl,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAudiobookTile(Audiobook audiobook) {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final imageUrl = maProvider.getImageUrl(audiobook, size: 128);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return RepaintBoundary(
+      child: ListTile(
+        key: ValueKey(audiobook.uri ?? audiobook.itemId),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceVariant,
+            borderRadius: BorderRadius.circular(8),
+            image: imageUrl != null
+                ? DecorationImage(
+                    image: CachedNetworkImageProvider(imageUrl),
+                    fit: BoxFit.cover,
+                  )
+                : null,
+          ),
+          child: imageUrl == null
+              ? Icon(Icons.headphones_rounded, color: colorScheme.onSurfaceVariant)
+              : null,
+        ),
+        title: Text(
+          audiobook.name,
+          style: TextStyle(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w500,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          audiobook.authors?.map((a) => a.name).join(', ') ?? S.of(context)!.unknownAuthor,
+          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: audiobook.duration != null
+            ? Text(
+                _formatDuration(audiobook.duration!),
+                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
+              )
+            : null,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AudiobookDetailScreen(
+                audiobook: audiobook,
+                initialImageUrl: imageUrl,
+              ),
+            ),
+          );
+        },
       ),
     );
   }

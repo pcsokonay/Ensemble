@@ -2097,7 +2097,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
   Future<Map<String, List<MediaItem>>> searchWithCache(String query, {bool forceRefresh = false}) async {
     final cacheKey = query.toLowerCase().trim();
-    if (cacheKey.isEmpty) return {'artists': [], 'albums': [], 'tracks': []};
+    if (cacheKey.isEmpty) return {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
 
     if (_cacheService.isSearchCacheValid(cacheKey, forceRefresh: forceRefresh)) {
       _logger.log('📦 Using cached search results for "$query"');
@@ -2105,7 +2105,7 @@ class MusicAssistantProvider with ChangeNotifier {
     }
 
     if (_api == null) {
-      return _cacheService.getCachedSearchResults(cacheKey) ?? {'artists': [], 'albums': [], 'tracks': []};
+      return _cacheService.getCachedSearchResults(cacheKey) ?? {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
     }
 
     try {
@@ -2116,6 +2116,8 @@ class MusicAssistantProvider with ChangeNotifier {
         'artists': results['artists'] ?? [],
         'albums': results['albums'] ?? [],
         'tracks': results['tracks'] ?? [],
+        'playlists': results['playlists'] ?? [],
+        'audiobooks': results['audiobooks'] ?? [],
       };
 
       _cacheService.setCachedSearchResults(cacheKey, cachedResults);
@@ -2123,7 +2125,7 @@ class MusicAssistantProvider with ChangeNotifier {
       return cachedResults;
     } catch (e) {
       _logger.log('❌ Search failed: $e');
-      return _cacheService.getCachedSearchResults(cacheKey) ?? {'artists': [], 'albums': [], 'tracks': []};
+      return _cacheService.getCachedSearchResults(cacheKey) ?? {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
     }
   }
 

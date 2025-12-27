@@ -1399,7 +1399,7 @@ class MusicAssistantAPI {
 
           final result = searchResponse['result'] as Map<String, dynamic>?;
           if (result == null) {
-            return <String, List<MediaItem>>{'artists': [], 'albums': [], 'tracks': []};
+            return <String, List<MediaItem>>{'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
           }
 
           // Parse results from the search response
@@ -1418,6 +1418,16 @@ class MusicAssistantAPI {
                   .toList() ??
               [];
 
+          final playlists = (result['playlists'] as List<dynamic>?)
+                  ?.map((item) => Playlist.fromJson(item as Map<String, dynamic>))
+                  .toList() ??
+              [];
+
+          final audiobooks = (result['audiobooks'] as List<dynamic>?)
+                  ?.map((item) => Audiobook.fromJson(item as Map<String, dynamic>))
+                  .toList() ??
+              [];
+
           // Deduplicate results by name
           // MA returns both library items and provider items for the same content
           // Prefer library items (provider='library') as they have all provider mappings
@@ -1425,15 +1435,17 @@ class MusicAssistantAPI {
             'artists': _deduplicateResults(artists),
             'albums': _deduplicateResults(albums),
             'tracks': _deduplicateResults(tracks),
+            'playlists': _deduplicateResults(playlists),
+            'audiobooks': _deduplicateResults(audiobooks),
           };
         } catch (e) {
           _logger.log('Error searching: $e');
-          return <String, List<MediaItem>>{'artists': [], 'albums': [], 'tracks': []};
+          return <String, List<MediaItem>>{'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
         }
       },
     ).catchError((e) {
       _logger.log('Error searching after retries: $e');
-      return <String, List<MediaItem>>{'artists': [], 'albums': [], 'tracks': []};
+      return <String, List<MediaItem>>{'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
     });
   }
 
