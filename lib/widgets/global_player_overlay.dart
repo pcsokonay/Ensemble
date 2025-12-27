@@ -411,20 +411,31 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     // Watch provider to trigger rebuilds when connection state changes
     final provider = context.watch<MusicAssistantProvider>();
 
-    // Check if we should start welcome screen - this runs on every build,
-    // which happens when provider state changes (via context.watch above).
-    // The check is idempotent (won't trigger twice due to _hintTriggered flag).
-    if (_settingsLoaded && !_hasCompletedOnboarding && !_hintTriggered) {
-      if (provider.isConnected && provider.selectedPlayer != null) {
-        // Schedule for post-frame to avoid setState during build
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && !_hintTriggered) {
-            _miniPlayerHintsReady = true;
-            _startWelcomeScreen();
-            _startMiniPlayerBounce();
-          }
-        });
-      }
+    // Compute whether this is a first-time user ready for welcome screen.
+    // This is SYNCHRONOUS - no setState needed - so it works in the same frame.
+    final isFirstTimeUserReady = _settingsLoaded &&
+        !_hasCompletedOnboarding &&
+        provider.isConnected &&
+        provider.selectedPlayer != null;
+
+    // Show welcome backdrop if:
+    // 1. Already in hint mode (_isHintModeActive), OR
+    // 2. First-time user ready but hint mode not started yet (!_hintTriggered)
+    // This ensures backdrop appears IMMEDIATELY when HomeScreen renders,
+    // preventing the flash. Welcome content fades in after via animation.
+    final shouldShowWelcomeBackdrop = _isHintModeActive ||
+        (isFirstTimeUserReady && !_hintTriggered);
+
+    // Trigger hint mode if conditions are met (for animations, bounce, etc)
+    if (isFirstTimeUserReady && !_hintTriggered) {
+      // Schedule for post-frame to avoid setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_hintTriggered) {
+          _miniPlayerHintsReady = true;
+          _startWelcomeScreen();
+          _startMiniPlayerBounce();
+        }
+      });
     }
 
     // Handle back gesture at top level - dismiss hint mode or device list if visible
@@ -570,13 +581,10 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             ),
           ),
 
-        // NOTE: Preemptive backdrop removed - AppStartup now handles the gate.
-        // The dark "Connecting..." screen stays visible until first-time users
-        // are connected with a player selected, so the welcome overlay appears
-        // immediately with no gap.
-
-        // Blur backdrop for hint/welcome mode - animated fade from solid to semi-transparent
-        if (_isHintModeActive)
+        // Welcome/hint backdrop - shows IMMEDIATELY when first-time user is ready.
+        // Uses computed `shouldShowWelcomeBackdrop` which is true BEFORE _isHintModeActive,
+        // preventing the 1-frame gap where home screen would be visible.
+        if (shouldShowWelcomeBackdrop)
           Positioned.fill(
             child: TweenAnimationBuilder<double>(
               // Hold solid for 2s, then fade to 0.5 over 1s
