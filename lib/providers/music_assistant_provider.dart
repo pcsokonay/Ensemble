@@ -2415,7 +2415,19 @@ class MusicAssistantProvider with ChangeNotifier {
                   (p) => p.playerId == builtinPlayerId && p.available,
                 );
                 _logger.log('📱 Auto-selected local player: ${playerToSelect?.name}');
-              } catch (e) {}
+              } catch (e) {
+                // Local player not found or not available - check why
+                final localPlayer = _availablePlayers
+                    .where((p) => p.playerId == builtinPlayerId)
+                    .toList();
+                if (localPlayer.isEmpty) {
+                  _logger.log('⚠️ Priority 2 skipped: local player ($builtinPlayerId) not in available players list');
+                } else {
+                  _logger.log('⚠️ Priority 2 skipped: local player found but available=${localPlayer.first.available}');
+                }
+              }
+            } else if (playerToSelect == null && builtinPlayerId == null) {
+              _logger.log('⚠️ Priority 2 skipped: builtinPlayerId is null');
             }
           }
 

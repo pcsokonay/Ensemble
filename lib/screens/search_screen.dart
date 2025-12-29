@@ -8,9 +8,13 @@ import '../models/media_item.dart';
 import '../services/debug_logger.dart';
 import '../services/database_service.dart';
 import '../widgets/global_player_overlay.dart';
+import '../widgets/player_picker_sheet.dart';
 import '../widgets/common/empty_state.dart';
 import '../widgets/common/disconnected_state.dart';
 import '../widgets/artist_avatar.dart';
+import '../constants/hero_tags.dart';
+import '../theme/theme_provider.dart';
+import '../utils/page_transitions.dart';
 import 'album_details_screen.dart';
 import 'artist_details_screen.dart';
 import 'playlist_details_screen.dart';
@@ -76,6 +80,8 @@ class SearchScreenState extends State<SearchScreen> {
   final _logger = DebugLogger();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final PageController _pageController = PageController();
+  final ScrollController _filterScrollController = ScrollController();
   Timer? _debounceTimer;
   Map<String, List<MediaItem>> _searchResults = {
     'artists': [],
@@ -83,6 +89,7 @@ class SearchScreenState extends State<SearchScreen> {
     'tracks': [],
     'playlists': [],
     'audiobooks': [],
+    'podcasts': [],
   };
   bool _isSearching = false;
   bool _hasSearched = false;
@@ -92,12 +99,77 @@ class SearchScreenState extends State<SearchScreen> {
   bool _libraryOnly = false;
   String? _expandedTrackId; // Track ID for expanded quick actions
 
+  // PERF: Cache list items per filter to avoid rebuilding during PageView animation
+  Map<String, List<_ListItem>> _cachedListItems = {};
+
+  // Scroll-to-hide search bar (vertical scroll only)
+  bool _isSearchBarVisible = true;
+  double _lastVerticalScrollOffset = 0;
+  static const double _scrollThreshold = 10.0;
+
   @override
   void initState() {
     super.initState();
     // Don't auto-focus - let user tap to focus
     // This prevents keyboard popup bug when SearchScreen is in widget tree but not visible
     _loadRecentSearches();
+  }
+
+  /// Get list of available filters based on current results
+  List<String> _getAvailableFilters() {
+    final filters = <String>['all'];
+    if (_searchResults['artists']?.isNotEmpty == true) filters.add('artists');
+    if (_searchResults['albums']?.isNotEmpty == true) filters.add('albums');
+    if (_searchResults['tracks']?.isNotEmpty == true) filters.add('tracks');
+    if (_searchResults['playlists']?.isNotEmpty == true) filters.add('playlists');
+    if (_searchResults['audiobooks']?.isNotEmpty == true) filters.add('audiobooks');
+    // Always show podcasts filter (placeholder until fully integrated)
+    filters.add('podcasts');
+    return filters;
+  }
+
+  /// Animate to a specific filter
+  void _animateToFilter(String filter) {
+    final filters = _getAvailableFilters();
+    final index = filters.indexOf(filter);
+    if (index >= 0 && _pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  /// Handle page change from swipe gesture
+  void _onPageChanged(int pageIndex) {
+    final filters = _getAvailableFilters();
+    if (pageIndex >= 0 && pageIndex < filters.length) {
+      setState(() {
+        _activeFilter = filters[pageIndex];
+      });
+      _scrollFilterIntoView(pageIndex);
+    }
+  }
+
+  /// Scroll filter bar to keep active filter visible
+  void _scrollFilterIntoView(int filterIndex) {
+    if (!_filterScrollController.hasClients) return;
+
+    // Approximate width per filter chip (padding + text)
+    const chipWidth = 80.0;
+    const horizontalPadding = 16.0;
+
+    // Calculate target scroll position to center the active filter
+    final targetOffset = (filterIndex * chipWidth) - horizontalPadding;
+    final maxScroll = _filterScrollController.position.maxScrollExtent;
+    final clampedOffset = targetOffset.clamp(0.0, maxScroll);
+
+    _filterScrollController.animateTo(
+      clampedOffset,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _loadRecentSearches() async {
@@ -127,7 +199,33 @@ class SearchScreenState extends State<SearchScreen> {
     _debounceTimer?.cancel();
     _searchController.dispose();
     _focusNode.dispose();
+    _pageController.dispose();
+    _filterScrollController.dispose();
     super.dispose();
+  }
+
+  /// Handle scroll notifications - only vertical scroll hides search bar
+  bool _handleScrollNotification(ScrollNotification notification) {
+    // Only respond to vertical scroll (not horizontal PageView swipe)
+    if (notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+
+    if (notification is ScrollUpdateNotification) {
+      final currentOffset = notification.metrics.pixels;
+      final delta = currentOffset - _lastVerticalScrollOffset;
+
+      if (delta.abs() > _scrollThreshold) {
+        final shouldShow = delta < 0 || currentOffset <= 0;
+        if (shouldShow != _isSearchBarVisible) {
+          setState(() {
+            _isSearchBarVisible = shouldShow;
+          });
+        }
+        _lastVerticalScrollOffset = currentOffset;
+      }
+    }
+    return false;
   }
 
   void _onSearchChanged(String query) {
@@ -140,9 +238,10 @@ class SearchScreenState extends State<SearchScreen> {
   Future<void> _performSearch(String query, {bool keepFocus = false}) async {
     if (query.isEmpty) {
       setState(() {
-        _searchResults = {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
+        _searchResults = {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': [], 'podcasts': []};
         _hasSearched = false;
         _searchError = null;
+        _cachedListItems.clear(); // PERF: Clear cache
       });
       return;
     }
@@ -161,6 +260,7 @@ class SearchScreenState extends State<SearchScreen> {
           _searchResults = results;
           _isSearching = false;
           _hasSearched = true;
+          _cachedListItems.clear(); // PERF: Clear cache on new results
         });
 
         // Save to search history if we got results
@@ -197,64 +297,97 @@ class SearchScreenState extends State<SearchScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.background,
-      appBar: AppBar(
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-        title: TextField(
-          controller: _searchController,
-          focusNode: _focusNode,
-          style: TextStyle(color: colorScheme.onSurface),
-          cursorColor: colorScheme.primary,
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            hintText: S.of(context)!.searchMusic,
-            hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
-            border: InputBorder.none,
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: Icon(Icons.clear_rounded, color: colorScheme.onSurface.withOpacity(0.5)),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() {
-                        _searchResults = {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': []};
-                        _hasSearched = false;
-                        _searchError = null;
-                      });
-                    },
-                  )
-                : null,
-          ),
-          onChanged: (value) {
-            setState(() {}); // Update clear button visibility
-            _onSearchChanged(value);
-          },
-          onSubmitted: (query) => _performSearch(query),
-        ),
-        actions: [
-          // Library-only toggle
-          Tooltip(
-            message: S.of(context)!.libraryOnly,
-            child: IconButton(
-              icon: Icon(
-                _libraryOnly ? Icons.library_music : Icons.library_music_outlined,
-                color: _libraryOnly ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.5),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Animated search bar - hides on scroll down
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              height: _isSearchBarVisible ? kToolbarHeight + 16 : 0,
+              clipBehavior: Clip.hardEdge,
+              decoration: const BoxDecoration(),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceVariant.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      // Search field
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 16),
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _focusNode,
+                            style: TextStyle(color: colorScheme.onSurface),
+                            cursorColor: colorScheme.primary,
+                            textInputAction: TextInputAction.search,
+                            textAlignVertical: TextAlignVertical.center,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                              hintText: S.of(context)!.searchMusic,
+                              hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
+                              border: InputBorder.none,
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(Icons.clear_rounded, color: colorScheme.onSurface.withOpacity(0.5)),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() {
+                                          _searchResults = {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': [], 'podcasts': []};
+                                          _hasSearched = false;
+                                          _searchError = null;
+                                          _cachedListItems.clear();
+                                        });
+                                      },
+                                    )
+                                  : null,
+                            ),
+                            onChanged: (value) {
+                              setState(() {});
+                              _onSearchChanged(value);
+                            },
+                            onSubmitted: (query) => _performSearch(query),
+                          ),
+                        ),
+                      ),
+                      // Library-only toggle
+                      Tooltip(
+                        message: S.of(context)!.libraryOnly,
+                        child: IconButton(
+                          icon: Icon(
+                            _libraryOnly ? Icons.library_music : Icons.library_music_outlined,
+                            color: _libraryOnly ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _libraryOnly = !_libraryOnly;
+                            });
+                            if (_searchController.text.isNotEmpty) {
+                              _performSearch(_searchController.text);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              onPressed: () {
-                setState(() {
-                  _libraryOnly = !_libraryOnly;
-                });
-                // Re-search if there's a query
-                if (_searchController.text.isNotEmpty) {
-                  _performSearch(_searchController.text);
-                }
-              },
             ),
-          ),
-        ],
+            // Main content
+            Expanded(
+              child: !maProvider.isConnected
+                  ? DisconnectedState.simple(context)
+                  : _buildSearchContent(),
+            ),
+          ],
+        ),
       ),
-      body: !maProvider.isConnected
-          ? DisconnectedState.simple(context)
-          : _buildSearchContent(),
     );
   }
 
@@ -369,72 +502,73 @@ class SearchScreenState extends State<SearchScreen> {
       return EmptyState.search(context: context);
     }
 
-    return Column(
+    // Use Stack so content scrolls behind the filter tabs
+    return Stack(
       children: [
-        // Filters
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              _buildFilterChip(S.of(context)!.all, 'all'),
-              const SizedBox(width: 8),
-              if (artists.isNotEmpty) ...[
-                _buildFilterChip(S.of(context)!.artists, 'artists'),
-                const SizedBox(width: 8),
-              ],
-              if (albums.isNotEmpty) ...[
-                _buildFilterChip(S.of(context)!.albums, 'albums'),
-                const SizedBox(width: 8),
-              ],
-              if (tracks.isNotEmpty) ...[
-                _buildFilterChip(S.of(context)!.tracks, 'tracks'),
-                const SizedBox(width: 8),
-              ],
-              if (playlists.isNotEmpty) ...[
-                _buildFilterChip(S.of(context)!.playlists, 'playlists'),
-                const SizedBox(width: 8),
-              ],
-              if (audiobooks.isNotEmpty) ...[
-                _buildFilterChip(S.of(context)!.audiobooks, 'audiobooks'),
-              ],
-            ],
-          ),
-        ),
+        // Results with swipeable pages - fills entire area
+        NotificationListener<ScrollNotification>(
+          onNotification: _handleScrollNotification,
+          child: PageView.builder(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
+            itemCount: _getAvailableFilters().length,
+            itemBuilder: (context, pageIndex) {
+              final filters = _getAvailableFilters();
+              final filterForPage = filters[pageIndex];
 
-        // Results
-        Expanded(
-          child: Builder(
-            builder: (context) {
-              final listItems = _buildListItems(artists, albums, tracks, playlists, audiobooks);
-              return ListView.builder(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, BottomSpacing.navBarOnly),
-                cacheExtent: 500, // Prebuild items off-screen for smoother scrolling
-                addAutomaticKeepAlives: false, // Tiles don't need individual keep-alive
-                addRepaintBoundaries: false, // We add RepaintBoundary manually to tiles
-                itemCount: listItems.length,
-                itemBuilder: (context, index) {
-                  final item = listItems[index];
-                  final showTypeInSubtitle = _activeFilter == 'all';
-                  switch (item.type) {
-                    case _ListItemType.header:
-                      return _buildSectionHeader(item.headerTitle!, item.headerCount!);
-                    case _ListItemType.artist:
-                      return _buildArtistTile(item.mediaItem! as Artist);
-                    case _ListItemType.album:
-                      return _buildAlbumTile(item.mediaItem! as Album, showType: showTypeInSubtitle);
-                    case _ListItemType.track:
-                      return _buildTrackTile(item.mediaItem! as Track, showType: showTypeInSubtitle);
-                    case _ListItemType.playlist:
-                      return _buildPlaylistTile(item.mediaItem! as Playlist, showType: showTypeInSubtitle);
-                    case _ListItemType.audiobook:
-                      return _buildAudiobookTile(item.mediaItem! as Audiobook, showType: showTypeInSubtitle);
-                    case _ListItemType.spacer:
-                      return const SizedBox(height: 24);
-                  }
-                },
+              // PERF: Use cached list items to avoid rebuilding during animation
+              final listItems = _cachedListItems[filterForPage] ??= _buildListItemsForFilter(
+                filterForPage, artists, albums, tracks, playlists, audiobooks,
+              );
+
+              // PERF: Wrap each page in RepaintBoundary to isolate repaints during swipe
+              return RepaintBoundary(
+                key: ValueKey('page_$filterForPage'),
+                child: ListView.builder(
+                  // PERF: Use key to preserve scroll position per filter
+                  key: PageStorageKey('list_$filterForPage'),
+                  // Top padding accounts for filter tabs overlay
+                  padding: EdgeInsets.fromLTRB(16, 68, 16, BottomSpacing.navBarOnly),
+                  cacheExtent: 500,
+                  addAutomaticKeepAlives: false,
+                  // PERF: false because each tile already has RepaintBoundary
+                  addRepaintBoundaries: false,
+                  itemCount: listItems.length,
+                  itemBuilder: (context, index) {
+                    final item = listItems[index];
+                    final showTypeInSubtitle = filterForPage == 'all';
+                    switch (item.type) {
+                      case _ListItemType.header:
+                        return _buildSectionHeader(item.headerTitle!, item.headerCount!);
+                      case _ListItemType.artist:
+                        return _buildArtistTile(item.mediaItem! as Artist);
+                      case _ListItemType.album:
+                        return _buildAlbumTile(item.mediaItem! as Album, showType: showTypeInSubtitle);
+                      case _ListItemType.track:
+                        return _buildTrackTile(item.mediaItem! as Track, showType: showTypeInSubtitle);
+                      case _ListItemType.playlist:
+                        return _buildPlaylistTile(item.mediaItem! as Playlist, showType: showTypeInSubtitle);
+                      case _ListItemType.audiobook:
+                        return _buildAudiobookTile(item.mediaItem! as Audiobook, showType: showTypeInSubtitle);
+                      case _ListItemType.spacer:
+                        return const SizedBox(height: 24);
+                    }
+                  },
+                ),
               );
             },
+          ),
+        ),
+        // Filter tabs overlay - positioned at top, content scrolls behind
+        Positioned(
+          top: 12,
+          left: 0,
+          right: 0,
+          child: SingleChildScrollView(
+            controller: _filterScrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: _buildFilterSelector(colorScheme),
           ),
         ),
       ],
@@ -656,25 +790,143 @@ class SearchScreenState extends State<SearchScreen> {
     return items;
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _activeFilter == value;
-    final colorScheme = Theme.of(context).colorScheme;
+  /// Build list items for a specific filter (used by PageView)
+  List<_ListItem> _buildListItemsForFilter(
+    String filter,
+    List<MediaItem> artists,
+    List<MediaItem> albums,
+    List<MediaItem> tracks,
+    List<MediaItem> playlists,
+    List<MediaItem> audiobooks,
+  ) {
+    final items = <_ListItem>[];
+    final query = _searchController.text;
 
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      showCheckmark: false,
-      onSelected: (selected) {
-        setState(() {
-          _activeFilter = value;
-        });
-      },
-      backgroundColor: colorScheme.surfaceVariant.withOpacity(0.3),
-      selectedColor: colorScheme.primaryContainer,
-      side: BorderSide.none,
-      labelStyle: TextStyle(
-        color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+    // For 'all' filter, create unified relevance-sorted list
+    if (filter == 'all') {
+      final scoredItems = <_ListItem>[];
+
+      for (final artist in artists) {
+        final score = _calculateRelevanceScore(artist, query);
+        scoredItems.add(_ListItem.artist(artist, relevanceScore: score));
+      }
+      for (final album in albums) {
+        final score = _calculateRelevanceScore(album, query);
+        scoredItems.add(_ListItem.album(album, relevanceScore: score));
+      }
+      for (final track in tracks) {
+        final score = _calculateRelevanceScore(track, query);
+        scoredItems.add(_ListItem.track(track, relevanceScore: score));
+      }
+      for (final playlist in playlists) {
+        final score = _calculateRelevanceScore(playlist, query);
+        scoredItems.add(_ListItem.playlist(playlist, relevanceScore: score));
+      }
+      for (final audiobook in audiobooks) {
+        final score = _calculateRelevanceScore(audiobook, query);
+        scoredItems.add(_ListItem.audiobook(audiobook, relevanceScore: score));
+      }
+
+      final crossRefArtists = _extractCrossReferencedArtists(
+        query,
+        artists.cast<Artist>(),
+        albums.cast<Album>(),
+        tracks.cast<Track>(),
+      );
+      for (final artist in crossRefArtists) {
+        scoredItems.add(_ListItem.artist(artist, relevanceScore: 25));
+      }
+
+      scoredItems.sort((a, b) => (b.relevanceScore ?? 0).compareTo(a.relevanceScore ?? 0));
+      return scoredItems;
+    }
+
+    // For specific type filters
+    if (filter == 'artists' && artists.isNotEmpty) {
+      for (final artist in artists) {
+        items.add(_ListItem.artist(artist));
+      }
+    }
+
+    if (filter == 'albums' && albums.isNotEmpty) {
+      for (final album in albums) {
+        items.add(_ListItem.album(album));
+      }
+    }
+
+    if (filter == 'tracks' && tracks.isNotEmpty) {
+      for (final track in tracks) {
+        items.add(_ListItem.track(track));
+      }
+    }
+
+    if (filter == 'playlists' && playlists.isNotEmpty) {
+      for (final playlist in playlists) {
+        items.add(_ListItem.playlist(playlist));
+      }
+    }
+
+    if (filter == 'audiobooks' && audiobooks.isNotEmpty) {
+      for (final audiobook in audiobooks) {
+        items.add(_ListItem.audiobook(audiobook));
+      }
+    }
+
+    return items;
+  }
+
+  /// Build joined segmented filter selector (like library media type selector)
+  Widget _buildFilterSelector(ColorScheme colorScheme) {
+    final filters = _getAvailableFilters();
+    final l10n = S.of(context)!;
+
+    String getLabel(String filter) {
+      switch (filter) {
+        case 'all': return l10n.all;
+        case 'artists': return l10n.artists;
+        case 'albums': return l10n.albums;
+        case 'tracks': return l10n.tracks;
+        case 'playlists': return l10n.playlists;
+        case 'audiobooks': return l10n.audiobooks;
+        case 'podcasts': return l10n.podcasts;
+        default: return filter;
+      }
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: filters.map((filter) {
+          final isSelected = _activeFilter == filter;
+          return Material(
+            // Solid color matching library tabs (surfaceVariant with opacity blended on dark bg)
+            color: isSelected
+                ? colorScheme.primaryContainer
+                : const Color(0xFF313035),
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _activeFilter = filter;
+                });
+                _animateToFilter(filter);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Text(
+                  getLabel(filter),
+                  style: TextStyle(
+                    color: isSelected
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onSurfaceVariant.withOpacity(0.8),
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -698,33 +950,43 @@ class SearchScreenState extends State<SearchScreen> {
     final maProvider = context.read<MusicAssistantProvider>();
     final imageUrl = maProvider.getImageUrl(artist, size: 256);
 
+    // Use 'search' suffix to avoid hero tag conflicts with library cards
+    const heroSuffix = '_search';
+    final artistId = artist.uri ?? artist.itemId;
+
     return RepaintBoundary(
       child: ListTile(
-        key: ValueKey(artist.uri ?? artist.itemId),
-      leading: ArtistAvatar(
-        artist: artist,
-        radius: 24,
-        imageSize: 128,
-      ),
-      title: Text(
-        artist.name,
-        style: TextStyle(
-          color: colorScheme.onSurface,
-          fontWeight: FontWeight.w500,
+        key: ValueKey(artistId),
+        leading: Hero(
+          tag: HeroTags.artistImage + artistId + heroSuffix,
+          child: ArtistAvatar(
+            artist: artist,
+            radius: 24,
+            imageSize: 128,
+          ),
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        S.of(context)!.artist,
-        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-      ),
+        title: Text(
+          artist.name,
+          style: TextStyle(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w500,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          S.of(context)!.artist,
+          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+        ),
         onTap: () {
+          // Update adaptive colors before navigation
+          updateAdaptiveColorsFromImage(context, imageUrl);
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => ArtistDetailsScreen(
+            FadeSlidePageRoute(
+              child: ArtistDetailsScreen(
                 artist: artist,
+                heroTagSuffix: 'search',
                 initialImageUrl: imageUrl,
               ),
             ),
@@ -742,47 +1004,69 @@ class SearchScreenState extends State<SearchScreen> {
         ? '${album.artistsString} • ${S.of(context)!.albumSingular}'
         : album.artistsString;
 
+    // Use 'search' suffix to avoid hero tag conflicts with library cards
+    const heroSuffix = '_search';
+    final albumId = album.uri ?? album.itemId;
+
     return RepaintBoundary(
       child: ListTile(
-        key: ValueKey(album.uri ?? album.itemId),
-        leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant,
-          borderRadius: BorderRadius.circular(8),
-          image: imageUrl != null
-              ? DecorationImage(
-                  image: CachedNetworkImageProvider(imageUrl),
-                  fit: BoxFit.cover,
-                )
-              : null,
+        key: ValueKey(albumId),
+        leading: Hero(
+          tag: HeroTags.albumCover + albumId + heroSuffix,
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+              image: imageUrl != null
+                  ? DecorationImage(
+                      image: CachedNetworkImageProvider(imageUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: imageUrl == null
+                ? Icon(Icons.album_rounded, color: colorScheme.onSurfaceVariant)
+                : null,
+          ),
         ),
-        child: imageUrl == null
-            ? Icon(Icons.album_rounded, color: colorScheme.onSurfaceVariant)
-            : null,
-      ),
-      title: Text(
-        album.nameWithYear,
-        style: TextStyle(
-          color: colorScheme.onSurface,
-          fontWeight: FontWeight.w500,
+        title: Hero(
+          tag: HeroTags.albumTitle + albumId + heroSuffix,
+          child: Material(
+            color: Colors.transparent,
+            child: Text(
+              album.nameWithYear,
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        subtitleText,
-        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+        subtitle: Hero(
+          tag: HeroTags.artistName + albumId + heroSuffix,
+          child: Material(
+            color: Colors.transparent,
+            child: Text(
+              subtitleText,
+              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
         onTap: () {
+          // Update adaptive colors before navigation
+          updateAdaptiveColorsFromImage(context, imageUrl);
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => AlbumDetailsScreen(
+            FadeSlidePageRoute(
+              child: AlbumDetailsScreen(
                 album: album,
+                heroTagSuffix: 'search',
                 initialImageUrl: imageUrl,
               ),
             ),
@@ -871,12 +1155,12 @@ class SearchScreenState extends State<SearchScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        // Radio button
+                        // Radio button (uses current player - 1 tap)
                         SizedBox(
                           height: 44,
                           width: 44,
                           child: FilledButton.tonal(
-                            onPressed: () => _showRadioMenu(track),
+                            onPressed: () => _playRadio(track),
                             style: FilledButton.styleFrom(
                               padding: EdgeInsets.zero,
                               shape: RoundedRectangleBorder(
@@ -887,12 +1171,28 @@ class SearchScreenState extends State<SearchScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        // Add to queue button
+                        // Radio On button (pick player - 2 taps)
                         SizedBox(
                           height: 44,
                           width: 44,
                           child: FilledButton.tonal(
-                            onPressed: () => _showAddToQueueMenu(track),
+                            onPressed: () => _showRadioOnMenu(track),
+                            style: FilledButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Icon(Icons.speaker_group_outlined, size: 20),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Add to queue button (uses current player - 1 tap)
+                        SizedBox(
+                          height: 44,
+                          width: 44,
+                          child: FilledButton.tonal(
+                            onPressed: () => _addToQueue(track),
                             style: FilledButton.styleFrom(
                               padding: EdgeInsets.zero,
                               shape: RoundedRectangleBorder(
@@ -1008,34 +1308,47 @@ class SearchScreenState extends State<SearchScreen> {
         ? '$authorText • ${S.of(context)!.audiobookSingular}'
         : authorText;
 
+    // Use 'search' suffix to avoid hero tag conflicts with library cards
+    const heroSuffix = '_search';
+    final audiobookId = audiobook.uri ?? audiobook.itemId;
+
     return RepaintBoundary(
       child: ListTile(
-        key: ValueKey(audiobook.uri ?? audiobook.itemId),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceVariant,
-            borderRadius: BorderRadius.circular(8),
-            image: imageUrl != null
-                ? DecorationImage(
-                    image: CachedNetworkImageProvider(imageUrl),
-                    fit: BoxFit.cover,
-                  )
+        key: ValueKey(audiobookId),
+        leading: Hero(
+          tag: HeroTags.audiobookCover + audiobookId + heroSuffix,
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+              image: imageUrl != null
+                  ? DecorationImage(
+                      image: CachedNetworkImageProvider(imageUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: imageUrl == null
+                ? Icon(Icons.headphones_rounded, color: colorScheme.onSurfaceVariant)
                 : null,
           ),
-          child: imageUrl == null
-              ? Icon(Icons.headphones_rounded, color: colorScheme.onSurfaceVariant)
-              : null,
         ),
-        title: Text(
-          audiobook.name,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w500,
+        title: Hero(
+          tag: HeroTags.audiobookTitle + audiobookId + heroSuffix,
+          child: Material(
+            color: Colors.transparent,
+            child: Text(
+              audiobook.name,
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
           subtitleText,
@@ -1050,11 +1363,14 @@ class SearchScreenState extends State<SearchScreen> {
               )
             : null,
         onTap: () {
+          // Update adaptive colors before navigation
+          updateAdaptiveColorsFromImage(context, imageUrl);
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => AudiobookDetailScreen(
+            FadeSlidePageRoute(
+              child: AudiobookDetailScreen(
                 audiobook: audiobook,
+                heroTagSuffix: 'search',
                 initialImageUrl: imageUrl,
               ),
             ),
@@ -1081,153 +1397,102 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  void _showRadioMenu(Track track) {
+  /// Play track radio on current player (1 tap)
+  Future<void> _playRadio(Track track) async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final players = maProvider.availablePlayers;
+    final player = maProvider.selectedPlayer;
+
+    if (player == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.of(context)!.noPlayerSelected)),
+      );
+      return;
+    }
+
+    try {
+      await maProvider.playRadio(player.playerId, track);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.startingRadio(track.name)),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(S.of(context)!.failedToStartRadio(e.toString()))),
+        );
+      }
+    }
+  }
+
+  /// Show player picker for Radio On (2 taps)
+  void _showRadioOnMenu(Track track) {
+    final maProvider = context.read<MusicAssistantProvider>();
 
     GlobalPlayerOverlay.hidePlayer();
 
-    showModalBottomSheet(
+    showPlayerPickerSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 16),
-            Text(
-              S.of(context)!.playOn,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            if (players.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Text(S.of(context)!.noPlayersAvailable),
-              )
-            else
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: players.length,
-                  itemBuilder: (context, index) {
-                    final player = players[index];
-                    return ListTile(
-                      leading: Icon(
-                        Icons.speaker,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      title: Text(player.name),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        try {
-                          maProvider.selectPlayer(player);
-                          await maProvider.playRadio(player.playerId, track);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(S.of(context)!.startingRadio(track.name)),
-                                duration: const Duration(seconds: 1),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(S.of(context)!.failedToStartRadio(e.toString()))),
-                            );
-                          }
-                        }
-                      },
-                    );
-                  },
-                ),
+      title: S.of(context)!.playOn,
+      players: maProvider.availablePlayers,
+      selectedPlayer: maProvider.selectedPlayer,
+      onPlayerSelected: (player) async {
+        try {
+          maProvider.selectPlayer(player);
+          await maProvider.playRadio(player.playerId, track);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(S.of(context)!.startingRadioOnPlayer(track.name, player.name)),
+                duration: const Duration(seconds: 1),
               ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
-          ],
-        ),
-      ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(S.of(context)!.failedToStartRadio(e.toString()))),
+            );
+          }
+        }
+      },
     ).whenComplete(() {
       GlobalPlayerOverlay.showPlayer();
     });
   }
 
-  void _showAddToQueueMenu(Track track) {
+  /// Add track to queue on current player (1 tap)
+  Future<void> _addToQueue(Track track) async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final players = maProvider.availablePlayers;
+    final player = maProvider.selectedPlayer;
 
-    GlobalPlayerOverlay.hidePlayer();
+    if (player == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.of(context)!.noPlayerSelected)),
+      );
+      return;
+    }
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 16),
-            Text(
-              S.of(context)!.addToQueueOn,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            if (players.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Text(S.of(context)!.noPlayersAvailable),
-              )
-            else
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: players.length,
-                  itemBuilder: (context, index) {
-                    final player = players[index];
-                    return ListTile(
-                      leading: Icon(
-                        Icons.speaker,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      title: Text(player.name),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        try {
-                          await maProvider.addTrackToQueue(player.playerId, track);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(S.of(context)!.addedToQueue),
-                                duration: const Duration(seconds: 1),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(S.of(context)!.failedToAddToQueue(e.toString()))),
-                            );
-                          }
-                        }
-                      },
-                    );
-                  },
-                ),
-              ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
-          ],
-        ),
-      ),
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    try {
+      await maProvider.addTrackToQueue(player.playerId, track);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.addedToQueue),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(S.of(context)!.failedToAddToQueue(e.toString()))),
+        );
+      }
+    }
   }
 
   Future<void> _toggleTrackFavorite(Track track) async {

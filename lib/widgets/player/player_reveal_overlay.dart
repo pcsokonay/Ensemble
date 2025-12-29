@@ -232,15 +232,18 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                 ),
 
                 // Player cards - positioned above mini player
+                // Use top constraint to allow scrolling when many players
                 Positioned(
                   left: 12,
                   right: 12,
+                  top: MediaQuery.of(context).padding.top + 60, // Below status bar + some padding
                   bottom: widget.miniPlayerBottom + widget.miniPlayerHeight + 8 - _dragOffset,
                   child: GestureDetector(
                     onVerticalDragUpdate: _handleVerticalDragUpdate,
                     onVerticalDragEnd: _handleVerticalDragEnd,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         // Hint above player list - different for onboarding vs regular use
                         // Onboarding: show first-time hint (how to select)
@@ -289,8 +292,16 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                               );
                             },
                           ),
-                        // Build player cards - all slide from behind mini player
-                        ...List.generate(players.length, (index) {
+                        // Scrollable player cards list for when there are many players
+                        Flexible(
+                          child: SingleChildScrollView(
+                            reverse: true, // Scroll from bottom up
+                            physics: players.length > 5
+                                ? const BouncingScrollPhysics()
+                                : const NeverScrollableScrollPhysics(),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: List.generate(players.length, (index) {
                           final player = players[index];
                           final isPlaying = player.state == 'playing';
 
@@ -363,6 +374,9 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                             ),
                           );
                         }),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),

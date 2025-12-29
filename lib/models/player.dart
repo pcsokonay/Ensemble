@@ -197,9 +197,21 @@ class Player {
     final activeSource = json['active_source'] as String?;
 
     // Detect external source (optical, Spotify, AirPlay, etc.)
-    // External sources have non-MA URIs and often media_type='unknown'
+    // Primary indicator: app_id - if not 'music_assistant', it's an external source
+    // Secondary indicators: URI patterns and media_type
     bool isExternalSource = false;
-    if (json.containsKey('current_media')) {
+
+    // Check app_id first - this is the most reliable indicator for DLNA players
+    // When MA is playing: app_id = 'music_assistant'
+    // When external source: app_id = 'http', 'spotify', etc.
+    final appId = json['app_id'] as String?;
+    if (appId != null && appId.isNotEmpty && appId != 'music_assistant') {
+      // app_id is set but not 'music_assistant' - external source is active
+      isExternalSource = true;
+    }
+
+    // Also check current_media for additional external source indicators
+    if (!isExternalSource && json.containsKey('current_media')) {
       final currentMedia = json['current_media'] as Map<String, dynamic>?;
       if (currentMedia != null) {
         final uri = currentMedia['uri'] as String?;
