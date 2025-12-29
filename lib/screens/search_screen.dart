@@ -532,11 +532,11 @@ class SearchScreenState extends State<SearchScreen> {
     // Column layout - filter bar above results, no overlay
     return Column(
       children: [
-        // Filter tabs - always visible
+        // Filter tabs - always visible, tight against results
         SingleChildScrollView(
           controller: _filterScrollController,
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 4),
           child: _buildFilterSelector(colorScheme),
         ),
         // Results with swipeable pages
@@ -562,7 +562,7 @@ class SearchScreenState extends State<SearchScreen> {
                   child: ListView.builder(
                     // PERF: Use key to preserve scroll position per filter
                     key: PageStorageKey('list_$filterForPage'),
-                    padding: EdgeInsets.fromLTRB(16, 8, 16, BottomSpacing.navBarOnly),
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, BottomSpacing.navBarOnly),
                     cacheExtent: 500,
                     addAutomaticKeepAlives: false,
                     // PERF: false because each tile already has RepaintBoundary
