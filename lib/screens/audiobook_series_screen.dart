@@ -275,11 +275,17 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      body: CustomScrollView(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Responsive cover size: 50% of screen width, clamped between 200-320
+          final coverSize = (constraints.maxWidth * 0.5).clamp(200.0, 320.0);
+          final expandedHeight = coverSize + 70;
+
+          return CustomScrollView(
         slivers: [
           // App bar with series cover collage (matches audiobook detail screen)
           SliverAppBar(
-            expandedHeight: 350,
+            expandedHeight: expandedHeight,
             pinned: true,
             backgroundColor: colorScheme.surface,
             leading: IconButton(
@@ -292,12 +298,12 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const SizedBox(height: 60),
-                  // Series cover collage - same size as audiobook detail cover
+                  // Series cover collage - responsive size
                   Hero(
                     tag: widget.heroTag ?? 'series_cover_${widget.series.id}',
                     child: Container(
-                      width: 280,
-                      height: 280,
+                      width: coverSize,
+                      height: coverSize,
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
@@ -449,6 +455,8 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
             child: SizedBox(height: BottomSpacing.withMiniPlayer),
           ),
         ],
+      );
+        },
       ),
     );
   }

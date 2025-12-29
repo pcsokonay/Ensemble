@@ -551,10 +551,16 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
       },
       child: Scaffold(
         backgroundColor: colorScheme.background,
-        body: CustomScrollView(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            // Responsive cover size: 40% of screen width, clamped between 160-280 (smaller for circular artist image)
+            final coverSize = (constraints.maxWidth * 0.4).clamp(160.0, 280.0);
+            final expandedHeight = coverSize + 100;
+
+            return CustomScrollView(
           slivers: [
             SliverAppBar(
-              expandedHeight: 300,
+              expandedHeight: expandedHeight,
               pinned: true,
               backgroundColor: colorScheme.background,
               leading: IconButton(
@@ -574,8 +580,8 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                     tag: HeroTags.artistImage + (widget.artist.uri ?? widget.artist.itemId) + _heroTagSuffix,
                     child: ClipOval(
                       child: Container(
-                        width: 200,
-                        height: 200,
+                        width: coverSize,
+                        height: coverSize,
                         color: colorScheme.surfaceVariant,
                         child: imageUrl != null
                             ? CachedNetworkImage(
@@ -585,13 +591,13 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                                 fadeOutDuration: Duration.zero,
                                 errorWidget: (_, __, ___) => Icon(
                                   Icons.person_rounded,
-                                  size: 100,
+                                  size: coverSize * 0.5,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               )
                             : Icon(
                                 Icons.person_rounded,
-                                size: 100,
+                                size: coverSize * 0.5,
                                 color: colorScheme.onSurfaceVariant,
                               ),
                       ),
@@ -847,6 +853,8 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
             ],
           ],
         ],
+        );
+          },
         ),
       ),
     );

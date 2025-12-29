@@ -468,10 +468,16 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
       },
       child: Scaffold(
         backgroundColor: colorScheme.surface,
-        body: CustomScrollView(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            // Responsive cover size: 50% of screen width, clamped between 200-320
+            final coverSize = (constraints.maxWidth * 0.5).clamp(200.0, 320.0);
+            final expandedHeight = coverSize + 70;
+
+            return CustomScrollView(
           slivers: [
             SliverAppBar(
-              expandedHeight: 350,
+              expandedHeight: expandedHeight,
               pinned: true,
               backgroundColor: colorScheme.surface,
               leading: IconButton(
@@ -540,8 +546,8 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          width: 280,
-                          height: 280,
+                          width: coverSize,
+                          height: coverSize,
                           color: colorScheme.surfaceContainerHighest,
                           child: imageUrl != null
                               ? CachedNetworkImage(
@@ -552,14 +558,14 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                                   placeholder: (_, __) => Center(
                                     child: Icon(
                                       MdiIcons.bookOutline,
-                                      size: 120,
+                                      size: coverSize * 0.43,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                   errorWidget: (_, __, ___) => Center(
                                     child: Icon(
                                       MdiIcons.bookOutline,
-                                      size: 120,
+                                      size: coverSize * 0.43,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
                                   ),
@@ -567,7 +573,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                               : Center(
                                   child: Icon(
                                     MdiIcons.bookOutline,
-                                    size: 120,
+                                    size: coverSize * 0.43,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
@@ -811,6 +817,8 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 140)),
           ],
+        );
+          },
         ),
       ),
     );

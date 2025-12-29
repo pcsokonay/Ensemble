@@ -703,10 +703,16 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
       },
       child: Scaffold(
         backgroundColor: colorScheme.background,
-        body: CustomScrollView(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            // Responsive cover size: 50% of screen width, clamped between 200-320
+            final coverSize = (constraints.maxWidth * 0.5).clamp(200.0, 320.0);
+            final expandedHeight = coverSize + 70;
+
+            return CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 350, // Increased height for bigger art
+            expandedHeight: expandedHeight,
             pinned: true,
             backgroundColor: colorScheme.background,
             leading: IconButton(
@@ -727,11 +733,11 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                     child: Hero(
                       tag: HeroTags.albumCover + (widget.album.uri ?? widget.album.itemId) + _heroTagSuffix,
                       child: Container(
-                        width: 280, // Increased size
-                        height: 280,
+                        width: coverSize,
+                        height: coverSize,
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceVariant,
-                          borderRadius: BorderRadius.circular(16), // Slightly more rounded
+                          borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.3),
@@ -749,7 +755,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                         child: imageUrl == null
                             ? Icon(
                                 Icons.album_rounded,
-                                size: 120,
+                                size: coverSize * 0.43,
                                 color: colorScheme.onSurfaceVariant,
                               )
                             : null,
@@ -1080,7 +1086,9 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 164)), // Space for bottom nav + mini player
         ],
-      ),
+      );
+          },
+        ),
       ),
     );
   }
