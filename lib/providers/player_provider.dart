@@ -575,10 +575,11 @@ class PlayerProvider with ChangeNotifier {
             } catch (e) {}
           }
 
+          // Try playing player (exclude external sources - not playing MA content)
           if (playerToSelect == null) {
             try {
               playerToSelect = _availablePlayers.firstWhere(
-                (p) => p.state == 'playing' && p.available,
+                (p) => p.state == 'playing' && p.available && !p.isExternalSource,
               );
             } catch (e) {}
           }

@@ -19,11 +19,12 @@ class PlayerSelector extends StatelessWidget {
     final availablePlayers = maProvider.availablePlayers;
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Count players that are currently playing (excluding selected player)
+    // Count players that are currently playing MA content (excluding selected player)
     // User already sees if selected player is playing, badge shows "other" activity
+    // Exclude external sources (Spotify Connect, TV optical, etc.) - they're not playing MA content
     final selectedPlayerId = selectedPlayer?.playerId;
     final playingCount = availablePlayers
-        .where((p) => p.state == 'playing' && p.playerId != selectedPlayerId)
+        .where((p) => p.state == 'playing' && p.playerId != selectedPlayerId && !p.isExternalSource)
         .length;
 
     return Padding(

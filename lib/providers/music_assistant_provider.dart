@@ -2370,8 +2370,9 @@ class MusicAssistantProvider with ChangeNotifier {
                   .firstWhere((p) => p.playerId == _selectedPlayer!.playerId)
                   .state;
               final currentIsPlaying = currentPlayerState == 'playing';
+              // Exclude external sources - they're not playing MA content
               final playingPlayers = _availablePlayers.where(
-                (p) => p.state == 'playing' && p.available,
+                (p) => p.state == 'playing' && p.available && !p.isExternalSource,
               ).toList();
 
               // Switch to playing player only if current isn't playing and exactly one other is
@@ -2400,8 +2401,9 @@ class MusicAssistantProvider with ChangeNotifier {
 
           if (!preferLocalPlayer) {
             // Priority 1 (normal): Single playing player (skip if multiple are playing)
+            // Exclude external sources - they're not playing MA content
             final playingPlayers = _availablePlayers.where(
-              (p) => p.state == 'playing' && p.available,
+              (p) => p.state == 'playing' && p.available && !p.isExternalSource,
             ).toList();
             if (playingPlayers.length == 1) {
               playerToSelect = playingPlayers.first;
@@ -2474,17 +2476,24 @@ class MusicAssistantProvider with ChangeNotifier {
     // IMPORTANT: Always set from cache, even if null - this prevents showing
     // stale track info when switching to a non-playing player.
     // For grouped child players, this returns the leader's track
-    _currentTrack = getCachedTrackForPlayer(player.playerId);
+    // IMPORTANT: Clear track for external sources - they're playing non-MA content
+    if (player.isExternalSource) {
+      _currentTrack = null;
+    } else {
+      _currentTrack = getCachedTrackForPlayer(player.playerId);
+    }
 
-    // Initialize position tracker for this player
+    // Initialize position tracker for this player (skip for external sources)
     _positionTracker.onPlayerSelected(player.playerId);
-    _positionTracker.updateFromServer(
-      playerId: player.playerId,
-      position: player.elapsedTime ?? 0.0,
-      isPlaying: player.state == 'playing',
-      duration: _currentTrack?.duration,
-      serverTimestamp: player.elapsedTimeLastUpdated,
-    );
+    if (!player.isExternalSource) {
+      _positionTracker.updateFromServer(
+        playerId: player.playerId,
+        position: player.elapsedTime ?? 0.0,
+        isPlaying: player.state == 'playing',
+        duration: _currentTrack?.duration,
+        serverTimestamp: player.elapsedTimeLastUpdated,
+      );
+    }
 
     // Switch audio handler mode based on player type
     final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
@@ -2770,6 +2779,13 @@ class MusicAssistantProvider with ChangeNotifier {
     try {
       _logger.log('🔍 Preload ${player.name}: state=${player.state}, available=${player.available}');
 
+      // Skip external sources - they're not playing MA content
+      if (player.isExternalSource) {
+        _logger.log('🔍 Preload ${player.name}: SKIPPED - external source');
+        _cacheService.setCachedTrackForPlayer(player.playerId, null);
+        return;
+      }
+
       if (!player.available || !player.powered) {
         _logger.log('🔍 Preload ${player.name}: SKIPPED - not available or powered');
         _cacheService.setCachedTrackForPlayer(player.playerId, null);
@@ -2899,6 +2915,28 @@ class MusicAssistantProvider with ChangeNotifier {
 
       _selectedPlayer = updatedPlayer;
       stateChanged = true;
+
+      // Handle external sources (Spotify Connect, TV optical, etc.)
+      // These players are "playing" from MA's perspective but not MA content
+      if (updatedPlayer.isExternalSource) {
+        if (_currentTrack != null) {
+          _currentTrack = null;
+          _cacheService.setCachedTrackForPlayer(updatedPlayer.playerId, null);
+          stateChanged = true;
+          _persistPlaybackState();
+        }
+        if (_currentAudiobook != null) {
+          _logger.log('📚 External source active, clearing audiobook context');
+          _currentAudiobook = null;
+          stateChanged = true;
+        }
+        // Clear notification for external source
+        audioHandler.clearRemoteState();
+        if (stateChanged) {
+          notifyListeners();
+        }
+        return;
+      }
 
       // Feed position tracker with server data
       // Log raw values to debug position issues
