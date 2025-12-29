@@ -44,6 +44,10 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
   double _dragOffset = 0;
   bool _isDragging = false;
 
+  // Scroll controller for when player list overflows
+  final ScrollController _scrollController = ScrollController();
+  bool _isScrollable = false;
+
   // Cache extracted colors per player for per-device accent colors
   final Map<String, ColorScheme?> _playerColors = {};
 
@@ -128,6 +132,7 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
   void dispose() {
     _revealController.dispose();
     _refreshTimer?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -157,11 +162,39 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
     });
   }
 
+  /// Check if scroll is at top (or not scrollable)
+  bool get _isAtTop {
+    if (!_isScrollable) return true;
+    if (!_scrollController.hasClients) return true;
+    return _scrollController.offset <= 0;
+  }
+
   void _handleVerticalDragUpdate(DragUpdateDetails details) {
+    final delta = details.primaryDelta ?? 0;
+
+    // If scrollable and not at top, let scroll handle it
+    if (_isScrollable && !_isAtTop) {
+      // Scroll the list
+      if (_scrollController.hasClients) {
+        final newOffset = _scrollController.offset - delta;
+        _scrollController.jumpTo(newOffset.clamp(0.0, _scrollController.position.maxScrollExtent));
+      }
+      return;
+    }
+
+    // At top: check if trying to scroll down (view more) or dismiss
+    if (_isScrollable && delta < 0 && _scrollController.hasClients) {
+      // Swiping up (delta negative) = scroll down to see more players
+      final newOffset = _scrollController.offset - delta;
+      _scrollController.jumpTo(newOffset.clamp(0.0, _scrollController.position.maxScrollExtent));
+      return;
+    }
+
+    // At top and swiping down = dismiss gesture
     setState(() {
       _isDragging = true;
       // Negate delta so swipe down = cards move down (toward dismissal)
-      _dragOffset -= details.primaryDelta ?? 0;
+      _dragOffset -= delta;
       // Clamp: allow moving down (positive) freely, limit moving up to 20px
       _dragOffset = _dragOffset.clamp(-20.0, double.infinity);
     });
@@ -169,6 +202,9 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
 
   void _handleVerticalDragEnd(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
+
+    // If not dragging (was scrolling), don't dismiss
+    if (!_isDragging) return;
 
     // Dismiss if dragged down enough or with enough velocity
     if (_dragOffset > 100 || velocity > 500) {
@@ -214,6 +250,21 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
         const cardHeight = 64.0;
         const cardSpacing = 12.0;
         final totalStackHeight = players.length * cardHeight + (players.length - 1) * cardSpacing;
+
+        // Calculate max available height (80% of screen minus mini player area)
+        final screenHeight = MediaQuery.of(context).size.height;
+        final statusBarHeight = MediaQuery.of(context).padding.top;
+        final bottomPadding = widget.miniPlayerBottom + widget.miniPlayerHeight + 20;
+        final maxListHeight = (screenHeight - statusBarHeight - bottomPadding) * 0.8;
+
+        // Determine if scrolling is needed
+        final needsScroll = totalStackHeight > maxListHeight;
+        // Update scrollable state (used by gesture handlers)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_isScrollable != needsScroll) {
+            _isScrollable = needsScroll;
+          }
+        });
 
         return AnimatedBuilder(
           animation: _revealAnimation,
@@ -289,7 +340,71 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                               );
                             },
                           ),
-                        // Build player cards - all slide from behind mini player
+                        // Build player cards - scrollable when overflow, otherwise static
+                        if (needsScroll)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxHeight: maxListHeight),
+                            child: SingleChildScrollView(
+                              controller: _scrollController,
+                              physics: const ClampingScrollPhysics(),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(players.length, (index) {
+                                  final player = players[index];
+                                  final isPlaying = player.state == 'playing';
+                                  final playerTrack = maProvider.getCachedTrackForPlayer(player.playerId);
+                                  String? albumArtUrl;
+                                  if (playerTrack != null && player.available && player.powered) {
+                                    albumArtUrl = maProvider.getImageUrl(playerTrack, size: 128);
+                                  }
+                                  final playerColorScheme = _playerColors[player.playerId];
+                                  final cardBgColor = playerColorScheme?.primaryContainer ?? defaultBgColor;
+                                  final cardTextColor = playerColorScheme?.onPrimaryContainer ?? defaultTextColor;
+                                  const baseOffset = 80.0;
+                                  final reverseIndex = players.length - 1 - index;
+                                  final distanceToTravel = baseOffset + (reverseIndex * (cardHeight + cardSpacing));
+                                  final slideOffset = distanceToTravel * (1.0 - t);
+
+                                  return Transform.translate(
+                                    offset: Offset(0, slideOffset),
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: PlayerCard(
+                                        player: player,
+                                        trackInfo: playerTrack,
+                                        albumArtUrl: albumArtUrl,
+                                        isSelected: false,
+                                        isPlaying: isPlaying,
+                                        isGrouped: player.isGrouped,
+                                        backgroundColor: cardBgColor,
+                                        textColor: cardTextColor,
+                                        onTap: () {
+                                          HapticFeedback.mediumImpact();
+                                          maProvider.selectPlayer(player);
+                                          dismiss();
+                                        },
+                                        onLongPress: () {
+                                          HapticFeedback.mediumImpact();
+                                          maProvider.togglePlayerSync(player.playerId);
+                                        },
+                                        onPlayPause: () {
+                                          if (isPlaying) {
+                                            maProvider.pausePlayer(player.playerId);
+                                          } else {
+                                            maProvider.resumePlayer(player.playerId);
+                                          }
+                                        },
+                                        onSkipNext: () => maProvider.nextTrack(player.playerId),
+                                        onPower: () => maProvider.togglePower(player.playerId),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+                          )
+                        else
+                        // Non-scrollable list for when players fit
                         ...List.generate(players.length, (index) {
                           final player = players[index];
                           final isPlaying = player.state == 'playing';
