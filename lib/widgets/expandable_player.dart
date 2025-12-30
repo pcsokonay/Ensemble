@@ -345,14 +345,17 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     }
 
     // 1. Show cached queue immediately (if available)
-    final cachedQueue = await maProvider.getCachedQueue(player.playerId);
-    if (cachedQueue != null && cachedQueue.items.isNotEmpty && mounted) {
-      setState(() {
-        _queue = cachedQueue;
-        _isLoadingQueue = false;
-      });
-    } else {
-      setState(() => _isLoadingQueue = true);
+    // Only load from cache if we don't already have a queue (preserves optimistic updates)
+    if (_queue == null) {
+      final cachedQueue = await maProvider.getCachedQueue(player.playerId);
+      if (cachedQueue != null && cachedQueue.items.isNotEmpty && mounted) {
+        setState(() {
+          _queue = cachedQueue;
+          _isLoadingQueue = false;
+        });
+      } else {
+        setState(() => _isLoadingQueue = true);
+      }
     }
 
     // 2. Fetch fresh queue in background
@@ -413,18 +416,61 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       debugPrint('🔀 Shuffle: _queue is null, returning');
       return;
     }
-    debugPrint('🔀 Shuffle: current=${_queue!.shuffle}, toggling to ${!_queue!.shuffle}');
+    final newShuffleState = !_queue!.shuffle;
+    debugPrint('🔀 Shuffle: current=${_queue!.shuffle}, toggling to $newShuffleState');
+
+    // Optimistically update local state for immediate visual feedback
+    setState(() {
+      _queue = PlayerQueue(
+        playerId: _queue!.playerId,
+        items: _queue!.items,
+        currentIndex: _queue!.currentIndex,
+        shuffleEnabled: newShuffleState,
+        repeatMode: _queue!.repeatMode,
+      );
+    });
+    debugPrint('🔀 Shuffle: optimistic update applied, shuffleEnabled=$newShuffleState');
+
     final maProvider = context.read<MusicAssistantProvider>();
     // Toggle: if currently shuffled, disable; if not shuffled, enable
-    await maProvider.toggleShuffle(_queue!.playerId, !_queue!.shuffle);
+    await maProvider.toggleShuffle(_queue!.playerId, newShuffleState);
     debugPrint('🔀 Shuffle: command sent, reloading queue');
     await _loadQueue();
   }
 
   Future<void> _cycleRepeat() async {
     if (_queue == null) return;
+
+    // Calculate next repeat mode: off -> all -> one -> off
+    String nextMode;
+    switch (_queue!.repeatMode) {
+      case 'off':
+      case null:
+        nextMode = 'all';
+        break;
+      case 'all':
+        nextMode = 'one';
+        break;
+      case 'one':
+        nextMode = 'off';
+        break;
+      default:
+        nextMode = 'off';
+    }
+
+    // Optimistically update local state for immediate visual feedback
+    setState(() {
+      _queue = PlayerQueue(
+        playerId: _queue!.playerId,
+        items: _queue!.items,
+        currentIndex: _queue!.currentIndex,
+        shuffleEnabled: _queue!.shuffleEnabled,
+        repeatMode: nextMode,
+      );
+    });
+
     final maProvider = context.read<MusicAssistantProvider>();
-    await maProvider.cycleRepeatMode(_queue!.playerId, _queue!.repeatMode);
+    await maProvider.setRepeatMode(_queue!.playerId, nextMode);
     await _loadQueue();
   }
 
