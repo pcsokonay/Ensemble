@@ -132,21 +132,34 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   /// Check if a player should show the "manually synced" indicator (yellow border)
-  /// Returns true only if the player is synced to another REGULAR player (not a group player)
-  /// This excludes players that are part of pre-configured MA speaker groups
+  /// Returns true for BOTH the leader AND children of a manually created sync group
+  /// Excludes pre-configured MA speaker groups (provider = 'player_group')
   bool isPlayerManuallySynced(String playerId) {
     final player = _availablePlayers.where((p) => p.playerId == playerId).firstOrNull;
-    if (player == null || player.syncedTo == null) return false;
+    if (player == null) return false;
 
-    // Check if syncedTo points to a group player (provider = 'player_group')
-    final syncTarget = _availablePlayers.where((p) => p.playerId == player.syncedTo).firstOrNull;
-    if (syncTarget == null) return false;
+    // Case 1: Player is a child synced to another player
+    if (player.syncedTo != null) {
+      final syncTarget = _availablePlayers.where((p) => p.playerId == player.syncedTo).firstOrNull;
+      if (syncTarget == null) return false;
 
-    // If synced to a group player, it's part of a pre-configured group, not manually synced
-    if (syncTarget.provider == 'player_group') return false;
+      // If synced to a group player, it's part of a pre-configured group
+      if (syncTarget.provider == 'player_group') return false;
 
-    // Synced to a regular player - this is a manual sync
-    return true;
+      // Synced to a regular player - this is a manual sync child
+      return true;
+    }
+
+    // Case 2: Player is a leader with group members
+    if (player.groupMembers != null && player.groupMembers!.length > 1) {
+      // If this player IS a group player (like "All Speakers"), not manually synced
+      if (player.provider == 'player_group') return false;
+
+      // Regular player with group members = manual sync leader
+      return true;
+    }
+
+    return false;
   }
 
   Track? get currentTrack => _currentTrack;
