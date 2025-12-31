@@ -2084,11 +2084,11 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           ),
         ),
         ),
-            // Player name pill - top right of mini player, flush with right edge
+            // Player name pill - top left of mini player, flush with left edge
             // Outside Material so it's not clipped, always visible when collapsed
             if (t < 0.5)
               Positioned(
-                right: 0,
+                left: 0,
                 top: -14, // Extends above mini player
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
