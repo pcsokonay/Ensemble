@@ -138,6 +138,11 @@ class MusicAssistantProvider with ChangeNotifier {
     final player = _availablePlayers.where((p) => p.playerId == playerId).firstOrNull;
     if (player == null) return false;
 
+    // Group players (like "All Speakers") should NEVER have yellow border
+    // They are pre-configured containers, not manually synced players
+    // Check this FIRST before any other logic to prevent edge cases
+    if (player.provider == 'player_group') return false;
+
     // Case 1: Player is a child synced to another player
     if (player.syncedTo != null) {
       final syncTarget = _availablePlayers.where((p) => p.playerId == player.syncedTo).firstOrNull;
@@ -151,11 +156,8 @@ class MusicAssistantProvider with ChangeNotifier {
     }
 
     // Case 2: Player is a leader with group members
+    // (player_group already handled above, so this is a manual sync leader)
     if (player.groupMembers != null && player.groupMembers!.length > 1) {
-      // If this player IS a group player (like "All Speakers"), not manually synced
-      if (player.provider == 'player_group') return false;
-
-      // Regular player with group members = manual sync leader
       return true;
     }
 

@@ -1095,6 +1095,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       right: _collapsedMargin,
       bottom: adjustedBottomOffset,
       child: GestureDetector(
+        // Tap to dismiss player reveal (matching _buildMorphingPlayer behavior)
+        onTap: widget.isDeviceRevealVisible ? GlobalPlayerOverlay.dismissPlayerReveal : null,
         onVerticalDragUpdate: (details) {
           if (details.primaryDelta! > 5 && widget.onRevealPlayers != null) {
             widget.onRevealPlayers!();
