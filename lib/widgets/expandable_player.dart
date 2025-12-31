@@ -1350,8 +1350,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       child: GestureDetector(
         // Use translucent to allow child widgets (like buttons) to receive taps
         behavior: HitTestBehavior.translucent,
-        // Only handle tap when collapsed - when expanded, let children handle their own taps
-        onTap: isExpanded ? null : expand,
+        // Handle tap: when device list is visible, dismiss it; when collapsed, expand
+        onTap: isExpanded ? null : (widget.isDeviceRevealVisible ? GlobalPlayerOverlay.dismissPlayerReveal : expand),
         onVerticalDragStart: (details) {
           // For expanded player or queue panel: start tracking immediately
           // For collapsed player: defer decision until we know swipe direction
@@ -1434,12 +1434,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           }
         },
         child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: selectedPlayer.isGrouped && t < 0.5
-                ? Border.all(color: _groupBorderColor, width: 1.5)
-                : null,
-          ),
+          // Use foregroundDecoration for border so it renders ON TOP of content
+          // This prevents the album art from clipping the yellow synced border
+          foregroundDecoration: selectedPlayer.isManuallySynced && t < 0.5
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  border: Border.all(color: _groupBorderColor, width: 1.5),
+                )
+              : null,
           child: Material(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(borderRadius),
@@ -1828,7 +1830,59 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                           t: t,
                           expandedElementsOpacity: expandedElementsOpacity,
                         )
-                      : Row(
+                      // When device reveal is visible (player list shown), use compact controls
+                      // like PlayerCard: Play, Next, Power - matching other players in the list
+                      : widget.isDeviceRevealVisible && t < 0.5
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                // Play/Pause - compact like PlayerCard
+                                Transform.translate(
+                                  offset: const Offset(3, 0),
+                                  child: SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: IconButton(
+                                      icon: Icon(
+                                        selectedPlayer.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                        color: textColor,
+                                        size: 28,
+                                      ),
+                                      onPressed: () => maProvider.playPauseSelectedPlayer(),
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                  ),
+                                ),
+                                // Skip next - nudged right like PlayerCard
+                                Transform.translate(
+                                  offset: const Offset(6, 0),
+                                  child: IconButton(
+                                    icon: Icon(
+                                      Icons.skip_next_rounded,
+                                      color: textColor,
+                                      size: 28,
+                                    ),
+                                    onPressed: () => maProvider.nextTrackSelectedPlayer(),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ),
+                                // Power button - smallest, like PlayerCard
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.power_settings_new_rounded,
+                                    color: selectedPlayer.powered ? textColor : textColor.withOpacity(0.5),
+                                    size: 20,
+                                  ),
+                                  onPressed: () => maProvider.togglePower(selectedPlayer.playerId),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                            )
+                          : Row(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: t > 0.5 ? MainAxisAlignment.center : MainAxisAlignment.end,
                     children: [

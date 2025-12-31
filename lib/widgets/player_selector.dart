@@ -226,8 +226,8 @@ class _PlayerSelectorSheetState extends State<_PlayerSelectorSheet> {
                                 );
                               }
 
-                              // Check if this player is part of a sync group
-                              final isGrouped = player.isGrouped;
+                              // Check if this player is manually synced (not a pre-configured group)
+                              final isGrouped = player.isManuallySynced;
                               // Pastel yellow for grouped players
                               const groupBorderColor = Color(0xFFFFF59D);
 

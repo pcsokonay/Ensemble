@@ -87,6 +87,11 @@ class Player {
   bool get isGroupLeader => groupMembers != null && groupMembers!.length > 1 && syncedTo == null;
   bool get isGroupChild => syncedTo != null;
 
+  // A player is manually synced if it's synced TO another player (child of a sync group)
+  // This excludes pre-configured MA speaker groups which have groupMembers but no syncedTo
+  // Used for yellow border highlight - only shows for players the user manually synced
+  bool get isManuallySynced => syncedTo != null;
+
   // Track when this Player object was created (for local interpolation fallback)
   static final Map<String, double> _playerCreationTimes = {};
 
