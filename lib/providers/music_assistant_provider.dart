@@ -148,7 +148,29 @@ class MusicAssistantProvider with ChangeNotifier {
 
     // Case 1: Player is a child synced to another player
     if (player.syncedTo != null) {
-      final syncTarget = _availablePlayers.where((p) => p.playerId == player.syncedTo).firstOrNull;
+      // Look up sync target - also check translated IDs for Cast+Sendspin players
+      // The syncedTo might contain a Cast ID but the player list has the Sendspin version
+      Player? syncTarget = _availablePlayers.where((p) => p.playerId == player.syncedTo).firstOrNull;
+
+      // If not found, try looking up by translated Sendspin ID
+      if (syncTarget == null) {
+        final translatedId = _castToSendspinIdMap[player.syncedTo];
+        if (translatedId != null) {
+          syncTarget = _availablePlayers.where((p) => p.playerId == translatedId).firstOrNull;
+        }
+      }
+
+      // Also check reverse: syncedTo might be Sendspin ID, look for Cast player
+      if (syncTarget == null) {
+        // Build reverse map on demand
+        for (final entry in _castToSendspinIdMap.entries) {
+          if (entry.value == player.syncedTo) {
+            syncTarget = _availablePlayers.where((p) => p.playerId == entry.key).firstOrNull;
+            if (syncTarget != null) break;
+          }
+        }
+      }
+
       if (syncTarget == null) return false;
 
       // If synced to a group player, it's part of a pre-configured group
@@ -2464,16 +2486,34 @@ class MusicAssistantProvider with ChangeNotifier {
         // But allow switching to a playing player when preferLocalPlayer is OFF
         // On coldStart, skip this block and apply full priority logic (playing > local > last selected)
         if (playerToSelect == null && _selectedPlayer != null && !coldStart) {
+          // Check if selected player is still available - also check translated Cast/Sendspin IDs
+          // When Cast player gets replaced by Sendspin version (or vice versa), we should keep selection
+          final selectedId = _selectedPlayer!.playerId;
+          final translatedId = _castToSendspinIdMap[selectedId];
+          String? reverseTranslatedId;
+          for (final entry in _castToSendspinIdMap.entries) {
+            if (entry.value == selectedId) {
+              reverseTranslatedId = entry.key;
+              break;
+            }
+          }
+
           final stillAvailable = _availablePlayers.any(
-            (p) => p.playerId == _selectedPlayer!.playerId && p.available,
+            (p) => p.available && (p.playerId == selectedId ||
+                   (translatedId != null && p.playerId == translatedId) ||
+                   (reverseTranslatedId != null && p.playerId == reverseTranslatedId)),
           );
           if (stillAvailable) {
+            // Find the actual player in the list (might be Cast or Sendspin version)
+            final currentPlayer = _availablePlayers.firstWhere(
+              (p) => p.playerId == selectedId ||
+                     (translatedId != null && p.playerId == translatedId) ||
+                     (reverseTranslatedId != null && p.playerId == reverseTranslatedId),
+            );
+
             // If preferLocalPlayer is OFF, check if we should switch to a playing player
             if (!preferLocalPlayer) {
-              final currentPlayerState = _availablePlayers
-                  .firstWhere((p) => p.playerId == _selectedPlayer!.playerId)
-                  .state;
-              final currentIsPlaying = currentPlayerState == 'playing';
+              final currentIsPlaying = currentPlayer.state == 'playing';
               // Exclude external sources - they're not playing MA content
               final playingPlayers = _availablePlayers.where(
                 (p) => p.state == 'playing' && p.available && !p.isExternalSource,
@@ -2488,9 +2528,10 @@ class MusicAssistantProvider with ChangeNotifier {
 
             // Keep current selection if no switch happened
             if (playerToSelect == null) {
-              playerToSelect = _availablePlayers.firstWhere(
-                (p) => p.playerId == _selectedPlayer!.playerId,
-              );
+              playerToSelect = currentPlayer;
+              if (currentPlayer.playerId != selectedId) {
+                _logger.log('🔄 Selected player ID changed (Cast<->Sendspin): $selectedId -> ${currentPlayer.playerId}');
+              }
             }
           }
         }
