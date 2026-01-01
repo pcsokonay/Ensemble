@@ -4119,12 +4119,34 @@ class MusicAssistantProvider with ChangeNotifier {
       // For children, we unsync the child directly (not the leader!)
       // Unsyncing the leader would dissolve the entire group
       String effectivePlayerId = playerId;
-      if (player.syncedTo != null) {
-        _logger.log('🔓 Player is a child synced to ${player.syncedTo}, unsyncing child directly');
+      String? leaderId = player.syncedTo;
+
+      if (leaderId != null) {
+        _logger.log('🔓 Player is a child synced to $leaderId, unsyncing child directly');
       }
 
-      // Unsync the player directly
-      await _api?.unsyncPlayer(effectivePlayerId);
+      // Try to unsync the player directly
+      try {
+        await _api?.unsyncPlayer(effectivePlayerId);
+      } catch (e) {
+        // Some players (like pure Sendspin CLI players) don't support set_members
+        // In this case, we need to unsync via the leader instead
+        if (e.toString().contains('set_members') && leaderId != null) {
+          _logger.log('🔓 Child unsync failed (set_members not supported), unsyncing via leader');
+
+          // Try to find the Sendspin ID for the leader if it's a Cast UUID
+          String leaderToUnsync = leaderId;
+          if (_castToSendspinIdMap.containsKey(leaderId)) {
+            leaderToUnsync = _castToSendspinIdMap[leaderId]!;
+            _logger.log('🔓 Translated leader to Sendspin ID: $leaderToUnsync');
+          }
+
+          await _api?.unsyncPlayer(leaderToUnsync);
+          _logger.log('⚠️ Dissolved entire group (pure Sendspin player limitation)');
+        } else {
+          rethrow;
+        }
+      }
 
       // Refresh players to get updated group state
       await refreshPlayers();
