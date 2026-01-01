@@ -1438,6 +1438,37 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            // Player name pill - behind mini player, teardrop tail effect
+            // The curved corner of the mini player reveals the tail tapering down
+            if (t < 0.5)
+              Positioned(
+                right: 0,
+                top: -18, // Starts above mini player
+                child: Container(
+                  // Extends down behind the player - the curved corner reveals the "tail"
+                  padding: const EdgeInsets.only(left: 12, right: 12, top: 5, bottom: 24),
+                  decoration: BoxDecoration(
+                    color: (adaptiveScheme?.tertiary ?? colorScheme.tertiary).withOpacity(0.95 * (1.0 - t * 2)),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(10),
+                      topRight: Radius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    selectedPlayer.name,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      color: (adaptiveScheme?.onTertiary ?? colorScheme.onTertiary).withOpacity(1.0 - t * 2),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
+                      decoration: TextDecoration.none,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
             Container(
           // Use foregroundDecoration for border so it renders ON TOP of content
           // This prevents the album art from clipping the yellow synced border
@@ -2084,64 +2115,6 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           ),
         ),
         ),
-            // Player name pill - integrated tab at top right, seamless with mini player
-            // Same background color, progress bar flows through, only top-left corner rounded
-            if (t < 0.5)
-              Positioned(
-                right: 0,
-                top: -20, // Extends above mini player
-                child: ClipRRect(
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(8),
-                    topRight: Radius.circular(borderRadius),
-                  ),
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: _progressNotifier,
-                    builder: (context, elapsedSeconds, child) {
-                      final totalSeconds = currentTrack?.duration?.inSeconds ?? 0;
-                      final progress = totalSeconds > 0
-                          ? (elapsedSeconds / totalSeconds).clamp(0.0, 1.0)
-                          : 0.0;
-                      final pillOpacity = (1.0 - t * 2).clamp(0.0, 1.0);
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: collapsedBgUnplayed.withOpacity(pillOpacity),
-                        ),
-                        child: Stack(
-                          children: [
-                            // Progress overlay - same as mini player progress bar
-                            Positioned.fill(
-                              child: FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor: progress,
-                                child: Container(
-                                  color: collapsedBg.withOpacity(pillOpacity),
-                                ),
-                              ),
-                            ),
-                            // Text on top
-                            Text(
-                              selectedPlayer.name,
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                color: textColor.withOpacity(pillOpacity),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0,
-                                decoration: TextDecoration.none,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
           ],
         ),
       ),
