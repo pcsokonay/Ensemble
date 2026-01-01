@@ -252,4 +252,53 @@ class DatabaseService {
 
   /// Clear all search history
   Future<void> clearSearchHistory() => db.clearSearchHistory();
+
+  // ============================================
+  // Cast-to-Sendspin Mapping Methods
+  // ============================================
+
+  static const String _sendspinMappingType = 'cast_sendspin_mapping';
+
+  /// Save a Cast UUID to Sendspin ID mapping
+  Future<void> saveCastToSendspinMapping(String castId, String sendspinId) {
+    _logger.log('💾 Persisting Cast->Sendspin mapping: $castId -> $sendspinId');
+    return db.cacheItem(
+      itemType: _sendspinMappingType,
+      itemId: castId,
+      data: jsonEncode({'sendspinId': sendspinId}),
+    );
+  }
+
+  /// Get persisted Sendspin ID for a Cast UUID
+  Future<String?> getSendspinIdForCast(String castId) async {
+    final item = await db.getCachedItem(_sendspinMappingType, castId);
+    if (item == null) return null;
+    try {
+      final data = jsonDecode(item.data) as Map<String, dynamic>;
+      return data['sendspinId'] as String?;
+    } catch (e) {
+      _logger.log('Error decoding Sendspin mapping: $e');
+      return null;
+    }
+  }
+
+  /// Load all persisted Cast-to-Sendspin mappings
+  Future<Map<String, String>> getAllCastToSendspinMappings() async {
+    final items = await db.getCachedItems(_sendspinMappingType);
+    final mappings = <String, String>{};
+    for (final item in items) {
+      try {
+        final data = jsonDecode(item.data) as Map<String, dynamic>;
+        final sendspinId = data['sendspinId'] as String?;
+        if (sendspinId != null) {
+          // The itemId is the Cast UUID
+          mappings[item.itemId] = sendspinId;
+        }
+      } catch (e) {
+        _logger.log('Error decoding Sendspin mapping: $e');
+      }
+    }
+    _logger.log('📦 Loaded ${mappings.length} Cast->Sendspin mappings from database');
+    return mappings;
+  }
 }
