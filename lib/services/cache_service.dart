@@ -254,6 +254,9 @@ class CacheService {
   /// Get cached track for a player (used for smooth swipe transitions)
   Track? getCachedTrackForPlayer(String playerId) => _playerTrackCache[playerId];
 
+  /// Get all player IDs that have cached tracks
+  Iterable<String> getAllCachedPlayerIds() => _playerTrackCache.keys;
+
   /// Set cached track for a player
   void setCachedTrackForPlayer(String playerId, Track? track) {
     _playerTrackCache[playerId] = track;

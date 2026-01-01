@@ -240,7 +240,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Get cached track for a player (used for smooth swipe transitions)
   /// For grouped child players, returns the leader's track
-  /// Also checks translated Cast<->Sendspin IDs
+  /// Also checks translated Cast<->Sendspin IDs (both from map and computed dynamically)
   Track? getCachedTrackForPlayer(String playerId) {
     // If player is a group child, get the leader's track instead
     final player = _availablePlayers.firstWhere(
@@ -263,18 +263,61 @@ class MusicAssistantProvider with ChangeNotifier {
 
     // If not found, try translated Cast<->Sendspin ID
     if (track == null) {
-      // Check Cast -> Sendspin
+      // Check Cast -> Sendspin (from map)
       final sendspinId = _castToSendspinIdMap[effectivePlayerId];
       if (sendspinId != null) {
         track = _cacheService.getCachedTrackForPlayer(sendspinId);
       }
 
-      // Check Sendspin -> Cast (reverse lookup)
+      // Check Sendspin -> Cast (reverse lookup from map)
       if (track == null) {
         for (final entry in _castToSendspinIdMap.entries) {
           if (entry.value == effectivePlayerId) {
             track = _cacheService.getCachedTrackForPlayer(entry.key);
             if (track != null) break;
+          }
+        }
+      }
+
+      // Dynamic ID computation for chromecast players
+      // This handles cases where the map doesn't have the entry yet
+      if (track == null) {
+        // If effectivePlayerId looks like a Sendspin ID (cast-{8chars}), compute Cast ID
+        if (effectivePlayerId.startsWith('cast-') && effectivePlayerId.length >= 13) {
+          // Sendspin ID: cast-7df484e3 -> need to find Cast ID that starts with 7df484e3
+          final prefix = effectivePlayerId.substring(5); // Remove "cast-"
+          // Search through available players for a chromecast player with matching UUID prefix
+          for (final p in _availablePlayers) {
+            if (p.provider == 'chromecast' && p.playerId.startsWith(prefix)) {
+              track = _cacheService.getCachedTrackForPlayer(p.playerId);
+              if (track != null) {
+                _logger.log('🔍 Found track via computed Cast ID: ${p.playerId}');
+                break;
+              }
+            }
+          }
+          // Also try direct cache lookup with the prefix as partial ID
+          if (track == null) {
+            // Try common UUID patterns - the cache might have the full Cast UUID
+            final possibleCastIds = _cacheService.getAllCachedPlayerIds()
+                .where((id) => id.startsWith(prefix))
+                .toList();
+            for (final castId in possibleCastIds) {
+              track = _cacheService.getCachedTrackForPlayer(castId);
+              if (track != null) {
+                _logger.log('🔍 Found track via cache scan for prefix $prefix: $castId');
+                break;
+              }
+            }
+          }
+        }
+
+        // If effectivePlayerId looks like a Cast UUID, compute Sendspin ID
+        if (track == null && effectivePlayerId.length >= 8 && effectivePlayerId.contains('-')) {
+          final computedSendspinId = 'cast-${effectivePlayerId.substring(0, 8)}';
+          track = _cacheService.getCachedTrackForPlayer(computedSendspinId);
+          if (track != null) {
+            _logger.log('🔍 Found track via computed Sendspin ID: $computedSendspinId');
           }
         }
       }
@@ -1800,6 +1843,18 @@ class MusicAssistantProvider with ChangeNotifier {
           if (!keepExisting) {
             _cacheService.setCachedTrackForPlayer(playerId, trackFromEvent);
             _logger.log('📋 Cached track for $playerName from player_updated: ${trackFromEvent.name}');
+
+            // Dual-cache for Cast<->Sendspin players so track is findable by either ID
+            final sendspinId = _castToSendspinIdMap[playerId];
+            if (sendspinId != null) {
+              _cacheService.setCachedTrackForPlayer(sendspinId, trackFromEvent);
+              _logger.log('📋 Also cached under Sendspin ID: $sendspinId');
+            } else if (playerId.length >= 8 && playerId.contains('-')) {
+              // Compute Sendspin ID for chromecast players not yet in map
+              final computedSendspinId = 'cast-${playerId.substring(0, 8)}';
+              _cacheService.setCachedTrackForPlayer(computedSendspinId, trackFromEvent);
+              _logger.log('📋 Also cached under computed Sendspin ID: $computedSendspinId');
+            }
           } else {
             _logger.log('📋 Skipped caching for $playerName - already have better data (artist: $existingHasProperArtist, image: $existingHasImage)');
           }
@@ -2989,6 +3044,15 @@ class MusicAssistantProvider with ChangeNotifier {
           _cacheService.setCachedTrackForPlayer(player.playerId, track);
           _logger.log('🔍 Preload ${player.name}: CACHED track "${track.name}"');
 
+          // Dual-cache for Cast<->Sendspin players
+          final sendspinId = _castToSendspinIdMap[player.playerId];
+          if (sendspinId != null) {
+            _cacheService.setCachedTrackForPlayer(sendspinId, track);
+          } else if (player.provider == 'chromecast' && player.playerId.length >= 8) {
+            final computedSendspinId = 'cast-${player.playerId.substring(0, 8)}';
+            _cacheService.setCachedTrackForPlayer(computedSendspinId, track);
+          }
+
           // Also precache the image so it's ready for swipe preview
           final imageUrl = getImageUrl(track, size: 512);
           if (imageUrl != null) {
@@ -3252,6 +3316,15 @@ class MusicAssistantProvider with ChangeNotifier {
             // Update cache if queue track has good metadata
             if (queueHasImage || queueHasProperArtist) {
               _cacheService.setCachedTrackForPlayer(_selectedPlayer!.playerId, queueTrack);
+
+              // Dual-cache for Cast<->Sendspin players
+              final sendspinId = _castToSendspinIdMap[_selectedPlayer!.playerId];
+              if (sendspinId != null) {
+                _cacheService.setCachedTrackForPlayer(sendspinId, queueTrack);
+              } else if (_selectedPlayer!.provider == 'chromecast' && _selectedPlayer!.playerId.length >= 8) {
+                final computedSendspinId = 'cast-${_selectedPlayer!.playerId.substring(0, 8)}';
+                _cacheService.setCachedTrackForPlayer(computedSendspinId, queueTrack);
+              }
             }
           }
           stateChanged = true;
