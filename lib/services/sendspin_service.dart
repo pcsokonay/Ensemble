@@ -87,6 +87,9 @@ class SendspinService {
   // Auth token for proxy authentication (MA 2.7.1+)
   String? _authToken;
 
+  // Connection deduplication guard - prevents multiple concurrent auth attempts
+  Completer<bool>? _connectionInProgress;
+
   SendspinService(this.serverUrl);
 
   /// Set the MA auth token for proxy authentication
@@ -99,6 +102,13 @@ class SendspinService {
   Future<bool> connect() async {
     if (_isDisposed) return false;
     if (_state == SendspinConnectionState.connected) return true;
+
+    // Deduplicate concurrent connection attempts
+    if (_connectionInProgress != null) {
+      _logger.log('Sendspin: Connection already in progress, waiting...');
+      return _connectionInProgress!.future;
+    }
+    _connectionInProgress = Completer<bool>();
 
     _updateState(SendspinConnectionState.connecting);
 
@@ -126,13 +136,19 @@ class SendspinService {
       if (!connected) {
         _logger.log('Sendspin: External proxy connection failed');
         _updateState(SendspinConnectionState.error);
+        _connectionInProgress?.complete(false);
+        _connectionInProgress = null;
         return false;
       }
 
+      _connectionInProgress?.complete(true);
+      _connectionInProgress = null;
       return true;
     } catch (e) {
       _logger.log('Sendspin: Connection error: $e');
       _updateState(SendspinConnectionState.error);
+      _connectionInProgress?.complete(false);
+      _connectionInProgress = null;
       return false;
     }
   }
@@ -141,6 +157,13 @@ class SendspinService {
   Future<bool> connectWithUrl(String wsUrl) async {
     if (_isDisposed) return false;
     if (_state == SendspinConnectionState.connected) return true;
+
+    // Deduplicate concurrent connection attempts
+    if (_connectionInProgress != null) {
+      _logger.log('Sendspin: Connection already in progress, waiting...');
+      return _connectionInProgress!.future;
+    }
+    _connectionInProgress = Completer<bool>();
 
     _updateState(SendspinConnectionState.connecting);
 
@@ -154,13 +177,19 @@ class SendspinService {
 
       if (!connected) {
         _updateState(SendspinConnectionState.error);
+        _connectionInProgress?.complete(false);
+        _connectionInProgress = null;
         return false;
       }
 
+      _connectionInProgress?.complete(true);
+      _connectionInProgress = null;
       return true;
     } catch (e) {
       _logger.log('Sendspin: Connection error: $e');
       _updateState(SendspinConnectionState.error);
+      _connectionInProgress?.complete(false);
+      _connectionInProgress = null;
       return false;
     }
   }

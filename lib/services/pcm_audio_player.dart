@@ -83,6 +83,11 @@ class PcmAudioPlayer {
   // Reduced from 8000 to 5000 frames (~104ms vs ~166ms) for faster response
   static const int _feedThreshold = 5000;
 
+  // Maximum buffer size to prevent memory overflow (~10 seconds of audio)
+  // At 48kHz stereo 16-bit: 192KB/sec, so ~2MB for 10 seconds
+  // Each chunk is ~4KB, so max ~500 chunks
+  static const int _maxBufferChunks = 500;
+
   // Stats
   int _framesPlayed = 0;
   int _bytesPlayed = 0;
@@ -201,6 +206,16 @@ class PcmAudioPlayer {
     return true;
   }
 
+  /// Safely add audio data to buffer with overflow protection
+  void _addToBuffer(Uint8List audioData) {
+    // If buffer is full, drop oldest chunks to make room
+    while (_audioBuffer.length >= _maxBufferChunks) {
+      _audioBuffer.removeAt(0);
+      _logger.log('⚠️ PcmAudioPlayer: Buffer overflow - dropping oldest chunk');
+    }
+    _audioBuffer.add(audioData);
+  }
+
   /// Handle incoming audio data from the stream
   void _onAudioData(Uint8List audioData) {
     // Ignore data if in error state
@@ -215,7 +230,7 @@ class PcmAudioPlayer {
       if (_state == PcmPlayerState.paused && !_isAutoRecovering) {
         _logger.log('PcmAudioPlayer: Audio arriving while paused - initiating auto-recovery');
         _isAutoRecovering = true;
-        _audioBuffer.add(audioData);
+        _addToBuffer(audioData);
 
         // Trigger async recovery
         _autoRecoverFromPause();
@@ -224,7 +239,7 @@ class PcmAudioPlayer {
 
       // If already recovering or in transitional state, buffer the data
       if (_isAutoRecovering) {
-        _audioBuffer.add(audioData);
+        _addToBuffer(audioData);
         return;
       }
 
@@ -232,8 +247,8 @@ class PcmAudioPlayer {
       return;
     }
 
-    // Add to buffer
-    _audioBuffer.add(audioData);
+    // Add to buffer with overflow protection
+    _addToBuffer(audioData);
 
     // Start playback if not already started
     if (!_isStarted && _state == PcmPlayerState.ready) {

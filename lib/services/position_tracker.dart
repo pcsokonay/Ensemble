@@ -24,6 +24,10 @@ class PositionTracker {
   double _anchorPosition = 0.0;  // Position in seconds at anchor time
   DateTime _anchorTime = DateTime.now();  // When we set the anchor
 
+  // Maximum time to interpolate from a stale anchor before capping
+  // After this, we stop adding time to prevent indefinite drift
+  static const Duration _maxAnchorAge = Duration(seconds: 30);
+
   // Interpolation timer
   Timer? _interpolationTimer;
 
@@ -43,7 +47,13 @@ class PositionTracker {
     }
 
     final now = DateTime.now();
-    final elapsed = now.difference(_anchorTime).inMilliseconds / 1000.0;
+    final anchorAge = now.difference(_anchorTime);
+
+    // Cap interpolation at max anchor age to prevent indefinite drift
+    // If anchor is stale, return last known position (anchor + max age)
+    final elapsed = anchorAge > _maxAnchorAge
+        ? _maxAnchorAge.inMilliseconds / 1000.0
+        : anchorAge.inMilliseconds / 1000.0;
     final interpolated = _anchorPosition + elapsed;
 
     // Cap at duration to prevent overflow
@@ -61,7 +71,12 @@ class PositionTracker {
     }
 
     final now = DateTime.now();
-    final elapsed = now.difference(_anchorTime).inMilliseconds / 1000.0;
+    final anchorAge = now.difference(_anchorTime);
+
+    // Cap interpolation at max anchor age to prevent indefinite drift
+    final elapsed = anchorAge > _maxAnchorAge
+        ? _maxAnchorAge.inMilliseconds / 1000.0
+        : anchorAge.inMilliseconds / 1000.0;
     final interpolated = _anchorPosition + elapsed;
 
     // Cap at duration

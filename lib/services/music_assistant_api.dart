@@ -2909,6 +2909,17 @@ class MusicAssistantAPI {
     _updateConnectionState(MAConnectionState.disconnected);
     await _channel?.sink.close();
     _channel = null;
+    // Complete all pending requests with an error before clearing
+    _cancelPendingRequests('Connection disconnected');
+  }
+
+  /// Cancel all pending requests with an error message
+  void _cancelPendingRequests(String reason) {
+    for (final entry in _pendingRequests.entries) {
+      if (!entry.value.isCompleted) {
+        entry.value.completeError(Exception(reason));
+      }
+    }
     _pendingRequests.clear();
   }
 

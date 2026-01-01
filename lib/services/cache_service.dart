@@ -11,6 +11,11 @@ class CacheService {
   final DebugLogger _logger = DebugLogger();
   bool _homeRowsLoaded = false;
 
+  // Cache size limits to prevent unbounded memory growth
+  static const int _maxDetailCacheSize = 50; // Max albums/playlists/artists cached
+  static const int _maxSearchCacheSize = 20; // Max search queries cached
+  static const int _maxPlayerTrackCacheSize = 30; // Max player track associations
+
   // Home screen row caching
   List<Album>? _cachedRecentAlbums;
   List<Artist>? _cachedDiscoverArtists;
@@ -38,6 +43,7 @@ class CacheService {
 
   // Player track cache (for smooth swipe transitions)
   final Map<String, Track?> _playerTrackCache = {};
+  final Map<String, DateTime> _playerTrackCacheTime = {};
 
   // ============================================================================
   // HOME SCREEN ROW CACHING
@@ -135,6 +141,7 @@ class CacheService {
   void setCachedAlbumTracks(String cacheKey, List<Track> tracks) {
     _albumTracksCache[cacheKey] = tracks;
     _albumTracksCacheTime[cacheKey] = DateTime.now();
+    _evictOldestEntries(_albumTracksCache, _albumTracksCacheTime, _maxDetailCacheSize);
     _logger.log('✅ Cached ${tracks.length} tracks for album $cacheKey');
   }
 
@@ -161,6 +168,7 @@ class CacheService {
   void setCachedPlaylistTracks(String cacheKey, List<Track> tracks) {
     _playlistTracksCache[cacheKey] = tracks;
     _playlistTracksCacheTime[cacheKey] = DateTime.now();
+    _evictOldestEntries(_playlistTracksCache, _playlistTracksCacheTime, _maxDetailCacheSize);
     _logger.log('✅ Cached ${tracks.length} tracks for playlist $cacheKey');
   }
 
@@ -187,6 +195,7 @@ class CacheService {
   void setCachedArtistAlbums(String cacheKey, List<Album> albums) {
     _artistAlbumsCache[cacheKey] = albums;
     _artistAlbumsCacheTime[cacheKey] = DateTime.now();
+    _evictOldestEntries(_artistAlbumsCache, _artistAlbumsCacheTime, _maxDetailCacheSize);
     _logger.log('✅ Cached ${albums.length} albums for artist $cacheKey');
   }
 
@@ -211,6 +220,7 @@ class CacheService {
   void setCachedSearchResults(String cacheKey, Map<String, List<MediaItem>> results) {
     _searchCache[cacheKey] = results;
     _searchCacheTime[cacheKey] = DateTime.now();
+    _evictOldestEntries(_searchCache, _searchCacheTime, _maxSearchCacheSize);
     _logger.log('✅ Cached search results for "$cacheKey"');
   }
 
@@ -260,11 +270,14 @@ class CacheService {
   /// Set cached track for a player
   void setCachedTrackForPlayer(String playerId, Track? track) {
     _playerTrackCache[playerId] = track;
+    _playerTrackCacheTime[playerId] = DateTime.now();
+    _evictOldestEntries(_playerTrackCache, _playerTrackCacheTime, _maxPlayerTrackCacheSize);
   }
 
   /// Clear cached track for a player (e.g., when external source is active)
   void clearCachedTrackForPlayer(String playerId) {
     _playerTrackCache.remove(playerId);
+    _playerTrackCacheTime.remove(playerId);
   }
 
   // ============================================================================
@@ -282,6 +295,7 @@ class CacheService {
     _searchCache.clear();
     _searchCacheTime.clear();
     _playerTrackCache.clear();
+    _playerTrackCacheTime.clear();
     _logger.log('🗑️ All detail caches cleared');
   }
 
@@ -366,5 +380,35 @@ class CacheService {
         _logger.log('⚠️ Failed to persist $rowType: $e');
       }
     }();
+  }
+
+  // ============================================================================
+  // LRU CACHE EVICTION
+  // ============================================================================
+
+  /// Evict oldest entries from cache maps to enforce size limit (LRU eviction)
+  /// Uses the timestamp map to determine which entries are oldest
+  void _evictOldestEntries<K, V>(
+    Map<K, V> cache,
+    Map<K, DateTime> cacheTime,
+    int maxSize,
+  ) {
+    if (cache.length <= maxSize) return;
+
+    // Sort keys by timestamp (oldest first)
+    final sortedKeys = cacheTime.keys.toList()
+      ..sort((a, b) => (cacheTime[a] ?? DateTime.now())
+          .compareTo(cacheTime[b] ?? DateTime.now()));
+
+    // Remove oldest entries until we're at maxSize
+    final keysToRemove = sortedKeys.take(cache.length - maxSize);
+    for (final key in keysToRemove) {
+      cache.remove(key);
+      cacheTime.remove(key);
+    }
+
+    if (keysToRemove.isNotEmpty) {
+      _logger.log('🗑️ LRU evicted ${keysToRemove.length} cache entries');
+    }
   }
 }

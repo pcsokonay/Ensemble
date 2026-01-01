@@ -94,6 +94,24 @@ class Player {
 
   // Track when this Player object was created (for local interpolation fallback)
   static final Map<String, double> _playerCreationTimes = {};
+  static const int _maxCreationTimesEntries = 50;
+
+  /// Clean up old creation time entries using LRU eviction
+  static void _cleanupCreationTimes() {
+    if (_playerCreationTimes.length <= _maxCreationTimesEntries) return;
+
+    // Sort by timestamp value (oldest first) for true LRU eviction
+    final sortedEntries = _playerCreationTimes.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+
+    // Remove oldest entries until we're at target size
+    final entriesToRemove = sortedEntries.take(
+      _playerCreationTimes.length - _maxCreationTimesEntries,
+    );
+    for (final entry in entriesToRemove) {
+      _playerCreationTimes.remove(entry.key);
+    }
+  }
 
   // Calculate current elapsed time (interpolated if playing)
   double get currentElapsedTime {
@@ -135,13 +153,8 @@ class Player {
     if (!_playerCreationTimes.containsKey(creationKey)) {
       // First time seeing this elapsed_time - record when we saw it
       _playerCreationTimes[creationKey] = now;
-      // Clean up old entries to prevent memory leak
-      if (_playerCreationTimes.length > 100) {
-        final keysToRemove = _playerCreationTimes.keys.take(50).toList();
-        for (final key in keysToRemove) {
-          _playerCreationTimes.remove(key);
-        }
-      }
+      // Clean up old entries to prevent memory leak (LRU eviction)
+      _cleanupCreationTimes();
     }
 
     final creationTime = _playerCreationTimes[creationKey]!;

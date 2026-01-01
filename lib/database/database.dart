@@ -25,6 +25,8 @@ class Profiles extends Table {
 }
 
 /// Recently played items - scoped by profile
+@TableIndex(name: 'idx_recently_played_profile', columns: {#profileUsername})
+@TableIndex(name: 'idx_recently_played_profile_played', columns: {#profileUsername, #playedAt})
 class RecentlyPlayed extends Table {
   /// Auto-incrementing ID
   IntColumn get id => integer().autoIncrement()();
@@ -55,6 +57,8 @@ class RecentlyPlayed extends Table {
 }
 
 /// Cached library items for fast startup
+@TableIndex(name: 'idx_library_cache_type', columns: {#itemType})
+@TableIndex(name: 'idx_library_cache_type_deleted', columns: {#itemType, #isDeleted})
 class LibraryCache extends Table {
   /// Composite key: provider + item_id
   TextColumn get cacheKey => text()();
@@ -139,6 +143,8 @@ class CachedPlayers extends Table {
 }
 
 /// Cached queue items for selected player
+@TableIndex(name: 'idx_cached_queue_player', columns: {#playerId})
+@TableIndex(name: 'idx_cached_queue_player_position', columns: {#playerId, #position})
 class CachedQueue extends Table {
   /// Auto-incrementing ID for ordering
   IntColumn get id => integer().autoIncrement()();
@@ -185,7 +191,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -207,6 +213,18 @@ class AppDatabase extends _$AppDatabase {
         // Migration from v3 to v4: Add search history table
         if (from < 4) {
           await m.createTable(searchHistory);
+        }
+        // Migration from v4 to v5: Add indexes for query performance
+        if (from < 5) {
+          // RecentlyPlayed indexes
+          await customStatement('CREATE INDEX IF NOT EXISTS idx_recently_played_profile ON recently_played (profile_username)');
+          await customStatement('CREATE INDEX IF NOT EXISTS idx_recently_played_profile_played ON recently_played (profile_username, played_at)');
+          // LibraryCache indexes
+          await customStatement('CREATE INDEX IF NOT EXISTS idx_library_cache_type ON library_cache (item_type)');
+          await customStatement('CREATE INDEX IF NOT EXISTS idx_library_cache_type_deleted ON library_cache (item_type, is_deleted)');
+          // CachedQueue indexes
+          await customStatement('CREATE INDEX IF NOT EXISTS idx_cached_queue_player ON cached_queue (player_id)');
+          await customStatement('CREATE INDEX IF NOT EXISTS idx_cached_queue_player_position ON cached_queue (player_id, position)');
         }
       },
     );
