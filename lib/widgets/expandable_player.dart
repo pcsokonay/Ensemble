@@ -2084,30 +2084,61 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           ),
         ),
         ),
-            // Player name pill - top left of mini player, flush with left edge
-            // Outside Material so it's not clipped, always visible when collapsed
+            // Player name pill - integrated tab at top right, seamless with mini player
+            // Same background color, progress bar flows through, only top-left corner rounded
             if (t < 0.5)
               Positioned(
-                left: 0,
-                top: -14, // Extends above mini player
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: (adaptiveScheme?.tertiary ?? colorScheme.tertiary).withOpacity(0.95 * (1.0 - t * 2)),
-                    borderRadius: BorderRadius.circular(8),
+                right: 0,
+                top: -20, // Extends above mini player
+                child: ClipRRect(
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(8),
+                    topRight: Radius.circular(borderRadius),
                   ),
-                  child: Text(
-                    selectedPlayer.name,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      color: (adaptiveScheme?.onTertiary ?? colorScheme.onTertiary).withOpacity(1.0 - t * 2),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0,
-                      decoration: TextDecoration.none,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _progressNotifier,
+                    builder: (context, elapsedSeconds, child) {
+                      final totalSeconds = currentTrack?.duration?.inSeconds ?? 0;
+                      final progress = totalSeconds > 0
+                          ? (elapsedSeconds / totalSeconds).clamp(0.0, 1.0)
+                          : 0.0;
+                      final pillOpacity = (1.0 - t * 2).clamp(0.0, 1.0);
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: collapsedBgUnplayed.withOpacity(pillOpacity),
+                        ),
+                        child: Stack(
+                          children: [
+                            // Progress overlay - same as mini player progress bar
+                            Positioned.fill(
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: progress,
+                                child: Container(
+                                  color: collapsedBg.withOpacity(pillOpacity),
+                                ),
+                              ),
+                            ),
+                            // Text on top
+                            Text(
+                              selectedPlayer.name,
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                color: textColor.withOpacity(pillOpacity),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0,
+                                decoration: TextDecoration.none,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
