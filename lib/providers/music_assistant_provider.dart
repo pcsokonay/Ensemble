@@ -3801,11 +3801,36 @@ class MusicAssistantProvider with ChangeNotifier {
         return;
       }
 
-      // Translate Cast player IDs to Sendspin IDs if available
-      // This is needed because regular Cast players can't sync with Sendspin players
-      // Both target AND leader need translation for Cast+Sendspin players
-      final actualTargetId = _castToSendspinIdMap[targetPlayerId] ?? targetPlayerId;
-      final actualLeaderId = _castToSendspinIdMap[leaderPlayer.playerId] ?? leaderPlayer.playerId;
+      // Translate Cast player IDs to Sendspin IDs for group commands
+      // Cast players don't support group commands - only their Sendspin counterparts do
+      // We need to translate BOTH target and leader IDs
+      //
+      // Strategy:
+      // 1. Use cached mapping from _castToSendspinIdMap if available
+      // 2. For Cast players (provider: chromecast), compute Sendspin ID dynamically:
+      //    Cast ID format: {uuid} e.g., 7ad8d968-e687-ef3c-ba07-f6e5c0a2806d
+      //    Sendspin ID format: cast-{first 8 chars} e.g., cast-7ad8d968
+      String translateToSendspinId(String playerId, Player? player) {
+        // Check cached mapping first
+        if (_castToSendspinIdMap.containsKey(playerId)) {
+          return _castToSendspinIdMap[playerId]!;
+        }
+        // For chromecast players, compute Sendspin ID dynamically
+        // This handles cases where the Sendspin player isn't active yet
+        if (player?.provider == 'chromecast' && playerId.length >= 8) {
+          final sendspinId = 'cast-${playerId.substring(0, 8)}';
+          _logger.log('🔗 Computed Sendspin ID for Cast player: $playerId -> $sendspinId');
+          return sendspinId;
+        }
+        return playerId;
+      }
+
+      // Find target player to check its provider
+      final targetPlayer = _availablePlayers.where((p) => p.playerId == targetPlayerId).firstOrNull;
+
+      final actualTargetId = translateToSendspinId(targetPlayerId, targetPlayer);
+      final actualLeaderId = translateToSendspinId(leaderPlayer.playerId, leaderPlayer);
+
       if (actualTargetId != targetPlayerId) {
         _logger.log('🔗 Translated target Cast ID to Sendspin ID: $targetPlayerId -> $actualTargetId');
       }
