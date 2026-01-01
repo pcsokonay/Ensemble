@@ -68,12 +68,16 @@ class PlayerControls extends StatelessWidget {
         if (isExpanded) SizedBox(width: _lerpDouble(0, 20, t)),
 
         // Previous
-        _buildControlButton(
-          icon: Icons.skip_previous_rounded,
-          color: textColor,
-          size: skipButtonSize,
-          onPressed: onPrevious,
-          useAnimation: isExpanded,
+        Semantics(
+          button: true,
+          label: 'Previous track',
+          child: _buildControlButton(
+            icon: Icons.skip_previous_rounded,
+            color: textColor,
+            size: skipButtonSize,
+            onPressed: onPrevious,
+            useAnimation: isExpanded,
+          ),
         ),
         SizedBox(width: _lerpDouble(0, 20, t)),
 
@@ -82,12 +86,16 @@ class PlayerControls extends StatelessWidget {
         SizedBox(width: _lerpDouble(0, 20, t)),
 
         // Next
-        _buildControlButton(
-          icon: Icons.skip_next_rounded,
-          color: textColor,
-          size: skipButtonSize,
-          onPressed: onNext,
-          useAnimation: isExpanded,
+        Semantics(
+          button: true,
+          label: 'Next track',
+          child: _buildControlButton(
+            icon: Icons.skip_next_rounded,
+            color: textColor,
+            size: skipButtonSize,
+            onPressed: onNext,
+            useAnimation: isExpanded,
+          ),
         ),
 
         // Repeat (expanded only)
@@ -153,21 +161,26 @@ class PlayerControls extends StatelessWidget {
     final bgColor = Color.lerp(Colors.transparent, primaryColor, progress);
     final iconColor = Color.lerp(textColor, backgroundColor, progress);
 
-    return GestureDetector(
-      onLongPress: onStop,
-      child: Container(
-        width: playButtonContainerSize,
-        height: playButtonContainerSize,
-        decoration: BoxDecoration(
-          color: bgColor,
-          shape: BoxShape.circle,
-        ),
-        child: IconButton(
-          icon: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
-          color: iconColor,
-          iconSize: playButtonSize,
-          onPressed: onPlayPause,
-          padding: EdgeInsets.zero,
+    return Semantics(
+      button: true,
+      label: isPlaying ? 'Pause' : 'Play',
+      hint: 'Long press to stop',
+      child: GestureDetector(
+        onLongPress: onStop,
+        child: Container(
+          width: playButtonContainerSize,
+          height: playButtonContainerSize,
+          decoration: BoxDecoration(
+            color: bgColor,
+            shape: BoxShape.circle,
+          ),
+          child: IconButton(
+            icon: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+            color: iconColor,
+            iconSize: playButtonSize,
+            onPressed: onPlayPause,
+            padding: EdgeInsets.zero,
+          ),
         ),
       ),
     );

@@ -230,11 +230,12 @@ class _PlayerCardState extends State<PlayerCard> {
           // Play/Pause and Next only shown when powered with content
           if (widget.player.available && widget.player.powered && widget.trackInfo != null) ...[
             // Play/Pause - slight nudge right
+            // Touch target increased to 44dp for accessibility (icon remains 28)
             Transform.translate(
               offset: const Offset(3, 0),
               child: SizedBox(
-                width: 28,
-                height: 28,
+                width: 44,
+                height: 44,
                 child: IconButton(
                   icon: Icon(
                     widget.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,

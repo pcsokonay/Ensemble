@@ -1908,11 +1908,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
                                 // Play/Pause - compact like PlayerCard
+                                // Touch target increased to 44dp for accessibility
                                 Transform.translate(
                                   offset: const Offset(3, 0),
                                   child: SizedBox(
-                                    width: 28,
-                                    height: 28,
+                                    width: 44,
+                                    height: 44,
                                     child: IconButton(
                                       icon: Icon(
                                         selectedPlayer.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
