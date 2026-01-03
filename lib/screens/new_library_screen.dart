@@ -920,10 +920,12 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                       // Main scrollable content
                       NotificationListener<ScrollNotification>(
                         onNotification: _handleScrollNotification,
-                        child: PageView(
+                        // PERF: Use PageView.builder to only build visible tabs
+                        child: PageView.builder(
                           controller: _pageController,
                           onPageChanged: _onPageChanged,
-                          children: _buildTabViews(context, l10n),
+                          itemCount: _tabCount,
+                          itemBuilder: (context, index) => _buildTabAtIndex(context, l10n, index),
                         ),
                       ),
                       // Fade gradient at top - content fades as it scrolls under filter bar
@@ -1185,29 +1187,39 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ PAGE VIEWS ============
-  List<Widget> _buildTabViews(BuildContext context, S l10n) {
+  /// PERF: Build only the requested tab (for PageView.builder)
+  Widget _buildTabAtIndex(BuildContext context, S l10n, int index) {
     switch (_selectedMediaType) {
       case LibraryMediaType.music:
-        return [
-          _buildArtistsTab(context, l10n),
-          _buildAlbumsTab(context, l10n),
-          if (_showFavoritesOnly) _buildTracksTab(context, l10n),
-          _buildPlaylistsTab(context, l10n),
-        ];
+        if (_showFavoritesOnly) {
+          // Artists, Albums, Tracks, Playlists
+          switch (index) {
+            case 0: return _buildArtistsTab(context, l10n);
+            case 1: return _buildAlbumsTab(context, l10n);
+            case 2: return _buildTracksTab(context, l10n);
+            case 3: return _buildPlaylistsTab(context, l10n);
+            default: return const SizedBox();
+          }
+        } else {
+          // Artists, Albums, Playlists (no Tracks)
+          switch (index) {
+            case 0: return _buildArtistsTab(context, l10n);
+            case 1: return _buildAlbumsTab(context, l10n);
+            case 2: return _buildPlaylistsTab(context, l10n);
+            default: return const SizedBox();
+          }
+        }
       case LibraryMediaType.books:
-        return [
-          _buildBooksAuthorsTab(context, l10n),
-          _buildAllBooksTab(context, l10n),
-          _buildSeriesTab(context, l10n),
-        ];
+        switch (index) {
+          case 0: return _buildBooksAuthorsTab(context, l10n);
+          case 1: return _buildAllBooksTab(context, l10n);
+          case 2: return _buildSeriesTab(context, l10n);
+          default: return const SizedBox();
+        }
       case LibraryMediaType.podcasts:
-        return [
-          _buildPodcastsComingSoonTab(context, l10n),
-        ];
+        return _buildPodcastsComingSoonTab(context, l10n);
       case LibraryMediaType.radio:
-        return [
-          _buildRadioStationsTab(context, l10n),
-        ];
+        return _buildRadioStationsTab(context, l10n);
     }
   }
 
