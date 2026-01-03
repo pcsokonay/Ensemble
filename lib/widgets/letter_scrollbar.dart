@@ -54,9 +54,13 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
     if (!_isDragging && widget.controller.hasClients) {
       final position = widget.controller.position;
       if (position.maxScrollExtent > 0) {
-        setState(() {
-          _scrollFraction = (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0);
-        });
+        final newFraction = (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0);
+        // PERF: Only rebuild if fraction changed by more than 1% to reduce rebuilds
+        if ((newFraction - _scrollFraction).abs() > 0.01) {
+          setState(() {
+            _scrollFraction = newFraction;
+          });
+        }
       }
     }
   }
