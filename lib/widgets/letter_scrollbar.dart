@@ -16,12 +16,16 @@ class LetterScrollbar extends StatefulWidget {
   /// Callback when user taps/drags to a specific index
   final void Function(int index)? onScrollToIndex;
 
+  /// Callback when drag state changes (for disabling scroll-to-hide)
+  final void Function(bool isDragging)? onDragStateChanged;
+
   const LetterScrollbar({
     super.key,
     required this.child,
     required this.controller,
     required this.items,
     this.onScrollToIndex,
+    this.onDragStateChanged,
   });
 
   @override
@@ -32,6 +36,30 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
   bool _isDragging = false;
   String _currentLetter = '';
   double _dragPosition = 0;
+  double _scrollFraction = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onScrollChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onScrollChanged);
+    super.dispose();
+  }
+
+  void _onScrollChanged() {
+    if (!_isDragging && widget.controller.hasClients) {
+      final position = widget.controller.position;
+      if (position.maxScrollExtent > 0) {
+        setState(() {
+          _scrollFraction = (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0);
+        });
+      }
+    }
+  }
 
   // Build a map of letter -> first index for that letter
   Map<String, int> get _letterIndexMap {
@@ -78,11 +106,13 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
           final maxScroll = scrollController.position.maxScrollExtent;
           final fraction = index / widget.items.length;
           final targetScroll = (fraction * maxScroll).clamp(0.0, maxScroll);
-          scrollController.animateTo(
-            targetScroll,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutCubic,
-          );
+
+          // Update scroll fraction immediately for smooth thumb tracking
+          setState(() {
+            _scrollFraction = fraction;
+          });
+
+          scrollController.jumpTo(targetScroll);
         }
       }
     }
@@ -93,6 +123,7 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
       _isDragging = true;
       _dragPosition = details.localPosition.dy;
     });
+    widget.onDragStateChanged?.call(true);
     _updateLetterAndScroll(details.localPosition.dy);
   }
 
@@ -107,6 +138,7 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
     setState(() {
       _isDragging = false;
     });
+    widget.onDragStateChanged?.call(false);
   }
 
   void _updateLetterAndScroll(double position) {
@@ -132,12 +164,12 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
         // The scrollable content
         widget.child,
 
-        // The draggable scrollbar area (right edge)
+        // The draggable scrollbar area (right edge) - wider grab area
         Positioned(
           right: 0,
           top: 0,
           bottom: 0,
-          width: 24,
+          width: 32, // Wider grab area
           child: GestureDetector(
             onVerticalDragStart: _handleDragStart,
             onVerticalDragUpdate: _handleDragUpdate,
@@ -152,23 +184,37 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
               setState(() {
                 _isDragging = false;
               });
+              widget.onDragStateChanged?.call(false);
             },
             behavior: HitTestBehavior.translucent,
-            child: Container(
-              color: Colors.transparent,
-              child: Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: _isDragging ? 4 : 3,
-                  height: _isDragging ? 60 : 40,
-                  decoration: BoxDecoration(
-                    color: _isDragging
-                        ? colorScheme.primary
-                        : colorScheme.onSurface.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final trackHeight = constraints.maxHeight;
+                final thumbHeight = _isDragging ? 60.0 : 40.0;
+                final availableTrack = trackHeight - thumbHeight;
+                final thumbTop = availableTrack * _scrollFraction;
+
+                return Stack(
+                  children: [
+                    // Thumb that tracks scroll position
+                    Positioned(
+                      top: thumbTop,
+                      right: 4,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 100),
+                        width: _isDragging ? 6 : 4,
+                        height: thumbHeight,
+                        decoration: BoxDecoration(
+                          color: _isDragging
+                              ? colorScheme.primary
+                              : colorScheme.onSurface.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -176,7 +222,7 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
         // The letter popup bubble
         if (_isDragging && _currentLetter.isNotEmpty)
           Positioned(
-            right: 40,
+            right: 48,
             top: _dragPosition - 28,
             child: Material(
               elevation: 4,

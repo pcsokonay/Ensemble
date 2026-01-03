@@ -84,6 +84,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   bool _isFilterBarVisible = true;
   double _lastScrollOffset = 0;
   static const double _scrollThreshold = 10.0;
+  bool _isLetterScrollbarDragging = false; // Disable scroll-to-hide while dragging
 
   // Scroll controllers for letter scrollbar
   final ScrollController _artistsScrollController = ScrollController();
@@ -417,6 +418,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   /// Handle scroll notifications to hide/show filter bars
   bool _handleScrollNotification(ScrollNotification notification) {
+    // Don't hide while dragging letter scrollbar
+    if (_isLetterScrollbarDragging) {
+      return false;
+    }
+
     // Only respond to vertical scroll (not horizontal PageView swipe)
     if (notification.metrics.axis != Axis.vertical) {
       return false;
@@ -437,6 +443,16 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       }
     }
     return false;
+  }
+
+  void _onLetterScrollbarDragChanged(bool isDragging) {
+    setState(() {
+      _isLetterScrollbarDragging = isDragging;
+      // Show the filter bar when starting to drag
+      if (isDragging) {
+        _isFilterBarVisible = true;
+      }
+    });
   }
 
   void _animateToCategory(int index) {
@@ -1111,6 +1127,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: LetterScrollbar(
         controller: _authorsScrollController,
         items: sortedAuthors,
+        onDragStateChanged: _onLetterScrollbarDragChanged,
         child: _authorsViewMode == 'list'
             ? ListView.builder(
                 controller: _authorsScrollController,
@@ -1459,6 +1476,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: LetterScrollbar(
         controller: _audiobooksScrollController,
         items: audiobookNames,
+        onDragStateChanged: _onLetterScrollbarDragChanged,
         child: _audiobooksViewMode == 'list'
             ? ListView.builder(
                 controller: _audiobooksScrollController,
@@ -1682,6 +1700,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: LetterScrollbar(
         controller: _seriesScrollController,
         items: seriesNames,
+        onDragStateChanged: _onLetterScrollbarDragChanged,
         child: _seriesViewMode == 'list'
             ? ListView.builder(
                 controller: _seriesScrollController,
@@ -2196,6 +2215,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           child: LetterScrollbar(
             controller: _artistsScrollController,
             items: artistNames,
+            onDragStateChanged: _onLetterScrollbarDragChanged,
             child: _artistsViewMode == 'list'
                 ? ListView.builder(
                     controller: _artistsScrollController,
@@ -2392,6 +2412,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           child: LetterScrollbar(
             controller: _albumsScrollController,
             items: albumNames,
+            onDragStateChanged: _onLetterScrollbarDragChanged,
             child: _albumsViewMode == 'list'
                 ? ListView.builder(
                     controller: _albumsScrollController,
@@ -2529,6 +2550,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: LetterScrollbar(
         controller: _playlistsScrollController,
         items: playlistNames,
+        onDragStateChanged: _onLetterScrollbarDragChanged,
         child: _playlistsViewMode == 'list'
             ? ListView.builder(
                 controller: _playlistsScrollController,
