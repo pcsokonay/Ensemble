@@ -605,7 +605,7 @@ class MusicAssistantAPI {
     try {
       _logger.log('🎙️ Getting episodes for podcast: $podcastId, provider: $provider');
 
-      // Method 1: Try to get podcast details which should include episodes
+      // Method 1: Try to get podcast details which might include episodes
       final response = await _sendCommand(
         'music/podcasts/get',
         args: {
@@ -614,14 +614,14 @@ class MusicAssistantAPI {
         },
       );
 
-      // Log full response structure for debugging
       _logger.log('🎙️ Response keys: ${response.keys.toList()}');
 
       final result = response['result'] as Map<String, dynamic>?;
       if (result != null) {
         _logger.log('🎙️ Result keys: ${result.keys.toList()}');
+        _logger.log('🎙️ total_episodes: ${result['total_episodes']}');
 
-        // Check all possible keys for episodes
+        // Check for episodes in response
         List<dynamic>? episodes;
         for (final key in ['episodes', 'items', 'podcast_episodes', 'children', 'tracks']) {
           if (result[key] is List && (result[key] as List).isNotEmpty) {
@@ -635,6 +635,62 @@ class MusicAssistantAPI {
           return episodes
               .map((item) => MediaItem.fromJson(item as Map<String, dynamic>))
               .toList();
+        }
+
+        // Check metadata for episodes
+        final metadata = result['metadata'] as Map<String, dynamic>?;
+        if (metadata != null) {
+          _logger.log('🎙️ Metadata keys: ${metadata.keys.toList()}');
+          for (final key in ['episodes', 'items', 'podcast_episodes']) {
+            if (metadata[key] is List && (metadata[key] as List).isNotEmpty) {
+              episodes = metadata[key] as List<dynamic>;
+              _logger.log('🎙️ Found episodes in metadata.$key (${episodes.length} items)');
+              return episodes
+                  .map((item) => MediaItem.fromJson(item as Map<String, dynamic>))
+                  .toList();
+            }
+          }
+        }
+
+        // Try using provider_mappings to get from source provider
+        final providerMappings = result['provider_mappings'] as List<dynamic>?;
+        if (providerMappings != null && providerMappings.isNotEmpty) {
+          _logger.log('🎙️ Provider mappings: ${providerMappings.length}');
+          for (final mapping in providerMappings) {
+            if (mapping is Map<String, dynamic>) {
+              final providerInstance = mapping['provider_instance'] as String?;
+              final mappingItemId = mapping['item_id'] as String?;
+              _logger.log('🎙️ Mapping: provider=$providerInstance, item_id=$mappingItemId');
+
+              if (providerInstance != null && mappingItemId != null) {
+                // Try to get podcast from source provider with full details
+                try {
+                  final providerResponse = await _sendCommand(
+                    'music/podcasts/get',
+                    args: {
+                      'item_id': mappingItemId,
+                      'provider_instance_id_or_domain': providerInstance,
+                    },
+                  );
+                  final providerResult = providerResponse['result'] as Map<String, dynamic>?;
+                  if (providerResult != null) {
+                    _logger.log('🎙️ Provider result keys: ${providerResult.keys.toList()}');
+                    for (final key in ['episodes', 'items', 'podcast_episodes']) {
+                      if (providerResult[key] is List && (providerResult[key] as List).isNotEmpty) {
+                        episodes = providerResult[key] as List<dynamic>;
+                        _logger.log('🎙️ Found ${episodes.length} episodes from provider');
+                        return episodes
+                            .map((item) => MediaItem.fromJson(item as Map<String, dynamic>))
+                            .toList();
+                      }
+                    }
+                  }
+                } catch (e) {
+                  _logger.log('🎙️ Provider fetch failed: $e');
+                }
+              }
+            }
+          }
         }
       }
 
