@@ -718,6 +718,26 @@ class MusicAssistantAPI {
     }
   }
 
+  /// Play a radio station
+  Future<void> playRadioStation(String playerId, MediaItem station) async {
+    try {
+      final uri = station.uri ?? 'library://radio/${station.itemId}';
+      _logger.log('📻 Playing radio station: ${station.name} with URI: $uri');
+
+      await _sendCommand(
+        'player_queues/play_media',
+        args: {
+          'queue_id': playerId,
+          'media': [uri],
+          'option': 'replace',
+        },
+      );
+    } catch (e) {
+      _logger.log('Error playing radio station: $e');
+      rethrow;
+    }
+  }
+
   /// Get full audiobook details including chapters
   Future<Audiobook?> getAudiobookDetails(String provider, String itemId) async {
     try {

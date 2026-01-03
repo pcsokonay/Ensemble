@@ -254,7 +254,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   String _getCurrentViewMode() {
     // Return the view mode for the currently selected tab
-    final tabIndex = _tabController.index;
+    final tabIndex = _selectedCategoryIndex;
 
     // Handle books media type
     if (_selectedMediaType == LibraryMediaType.books) {
@@ -301,7 +301,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   void _cycleCurrentViewMode() {
-    final tabIndex = _tabController.index;
+    final tabIndex = _selectedCategoryIndex;
 
     // Handle books media type
     if (_selectedMediaType == LibraryMediaType.books) {
@@ -2069,9 +2069,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          subtitle: station.metadata?.description != null
+          subtitle: station.metadata?['description'] != null
               ? Text(
-                  station.metadata!.description!,
+                  station.metadata!['description'] as String,
                   style: TextStyle(
                     color: colorScheme.onSurface.withOpacity(0.6),
                     fontSize: 13,
@@ -2083,7 +2083,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           onTap: () {
             final selectedPlayer = maProvider.selectedPlayer;
             if (selectedPlayer != null) {
-              maProvider.playMedia(selectedPlayer.playerId, station);
+              maProvider.api?.playRadioStation(selectedPlayer.playerId, station);
             }
           },
         );
