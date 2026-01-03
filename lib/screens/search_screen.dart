@@ -593,7 +593,7 @@ class SearchScreenState extends State<SearchScreen> {
                   child: ListView.builder(
                     // PERF: Use key to preserve scroll position per filter
                     key: PageStorageKey('list_$filterForPage'),
-                    padding: EdgeInsets.fromLTRB(16, 0, 16, BottomSpacing.navBarOnly),
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, BottomSpacing.navBarOnly),
                     cacheExtent: 500,
                     addAutomaticKeepAlives: false,
                     // PERF: false because each tile already has RepaintBoundary

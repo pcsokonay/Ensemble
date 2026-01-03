@@ -1136,7 +1136,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
                 itemCount: sortedAuthors.length,
-                padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.withMiniPlayer),
+                padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                 itemBuilder: (context, index) {
                   return _buildAuthorListTile(sortedAuthors[index], authorMap[sortedAuthors[index]]!, l10n);
                 },
@@ -1485,7 +1485,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
                 itemCount: audiobooks.length,
-                padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.withMiniPlayer),
+                padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                 itemBuilder: (context, index) {
                   return _buildAudiobookListTile(context, audiobooks[index], maProvider);
                 },
@@ -1709,7 +1709,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
                 itemCount: sortedSeries.length,
-                padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.withMiniPlayer),
+                padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                 itemBuilder: (context, index) {
                   return _buildSeriesListTile(context, sortedSeries[index], maProvider, l10n);
                 },
@@ -2224,7 +2224,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: false,
                     itemCount: sortedArtists.length,
-                    padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.navBarOnly),
+                    padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.navBarOnly),
                     itemBuilder: (context, index) {
                       final artist = sortedArtists[index];
                       return _buildArtistTile(
@@ -2420,7 +2420,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     cacheExtent: 500,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: false,
-                    padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.navBarOnly),
+                    padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.navBarOnly),
                     itemCount: sortedAlbums.length,
                     itemBuilder: (context, index) {
                       final album = sortedAlbums[index];
@@ -2559,7 +2559,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
                 itemCount: sortedPlaylists.length,
-                padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.navBarOnly),
+                padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.navBarOnly),
                 itemBuilder: (context, index) {
                   final playlist = sortedPlaylists[index];
                   return _buildPlaylistTile(context, playlist, l10n);
@@ -2758,7 +2758,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         cacheExtent: 500,
         addAutomaticKeepAlives: false, // Tiles don't need individual keep-alive
         addRepaintBoundaries: false, // We add RepaintBoundary manually to tiles
-        padding: EdgeInsets.only(left: 8, right: 8, top: 8, bottom: BottomSpacing.navBarOnly),
+        padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.navBarOnly),
         itemCount: sortedTracks.length,
         itemBuilder: (context, index) {
           final track = sortedTracks[index];
