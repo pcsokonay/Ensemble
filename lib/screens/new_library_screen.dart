@@ -766,16 +766,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           body: SafeArea(
             child: Column(
               children: [
-                // Two-row filter: Row 1 = Media types, Row 2 = Sub-categories + action buttons
-                // Animates to hide when scrolling down
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOutCubic,
-                  height: _isFilterBarVisible ? (_filterRowHeight * 2 + 8 + 16) : 0, // 2 rows + spacing + padding
-                  clipBehavior: Clip.hardEdge,
-                  decoration: const BoxDecoration(),
-                  child: _buildFilterRows(colorScheme, l10n),
-                ),
+                // Two-row filter: Row 1 = Media types (hides on scroll), Row 2 = Sub-categories (always visible)
+                _buildFilterRows(colorScheme, l10n, showLibraryTypeRow: _isFilterBarVisible),
                 // Connecting banner when showing cached data
                 // Hide when we have cached players - UI is functional during background reconnect
                 if (!isConnected && syncService.hasCache && !context.read<MusicAssistantProvider>().hasCachedPlayers)
@@ -826,25 +818,30 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   // Consistent height for filter rows
   static const double _filterRowHeight = 36.0;
 
-  Widget _buildFilterRows(ColorScheme colorScheme, S l10n) {
+  Widget _buildFilterRows(ColorScheme colorScheme, S l10n, {required bool showLibraryTypeRow}) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Row 1: Media type chips (justified across full width)
-        SizedBox(
-          height: _filterRowHeight,
+        // Row 1: Media type chips (hides when scrolling)
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          height: showLibraryTypeRow ? _filterRowHeight : 0,
+          clipBehavior: Clip.hardEdge,
+          decoration: const BoxDecoration(),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: _buildMediaTypeChips(colorScheme, l10n),
           ),
         ),
-        const SizedBox(height: 8), // Space between rows
-        // Row 2: Sub-category chips (left) + action buttons (right)
+        if (showLibraryTypeRow) const SizedBox(height: 8), // Space between rows
+        // Row 2: Sub-category chips (left) + action buttons (right) - always visible
         SizedBox(
           height: _filterRowHeight,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Left: category chips
                 Expanded(
@@ -994,8 +991,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 : colorScheme.surfaceVariant.withOpacity(0.6),
             child: InkWell(
               onTap: () => _animateToCategory(index),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Container(
+                height: _filterRowHeight,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: Text(
                   label,
                   style: TextStyle(
