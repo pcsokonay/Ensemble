@@ -27,6 +27,7 @@ import 'settings_screen.dart';
 import 'audiobook_author_screen.dart';
 import 'audiobook_detail_screen.dart';
 import 'audiobook_series_screen.dart';
+import 'podcast_detail_screen.dart';
 
 /// Media type for the library
 enum LibraryMediaType { music, books, podcasts, radio }
@@ -2259,8 +2260,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       );
     }
 
-    // PERF: Use appropriate cache size based on view mode
-    final cacheSize = _podcastsViewMode == 'grid3' ? 200 : 256;
+    // PERF: Request larger images from API but decode at appropriate size for memory
+    final apiImageSize = 512; // Request higher quality from API
+    final cacheSize = _podcastsViewMode == 'grid3' ? 200 : 300; // Memory decode size
 
     return RefreshIndicator(
       color: colorScheme.primary,
@@ -2274,41 +2276,44 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               itemCount: podcasts.length,
               itemBuilder: (context, index) {
                 final podcast = podcasts[index];
-                final imageUrl = maProvider.getImageUrl(podcast, size: cacheSize);
+                final imageUrl = maProvider.getImageUrl(podcast, size: apiImageSize);
 
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: imageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            width: 56,
-                            height: 56,
-                            fit: BoxFit.cover,
-                            memCacheWidth: cacheSize,
-                            memCacheHeight: cacheSize,
-                            fadeInDuration: Duration.zero,
-                            fadeOutDuration: Duration.zero,
-                            placeholder: (context, url) => Container(
+                  leading: Hero(
+                    tag: HeroTags.podcastCover + (podcast.uri ?? podcast.itemId) + '_library',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: imageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              memCacheWidth: cacheSize,
+                              memCacheHeight: cacheSize,
+                              fadeInDuration: Duration.zero,
+                              fadeOutDuration: Duration.zero,
+                              placeholder: (context, url) => Container(
+                                width: 56,
+                                height: 56,
+                                color: colorScheme.surfaceVariant,
+                                child: Icon(MdiIcons.podcast, color: colorScheme.onSurfaceVariant),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                width: 56,
+                                height: 56,
+                                color: colorScheme.surfaceVariant,
+                                child: Icon(MdiIcons.podcast, color: colorScheme.onSurfaceVariant),
+                              ),
+                            )
+                          : Container(
                               width: 56,
                               height: 56,
                               color: colorScheme.surfaceVariant,
                               child: Icon(MdiIcons.podcast, color: colorScheme.onSurfaceVariant),
                             ),
-                            errorWidget: (context, url, error) => Container(
-                              width: 56,
-                              height: 56,
-                              color: colorScheme.surfaceVariant,
-                              child: Icon(MdiIcons.podcast, color: colorScheme.onSurfaceVariant),
-                            ),
-                          )
-                        : Container(
-                            width: 56,
-                            height: 56,
-                            color: colorScheme.surfaceVariant,
-                            child: Icon(MdiIcons.podcast, color: colorScheme.onSurfaceVariant),
-                          ),
+                    ),
                   ),
                   title: Text(
                     podcast.name,
@@ -2328,7 +2333,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                           overflow: TextOverflow.ellipsis,
                         )
                       : null,
-                  onTap: () => _openPodcastDetails(podcast, maProvider),
+                  onTap: () => _openPodcastDetails(podcast, maProvider, imageUrl),
                 );
               },
             )
@@ -2345,52 +2350,55 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               itemCount: podcasts.length,
               itemBuilder: (context, index) {
                 final podcast = podcasts[index];
-                return _buildPodcastCard(podcast, maProvider, cacheSize);
+                return _buildPodcastCard(podcast, maProvider, apiImageSize, cacheSize);
               },
             ),
     );
   }
 
-  Widget _buildPodcastCard(MediaItem podcast, MusicAssistantProvider maProvider, int cacheSize) {
+  Widget _buildPodcastCard(MediaItem podcast, MusicAssistantProvider maProvider, int apiImageSize, int cacheSize) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final imageUrl = maProvider.getImageUrl(podcast, size: cacheSize);
+    final imageUrl = maProvider.getImageUrl(podcast, size: apiImageSize);
 
     return GestureDetector(
-      onTap: () => _openPodcastDetails(podcast, maProvider),
+      onTap: () => _openPodcastDetails(podcast, maProvider, imageUrl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           AspectRatio(
             aspectRatio: 1.0,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                color: colorScheme.surfaceVariant,
-                child: imageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        fit: BoxFit.cover,
-                        memCacheWidth: cacheSize,
-                        memCacheHeight: cacheSize,
-                        fadeInDuration: Duration.zero,
-                        fadeOutDuration: Duration.zero,
-                        placeholder: (context, url) => const SizedBox(),
-                        errorWidget: (context, url, error) => Center(
+            child: Hero(
+              tag: HeroTags.podcastCover + (podcast.uri ?? podcast.itemId) + '_library',
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  color: colorScheme.surfaceVariant,
+                  child: imageUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.cover,
+                          memCacheWidth: cacheSize,
+                          memCacheHeight: cacheSize,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          placeholder: (context, url) => const SizedBox(),
+                          errorWidget: (context, url, error) => Center(
+                            child: Icon(
+                              MdiIcons.podcast,
+                              size: 48,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        )
+                      : Center(
                           child: Icon(
                             MdiIcons.podcast,
                             size: 48,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
-                      )
-                    : Center(
-                        child: Icon(
-                          MdiIcons.podcast,
-                          size: 48,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                ),
               ),
             ),
           ),
@@ -2410,12 +2418,17 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     );
   }
 
-  void _openPodcastDetails(MediaItem podcast, MusicAssistantProvider maProvider) {
-    // For now, just show a snackbar with the podcast name
-    // TODO: Navigate to podcast details screen
-    final l10n = S.of(context)!;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${podcast.name} - ${l10n.podcastSupportComingSoon}')),
+  void _openPodcastDetails(MediaItem podcast, MusicAssistantProvider maProvider, String? imageUrl) {
+    updateAdaptiveColorsFromImage(context, imageUrl);
+    Navigator.push(
+      context,
+      FadeSlidePageRoute(
+        child: PodcastDetailScreen(
+          podcast: podcast,
+          heroTagSuffix: 'library',
+          initialImageUrl: imageUrl,
+        ),
+      ),
     );
   }
 

@@ -25,4 +25,7 @@ class HeroTags {
 
   /// Audiobook author image hero tag prefix
   static const String authorImage = 'author_image_';
+
+  /// Podcast cover hero tag prefix
+  static const String podcastCover = 'podcast_cover_';
 }
