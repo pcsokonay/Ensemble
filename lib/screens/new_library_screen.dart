@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -86,6 +87,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   // Series book counts cache: seriesId -> number of books
   final Map<String, int> _seriesBookCounts = {};
   bool _seriesLoaded = false;
+  // PERF: Debounce color extraction to avoid blocking UI during scroll
+  Timer? _colorExtractionDebounce;
+  final Map<String, List<String>> _pendingColorExtractions = {};
 
   // Restoration: Remember selected tab across app restarts
   final RestorableInt _selectedTabIndex = RestorableInt(0);
@@ -493,6 +497,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   @override
   void dispose() {
+    _colorExtractionDebounce?.cancel();
     _pageController.dispose();
     _selectedTabIndex.dispose();
     _artistsScrollController.dispose();
@@ -730,8 +735,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             _seriesCoversLoading.remove(seriesId);
           });
 
-          // Extract colors from covers asynchronously (don't block UI)
-          _extractSeriesColors(seriesId, covers);
+          // PERF: Queue color extraction with debounce to avoid blocking UI during scroll
+          _queueColorExtraction(seriesId, covers);
         }
       }
     } catch (e) {
@@ -740,14 +745,46 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
   }
 
+  /// PERF: Queue color extraction requests - processed after scroll settles
+  void _queueColorExtraction(String seriesId, List<String> coverUrls) {
+    if (coverUrls.isEmpty) return;
+
+    // Add to pending queue
+    _pendingColorExtractions[seriesId] = coverUrls;
+
+    // Cancel existing timer and start a new one
+    _colorExtractionDebounce?.cancel();
+    _colorExtractionDebounce = Timer(const Duration(milliseconds: 300), () {
+      _processQueuedColorExtractions();
+    });
+  }
+
+  /// PERF: Process all queued color extractions in batch after scroll settles
+  Future<void> _processQueuedColorExtractions() async {
+    if (_pendingColorExtractions.isEmpty || !mounted) return;
+
+    // Copy and clear the queue to avoid processing new items added during extraction
+    final toProcess = Map<String, List<String>>.from(_pendingColorExtractions);
+    _pendingColorExtractions.clear();
+
+    // Process each series sequentially to avoid overwhelming the UI thread
+    for (final entry in toProcess.entries) {
+      if (!mounted) break;
+      await _extractSeriesColors(entry.key, entry.value);
+      // Small yield between extractions to keep UI responsive
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+  }
+
   /// Extract dominant colors from series book covers for empty cell backgrounds
   Future<void> _extractSeriesColors(String seriesId, List<String> coverUrls) async {
-    if (coverUrls.isEmpty) return;
+    if (coverUrls.isEmpty || !mounted) return;
 
     final extractedColors = <Color>[];
 
     // Extract colors from first few covers (limit to avoid too much processing)
     for (final url in coverUrls.take(4)) {
+      if (!mounted) break;
       try {
         final palette = await PaletteGenerator.fromImageProvider(
           CachedNetworkImageProvider(url),
