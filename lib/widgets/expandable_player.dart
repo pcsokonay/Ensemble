@@ -1695,10 +1695,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     child: SizedBox(
                       width: titleWidth,
                       child: Text(
-                        // Always show artist/author (was showing "Now Playing" when device reveal visible)
+                        // Always show artist/author/podcast name (was showing "Now Playing" when device reveal visible)
                         maProvider.isPlayingAudiobook
                             ? (maProvider.currentAudiobook?.authorsString ?? S.of(context)!.unknownAuthor)
-                            : currentTrack.artistsString,
+                            : maProvider.isPlayingPodcast
+                                ? (maProvider.currentPodcastName ?? S.of(context)!.podcast)
+                                : currentTrack.artistsString,
                         style: TextStyle(
                           color: textColor.withOpacity(t > 0.5 ? 0.7 : MiniPlayerLayout.secondaryTextOpacity),
                           fontSize: artistFontSize,
@@ -1884,11 +1886,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                   ),
 
                 // Playback controls - with slide animation when collapsed
+                // Use skip 30s controls for audiobooks and podcasts
                 Positioned(
                   left: t > 0.5 ? 0 : null,
                   right: t > 0.5 ? 0 : collapsedControlsRight - miniPlayerSlideOffset,
                   top: controlsTop,
-                  child: maProvider.isPlayingAudiobook
+                  child: (maProvider.isPlayingAudiobook || maProvider.isPlayingPodcast)
                       ? _buildAudiobookControls(
                           maProvider: maProvider,
                           selectedPlayer: selectedPlayer,

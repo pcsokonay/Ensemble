@@ -215,6 +215,46 @@ class MusicAssistantProvider with ChangeNotifier {
   /// Whether we're currently playing an audiobook
   bool get isPlayingAudiobook => _currentAudiobook != null;
 
+  /// Whether we're currently playing a podcast episode
+  /// Detected by checking if the current track's URI contains podcast_episode
+  bool get isPlayingPodcast {
+    final uri = _currentTrack?.uri;
+    if (uri == null) return false;
+    return uri.contains('podcast_episode') || uri.contains('podcast/');
+  }
+
+  /// Get the podcast name when playing a podcast episode
+  /// Returns the podcast name from metadata, album name, or artist name
+  String? get currentPodcastName {
+    if (!isPlayingPodcast || _currentTrack == null) return null;
+    // Try metadata first (if episode has parent podcast info)
+    final metadata = _currentTrack!.metadata;
+    if (metadata != null) {
+      // Check for podcast_name or podcast.name in metadata
+      if (metadata['podcast_name'] != null) {
+        return metadata['podcast_name'] as String;
+      }
+      if (metadata['podcast'] is Map) {
+        final podcast = metadata['podcast'] as Map;
+        if (podcast['name'] != null) {
+          return podcast['name'] as String;
+        }
+      }
+    }
+    // Fall back to album name (often contains podcast name)
+    if (_currentTrack!.album != null) {
+      return _currentTrack!.album!.name;
+    }
+    // Fall back to artist (sometimes the podcast name is set as artist)
+    if (_currentTrack!.artists != null && _currentTrack!.artists!.isNotEmpty) {
+      final artistName = _currentTrack!.artists!.first.name;
+      if (artistName != 'Unknown Artist' && artistName.isNotEmpty) {
+        return artistName;
+      }
+    }
+    return null;
+  }
+
   String get lastSearchQuery => _lastSearchQuery;
   Map<String, List<MediaItem>> get lastSearchResults => _lastSearchResults;
 
