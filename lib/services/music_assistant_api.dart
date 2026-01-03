@@ -638,65 +638,42 @@ class MusicAssistantAPI {
         }
       }
 
-      // Method 2: Try browse endpoint with podcast URI
+      // Method 2: Try browse endpoint with podcast URI from response
       _logger.log('🎙️ No episodes in details, trying browse...');
-      final podcastUri = 'library://podcast/$podcastId';
-      final browseResponse = await _sendCommand(
-        'music/browse',
-        args: {'path': podcastUri},
-      );
 
-      final browseResult = browseResponse['result'] as List<dynamic>?;
-      if (browseResult != null && browseResult.isNotEmpty) {
-        _logger.log('🎙️ Browse found ${browseResult.length} items');
+      // Use the podcast's actual URI from the response, not constructed
+      final podcastActualUri = result?['uri'] as String?;
+      _logger.log('🎙️ Podcast actual URI: $podcastActualUri');
 
-        // Log first item structure for debugging
-        final firstItem = browseResult.first as Map<String, dynamic>?;
-        if (firstItem != null) {
-          _logger.log('🎙️ Browse item keys: ${firstItem.keys.toList()}');
-          _logger.log('🎙️ Browse item name: ${firstItem['name']}');
-          _logger.log('🎙️ Browse item label: ${firstItem['label']}');
-          _logger.log('🎙️ Browse item uri: ${firstItem['uri']}');
-          _logger.log('🎙️ Browse item path: ${firstItem['path']}');
-          _logger.log('🎙️ Browse item media_type: ${firstItem['media_type']}');
-        }
+      if (podcastActualUri != null && podcastActualUri.isNotEmpty) {
+        final browseResponse = await _sendCommand(
+          'music/browse',
+          args: {'path': podcastActualUri},
+        );
 
-        // Parse browse items - they may have different structure
-        final episodes = <MediaItem>[];
-        for (final item in browseResult) {
-          if (item is Map<String, dynamic>) {
-            // Browse items might use 'path' as URI and 'label'/'name' for title
-            final name = item['name'] as String? ??
-                        item['label'] as String? ??
-                        'Episode';
-            final uri = item['uri'] as String? ?? item['path'] as String?;
-            final itemId = item['item_id'] as String? ?? uri ?? '';
-            final provider = item['provider'] as String? ?? 'library';
+        final browseResult = browseResponse['result'] as List<dynamic>?;
+        if (browseResult != null && browseResult.isNotEmpty) {
+          _logger.log('🎙️ Browse (actual URI) found ${browseResult.length} items');
 
-            // Parse media type from string
-            final mediaTypeStr = item['media_type'] as String?;
-            MediaType mediaType = MediaType.track; // default
-            if (mediaTypeStr != null) {
-              mediaType = MediaType.values.firstWhere(
-                (e) => e.name == mediaTypeStr || e.name == mediaTypeStr.toLowerCase(),
-                orElse: () => MediaType.track,
-              );
+          // Filter out folder navigation items (like "..")
+          final episodeItems = browseResult.where((item) {
+            if (item is Map<String, dynamic>) {
+              final mediaType = item['media_type'] as String?;
+              final name = item['name'] as String?;
+              return mediaType != 'folder' && name != '..';
             }
+            return false;
+          }).toList();
 
-            episodes.add(MediaItem(
-              itemId: itemId,
-              provider: provider,
-              name: name,
-              uri: uri,
-              metadata: item['metadata'] as Map<String, dynamic>?,
-              mediaType: mediaType,
-            ));
+          if (episodeItems.isNotEmpty) {
+            _logger.log('🎙️ Found ${episodeItems.length} actual episodes');
+            final firstItem = episodeItems.first as Map<String, dynamic>;
+            _logger.log('🎙️ First episode keys: ${firstItem.keys.toList()}');
+            _logger.log('🎙️ First episode name: ${firstItem['name']}');
+            _logger.log('🎙️ First episode uri: ${firstItem['uri']}');
+
+            return _parseBrowseEpisodes(episodeItems);
           }
-        }
-
-        if (episodes.isNotEmpty) {
-          _logger.log('🎙️ Parsed ${episodes.length} episodes from browse');
-          return episodes;
         }
       }
 
@@ -738,6 +715,51 @@ class MusicAssistantAPI {
       _logger.log('🎙️ Error getting podcast episodes: $e');
       return [];
     }
+  }
+
+  /// Parse browse results into MediaItem episodes
+  List<MediaItem> _parseBrowseEpisodes(List<dynamic> items) {
+    final episodes = <MediaItem>[];
+    for (final item in items) {
+      if (item is Map<String, dynamic>) {
+        final name = item['name'] as String? ??
+                    item['label'] as String? ??
+                    'Episode';
+        final uri = item['uri'] as String? ?? item['path'] as String?;
+        final itemId = item['item_id'] as String? ?? uri ?? '';
+        final provider = item['provider'] as String? ?? 'library';
+
+        // Parse media type from string
+        final mediaTypeStr = item['media_type'] as String?;
+        MediaType mediaType = MediaType.track;
+        if (mediaTypeStr != null) {
+          mediaType = MediaType.values.firstWhere(
+            (e) => e.name == mediaTypeStr || e.name == mediaTypeStr.toLowerCase(),
+            orElse: () => MediaType.track,
+          );
+        }
+
+        // Get duration if available
+        Duration? duration;
+        final durationVal = item['duration'];
+        if (durationVal is int) {
+          duration = Duration(seconds: durationVal);
+        } else if (durationVal is double) {
+          duration = Duration(seconds: durationVal.toInt());
+        }
+
+        episodes.add(MediaItem(
+          itemId: itemId,
+          provider: provider,
+          name: name,
+          uri: uri,
+          metadata: item['metadata'] as Map<String, dynamic>?,
+          mediaType: mediaType,
+          duration: duration,
+        ));
+      }
+    }
+    return episodes;
   }
 
   /// Play a podcast episode
