@@ -2893,6 +2893,57 @@ class MusicAssistantAPI {
     return '$baseUrl/imageproxy?provider=${Uri.encodeComponent(provider ?? "")}&size=$size&fmt=jpeg&path=${Uri.encodeComponent(imagePath)}';
   }
 
+  // ==================== iTunes Artwork Lookup ====================
+
+  /// Search iTunes for a podcast and return high-res artwork URL
+  /// Returns null if not found or on error
+  Future<String?> getITunesPodcastArtwork(String podcastName) async {
+    try {
+      final searchTerm = Uri.encodeComponent(podcastName);
+      final url = 'https://itunes.apple.com/search?term=$searchTerm&entity=podcast&limit=1';
+
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 10);
+
+      final request = await client.getUrl(Uri.parse(url));
+      final response = await request.close();
+
+      if (response.statusCode != 200) {
+        _logger.log('🎨 iTunes search failed for "$podcastName": ${response.statusCode}');
+        return null;
+      }
+
+      final body = await response.transform(utf8.decoder).join();
+      final json = jsonDecode(body) as Map<String, dynamic>;
+
+      final results = json['results'] as List<dynamic>?;
+      if (results == null || results.isEmpty) {
+        _logger.log('🎨 No iTunes results for "$podcastName"');
+        return null;
+      }
+
+      final podcast = results.first as Map<String, dynamic>;
+      var artworkUrl = podcast['artworkUrl600'] as String?;
+
+      if (artworkUrl == null) {
+        artworkUrl = podcast['artworkUrl100'] as String?;
+      }
+
+      if (artworkUrl != null) {
+        // Bump to highest resolution (1400x1400)
+        artworkUrl = artworkUrl
+            .replaceAll('600x600', '1400x1400')
+            .replaceAll('100x100', '1400x1400');
+        _logger.log('🎨 Found iTunes artwork for "$podcastName": $artworkUrl');
+      }
+
+      return artworkUrl;
+    } catch (e) {
+      _logger.log('🎨 iTunes lookup error for "$podcastName": $e');
+      return null;
+    }
+  }
+
   // ==================== Authentication Methods ====================
 
   /// Authenticate the WebSocket session with a token

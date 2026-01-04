@@ -3755,8 +3755,8 @@ class MusicAssistantProvider with ChangeNotifier {
     }
   }
 
-  /// Load higher-quality podcast covers from episodes in background
-  /// Uses episode cover if: podcast has no cover, OR episode has same image at higher quality
+  /// Load high-resolution podcast covers from iTunes in background
+  /// iTunes provides 1400x1400 artwork for most podcasts
   Future<void> _loadPodcastCoversInBackground() async {
     if (_api == null) return;
 
@@ -3765,61 +3765,17 @@ class MusicAssistantProvider with ChangeNotifier {
         // Skip if already cached
         if (_podcastCoverCache.containsKey(podcast.itemId)) continue;
 
-        final podcastOwnImage = _api!.getImageUrl(podcast, size: 1024);
+        // Try iTunes for high-res artwork
+        final itunesArtwork = await _api!.getITunesPodcastArtwork(podcast.name);
 
-        final episodes = await _api!.getPodcastEpisodes(
-          podcast.itemId,
-          provider: podcast.provider,
-        );
-
-        if (episodes.isEmpty) continue;
-
-        final firstEpisode = episodes.first;
-        final episodeImage = _api!.getImageUrl(firstEpisode, size: 1024);
-
-        if (episodeImage == null) continue;
-
-        if (podcastOwnImage == null) {
-          // Podcast has no cover - use episode cover
-          _podcastCoverCache[podcast.itemId] = episodeImage;
-          _logger.log('🎙️ Using episode cover for ${podcast.name} (podcast had no cover)');
+        if (itunesArtwork != null) {
+          _podcastCoverCache[podcast.itemId] = itunesArtwork;
+          _logger.log('🎙️ Cached iTunes artwork for ${podcast.name}');
           notifyListeners();
-        } else if (_isSameImageSource(podcastOwnImage, episodeImage)) {
-          // Same image source - use episode version (likely higher quality)
-          _podcastCoverCache[podcast.itemId] = episodeImage;
-          _logger.log('🎙️ Using episode cover for ${podcast.name} (same image, better quality)');
-          notifyListeners();
-        } else {
-          // Different images - podcast has unique episodes, keep podcast cover
-          _logger.log('🎙️ Keeping podcast cover for ${podcast.name} (episodes have different covers)');
         }
       } catch (e) {
         _logger.log('⚠️ Failed to load cover for ${podcast.name}: $e');
       }
-    }
-  }
-
-  /// Check if two image URLs point to the same source image (ignoring size params)
-  bool _isSameImageSource(String url1, String url2) {
-    try {
-      final uri1 = Uri.parse(url1);
-      final uri2 = Uri.parse(url2);
-
-      // Extract the 'path' query parameter which identifies the actual image
-      final path1 = uri1.queryParameters['path'];
-      final path2 = uri2.queryParameters['path'];
-
-      if (path1 != null && path2 != null) {
-        return path1 == path2;
-      }
-
-      // Fallback: compare URLs without size parameter
-      final params1 = Map<String, String>.from(uri1.queryParameters)..remove('size');
-      final params2 = Map<String, String>.from(uri2.queryParameters)..remove('size');
-
-      return params1.toString() == params2.toString();
-    } catch (e) {
-      return false;
     }
   }
 

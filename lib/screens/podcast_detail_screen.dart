@@ -599,7 +599,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                                 ),
                               ),
                             ),
-                            // Expanded action buttons
+                            // Expanded action buttons (matching album track style)
                             AnimatedCrossFade(
                               firstChild: const SizedBox.shrink(),
                               secondChild: Padding(
@@ -607,37 +607,51 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                                 child: Row(
                                   children: [
                                     // Play button
-                                    FilledButton.tonal(
-                                      onPressed: () => _playEpisode(episode),
-                                      style: FilledButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.play_arrow, size: 20),
-                                          const SizedBox(width: 6),
-                                          Text(S.of(context)!.play),
-                                        ],
+                                    SizedBox(
+                                      height: 44,
+                                      width: 44,
+                                      child: FilledButton.tonal(
+                                        onPressed: () => _playEpisode(episode),
+                                        style: FilledButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: const Icon(Icons.play_arrow, size: 20),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    // Add to queue button
-                                    FilledButton.tonal(
-                                      onPressed: () => _addToQueue(episode),
-                                      style: FilledButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                                      ),
-                                      child: const Icon(Icons.playlist_add, size: 20),
-                                    ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 10),
                                     // Play on... button
-                                    FilledButton.tonal(
-                                      onPressed: () => _showPlayOnMenu(context, episode),
-                                      style: FilledButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    SizedBox(
+                                      height: 44,
+                                      width: 44,
+                                      child: FilledButton.tonal(
+                                        onPressed: () => _showPlayOnMenu(context, episode),
+                                        style: FilledButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: const Icon(Icons.speaker_group_outlined, size: 20),
                                       ),
-                                      child: const Icon(Icons.speaker_group_outlined, size: 20),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    // Add to queue button
+                                    SizedBox(
+                                      height: 44,
+                                      width: 44,
+                                      child: FilledButton.tonal(
+                                        onPressed: () => _addToQueue(episode),
+                                        style: FilledButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: const Icon(Icons.playlist_add, size: 20),
+                                      ),
                                     ),
                                   ],
                                 ),
