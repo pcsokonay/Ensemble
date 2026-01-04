@@ -224,6 +224,13 @@ class CacheService {
     _logger.log('✅ Cached search results for "$cacheKey"');
   }
 
+  /// Invalidate all search cache (call when library items change)
+  void invalidateSearchCache() {
+    _searchCache.clear();
+    _searchCacheTime.clear();
+    _logger.log('🗑️ Search cache invalidated');
+  }
+
   // ============================================================================
   // PLAYER CACHING
   // ============================================================================

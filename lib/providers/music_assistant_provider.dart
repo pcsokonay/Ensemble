@@ -1122,6 +1122,8 @@ class MusicAssistantProvider with ChangeNotifier {
         await _api!.addItemToLibrary(mediaType, itemId, provider);
         // Trigger a background refresh to update library with new item
         _scheduleLibraryRefresh(mediaType);
+        // Invalidate search cache so next search shows updated library status
+        _cacheService.invalidateSearchCache();
         return true;
       } catch (e) {
         _logger.log('❌ Failed to add to library: $e');
@@ -1144,8 +1146,18 @@ class MusicAssistantProvider with ChangeNotifier {
         await _api!.removeItemFromLibrary(mediaType, libraryItemId);
         // Remove from local cache immediately for instant feedback
         _removeFromLocalLibrary(mediaType, libraryItemId);
+        // Invalidate search cache so next search shows updated library status
+        _cacheService.invalidateSearchCache();
         return true;
       } catch (e) {
+        final errorStr = e.toString().toLowerCase();
+        // "not found in library" means item is already removed - treat as success
+        if (errorStr.contains('not found in library')) {
+          _logger.log('ℹ️ Item already removed from library');
+          _removeFromLocalLibrary(mediaType, libraryItemId);
+          _cacheService.invalidateSearchCache();
+          return true;
+        }
         _logger.log('❌ Failed to remove from library: $e');
         return false;
       }
