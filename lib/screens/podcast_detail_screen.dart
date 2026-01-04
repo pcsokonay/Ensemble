@@ -53,7 +53,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
 
   Future<void> _extractColors() async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.getImageUrl(widget.podcast, size: 1024) ?? widget.initialImageUrl;
+    final imageUrl = maProvider.getPodcastImageUrl(widget.podcast) ?? widget.initialImageUrl;
 
     if (imageUrl != null) {
       try {
@@ -165,8 +165,9 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final maProvider = context.read<MusicAssistantProvider>();
-    final providerImageUrl = maProvider.getImageUrl(widget.podcast, size: 1024);
+    final maProvider = context.watch<MusicAssistantProvider>();
+    // Use getPodcastImageUrl for better quality (uses episode covers when available)
+    final providerImageUrl = maProvider.getPodcastImageUrl(widget.podcast);
     final imageUrl = providerImageUrl ?? widget.initialImageUrl;
 
     final adaptiveTheme = context.select<ThemeProvider, bool>(
