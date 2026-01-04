@@ -42,6 +42,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   bool _isDescriptionExpanded = false;
   String? _artistDescription;
   String? _artistImageUrl;
+  MusicAssistantProvider? _maProvider;
 
   // View preferences
   String _sortOrder = 'alpha'; // 'alpha' or 'year'
@@ -70,7 +71,55 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
           // Note: _extractColors is called by _loadArtistImage after image loads
         }
       });
+
+      // Listen to provider changes to update library status
+      _maProvider = context.read<MusicAssistantProvider>();
+      _maProvider?.addListener(_onProviderChanged);
     });
+  }
+
+  void _onProviderChanged() {
+    if (!mounted) return;
+    // Re-check library status when provider data changes
+    final newIsInLibrary = _checkIfInLibraryFromProvider();
+    if (newIsInLibrary != _isInLibrary) {
+      setState(() {
+        _isInLibrary = newIsInLibrary;
+      });
+    }
+  }
+
+  /// Check if artist is in library using provider's artists list
+  bool _checkIfInLibraryFromProvider() {
+    if (_maProvider == null) return _checkIfInLibrary(widget.artist);
+
+    final artistName = widget.artist.name.toLowerCase();
+    final artistUri = widget.artist.uri;
+
+    // Check if this artist exists in the provider's library
+    return _maProvider!.artists.any((a) {
+      // Match by URI if available
+      if (artistUri != null && a.uri == artistUri) return true;
+      // Match by name as fallback
+      if (a.name.toLowerCase() == artistName) return true;
+      // Check provider mappings for matching URIs
+      if (widget.artist.providerMappings != null) {
+        for (final mapping in widget.artist.providerMappings!) {
+          if (a.providerMappings?.any((m) =>
+            m.providerInstance == mapping.providerInstance &&
+            m.itemId == mapping.itemId) == true) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _maProvider?.removeListener(_onProviderChanged);
+    super.dispose();
   }
 
   Future<void> _loadViewPreferences() async {

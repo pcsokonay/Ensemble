@@ -76,6 +76,8 @@ class MusicAssistantProvider with ChangeNotifier {
   StreamSubscription? _localPlayerEventSubscription;
   StreamSubscription? _playerUpdatedEventSubscription;
   StreamSubscription? _playerAddedEventSubscription;
+  StreamSubscription? _mediaItemAddedEventSubscription;
+  StreamSubscription? _mediaItemDeletedEventSubscription;
   Timer? _localPlayerStateReportTimer;
   TrackMetadata? _pendingTrackMetadata;
   TrackMetadata? _currentNotificationMetadata;
@@ -723,6 +725,21 @@ class MusicAssistantProvider with ChangeNotifier {
         onError: (error) => _logger.log('Player added event stream error: $error'),
       );
 
+      // Subscribe to library change events for instant UI updates
+      _mediaItemAddedEventSubscription?.cancel();
+      _mediaItemAddedEventSubscription = _api!.mediaItemAddedEvents.listen(
+        _handleMediaItemAddedEvent,
+        onError: (error) => _logger.log('Media item added event stream error: $error'),
+      );
+      _logger.log('📡 Subscribed to media_item_added events');
+
+      _mediaItemDeletedEventSubscription?.cancel();
+      _mediaItemDeletedEventSubscription = _api!.mediaItemDeletedEvents.listen(
+        _handleMediaItemDeletedEvent,
+        onError: (error) => _logger.log('Media item deleted event stream error: $error'),
+      );
+      _logger.log('📡 Subscribed to media_item_deleted events');
+
       await _api!.connect();
       notifyListeners();
     } catch (e) {
@@ -1137,28 +1154,31 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Remove item from library
   /// Returns true if action was executed successfully
+  /// Uses optimistic update: local cache is updated immediately before API call
   Future<bool> removeFromLibrary({
     required String mediaType,
     required int libraryItemId,
   }) async {
     if (isConnected && _api != null) {
+      // OPTIMISTIC UPDATE: Update local cache immediately for instant UI feedback
+      // This ensures library screens show the change even before API completes
+      _removeFromLocalLibrary(mediaType, libraryItemId);
+      _cacheService.invalidateSearchCache();
+
       try {
         await _api!.removeItemFromLibrary(mediaType, libraryItemId);
-        // Remove from local cache immediately for instant feedback
-        _removeFromLocalLibrary(mediaType, libraryItemId);
-        // Invalidate search cache so next search shows updated library status
-        _cacheService.invalidateSearchCache();
         return true;
       } catch (e) {
         final errorStr = e.toString().toLowerCase();
         // "not found in library" means item is already removed - treat as success
         if (errorStr.contains('not found in library')) {
           _logger.log('ℹ️ Item already removed from library');
-          _removeFromLocalLibrary(mediaType, libraryItemId);
-          _cacheService.invalidateSearchCache();
           return true;
         }
-        _logger.log('❌ Failed to remove from library: $e');
+        // On actual error, we'd ideally restore the item, but that's complex
+        // For now, just log the error - the background refresh will fix state
+        _logger.log('❌ Failed to remove from library (local cache already updated): $e');
+        _scheduleLibraryRefresh(mediaType);
         return false;
       }
     } else {
@@ -1168,78 +1188,113 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   /// Remove item from local library cache for instant UI feedback
+  /// Creates new list instances to ensure Selector widgets detect changes
   void _removeFromLocalLibrary(String mediaType, int libraryItemId) {
     final libraryIdStr = libraryItemId.toString();
     bool updated = false;
 
+    // Helper to check if item matches the library ID being removed
+    // Checks both direct provider=library match AND providerMappings
+    bool matchesLibraryId(String? provider, String? itemId, List<ProviderMapping>? mappings) {
+      // Direct match: item's own provider is 'library' and ID matches
+      if (provider == 'library' && itemId == libraryIdStr) {
+        return true;
+      }
+      // Mapping match: check if any providerMapping has library instance with matching ID
+      if (mappings != null) {
+        for (final m in mappings) {
+          if ((m.providerInstance == 'library' || m.providerDomain == 'library') &&
+              m.itemId == libraryIdStr) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
     if (mediaType == 'artist') {
       final before = _artists.length;
-      _artists.removeWhere((a) =>
-        (a.provider == 'library' && a.itemId == libraryIdStr) ||
-        a.providerMappings?.any((m) => m.providerInstance == 'library' && m.itemId == libraryIdStr) == true
-      );
+      _logger.log('🔍 Looking for artist with libraryId=$libraryIdStr in ${_artists.length} artists');
+      // Debug: log first few artists to understand structure
+      if (_artists.isNotEmpty) {
+        final sample = _artists.take(3);
+        for (final a in sample) {
+          _logger.log('  Sample artist: ${a.name}, provider=${a.provider}, itemId=${a.itemId}, mappings=${a.providerMappings?.length ?? 0}');
+        }
+      }
+      // Create new list to trigger Selector rebuilds (reference equality)
+      _artists = _artists.where((a) =>
+        !matchesLibraryId(a.provider, a.itemId, a.providerMappings)
+      ).toList();
       updated = _artists.length != before;
+      if (!updated) {
+        _logger.log('⚠️ Artist with libraryId=$libraryIdStr not found in local cache');
+      }
     } else if (mediaType == 'album') {
       final before = _albums.length;
-      _albums.removeWhere((a) =>
-        (a.provider == 'library' && a.itemId == libraryIdStr) ||
-        a.providerMappings?.any((m) => m.providerInstance == 'library' && m.itemId == libraryIdStr) == true
-      );
+      _albums = _albums.where((a) =>
+        !matchesLibraryId(a.provider, a.itemId, a.providerMappings)
+      ).toList();
       updated = _albums.length != before;
     } else if (mediaType == 'track') {
       final before = _tracks.length;
-      _tracks.removeWhere((t) =>
-        (t.provider == 'library' && t.itemId == libraryIdStr) ||
-        t.providerMappings?.any((m) => m.providerInstance == 'library' && m.itemId == libraryIdStr) == true
-      );
+      _tracks = _tracks.where((t) =>
+        !matchesLibraryId(t.provider, t.itemId, t.providerMappings)
+      ).toList();
       updated = _tracks.length != before;
     } else if (mediaType == 'radio') {
       final before = _radioStations.length;
-      _radioStations.removeWhere((r) =>
-        (r.provider == 'library' && r.itemId == libraryIdStr) ||
-        r.providerMappings?.any((m) => m.providerInstance == 'library' && m.itemId == libraryIdStr) == true
-      );
+      _radioStations = _radioStations.where((r) =>
+        !matchesLibraryId(r.provider, r.itemId, r.providerMappings)
+      ).toList();
       updated = _radioStations.length != before;
     } else if (mediaType == 'podcast') {
       final before = _podcasts.length;
-      _podcasts.removeWhere((p) =>
-        (p.provider == 'library' && p.itemId == libraryIdStr) ||
-        p.providerMappings?.any((m) => m.providerInstance == 'library' && m.itemId == libraryIdStr) == true
-      );
+      _podcasts = _podcasts.where((p) =>
+        !matchesLibraryId(p.provider, p.itemId, p.providerMappings)
+      ).toList();
       updated = _podcasts.length != before;
     }
 
     if (updated) {
+      _logger.log('🗑️ Removed $mediaType with libraryId=$libraryItemId from local cache');
       notifyListeners();
     }
   }
 
-  /// Schedule a background refresh for a media type after library change
+  /// Refresh library data for a media type after library change
+  /// Runs immediately (no delay) to ensure UI stays in sync
   void _scheduleLibraryRefresh(String mediaType) {
-    // Use a short delay to batch multiple adds
-    Future.delayed(const Duration(milliseconds: 500), () async {
+    // Run immediately - no delay to ensure data consistency
+    () async {
       if (!isConnected || _api == null) return;
 
       try {
+        _logger.log('🔄 Refreshing $mediaType library after change...');
         if (mediaType == 'artist') {
           _artists = await _api!.getArtists(
             limit: LibraryConstants.maxLibraryItems,
             albumArtistsOnly: false,
           );
+          _logger.log('✅ Refreshed artists: ${_artists.length} items');
         } else if (mediaType == 'album') {
           _albums = await _api!.getAlbums(limit: LibraryConstants.maxLibraryItems);
+          _logger.log('✅ Refreshed albums: ${_albums.length} items');
         } else if (mediaType == 'track') {
           _tracks = await _api!.getTracks(limit: LibraryConstants.maxLibraryItems);
+          _logger.log('✅ Refreshed tracks: ${_tracks.length} items');
         } else if (mediaType == 'radio') {
           _radioStations = await _api!.getRadioStations(limit: 100);
+          _logger.log('✅ Refreshed radio stations: ${_radioStations.length} items');
         } else if (mediaType == 'podcast') {
           _podcasts = await _api!.getPodcasts(limit: 100);
+          _logger.log('✅ Refreshed podcasts: ${_podcasts.length} items');
         }
         notifyListeners();
       } catch (e) {
         _logger.log('⚠️ Background library refresh failed: $e');
       }
-    });
+    }();
   }
 
   Future<void> disconnect() async {
@@ -1251,6 +1306,8 @@ class MusicAssistantProvider with ChangeNotifier {
     _localPlayerEventSubscription?.cancel();
     _playerUpdatedEventSubscription?.cancel();
     _playerAddedEventSubscription?.cancel();
+    _mediaItemAddedEventSubscription?.cancel();
+    _mediaItemDeletedEventSubscription?.cancel();
     _positionTracker.clear();
     // Disconnect Sendspin and PCM player if connected
     if (_sendspinConnected) {
@@ -2084,6 +2141,54 @@ class MusicAssistantProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _logger.log('Error handling player added event: $e');
+    }
+  }
+
+  /// Handle media_item_added event - refresh library when items are added
+  /// This handles the case where addToLibrary API call times out but the item was actually added
+  void _handleMediaItemAddedEvent(Map<String, dynamic> event) {
+    try {
+      _logger.log('📥 Media item added event received: $event');
+      final mediaType = event['media_type'] as String?;
+      _logger.log('📥 Media item added: type=$mediaType');
+
+      // Invalidate search cache so new searches show updated library status
+      _cacheService.invalidateSearchCache();
+
+      // Refresh the appropriate library list
+      if (mediaType != null) {
+        _scheduleLibraryRefresh(mediaType);
+      } else {
+        // If no media_type, refresh all common types
+        _logger.log('📥 No media_type in event, refreshing artist library');
+        _scheduleLibraryRefresh('artist');
+      }
+    } catch (e) {
+      _logger.log('Error handling media item added event: $e');
+    }
+  }
+
+  /// Handle media_item_deleted event - refresh library when items are removed
+  /// This ensures UI updates even if removeFromLibrary API call times out
+  void _handleMediaItemDeletedEvent(Map<String, dynamic> event) {
+    try {
+      _logger.log('🗑️ Media item deleted event received: $event');
+      final mediaType = event['media_type'] as String?;
+      _logger.log('🗑️ Media item deleted: type=$mediaType');
+
+      // Invalidate search cache so new searches show updated library status
+      _cacheService.invalidateSearchCache();
+
+      // Refresh the appropriate library list
+      if (mediaType != null) {
+        _scheduleLibraryRefresh(mediaType);
+      } else {
+        // If no media_type, refresh all common types
+        _logger.log('🗑️ No media_type in event, refreshing artist library');
+        _scheduleLibraryRefresh('artist');
+      }
+    } catch (e) {
+      _logger.log('Error handling media item deleted event: $e');
     }
   }
 
@@ -5044,6 +5149,8 @@ class MusicAssistantProvider with ChangeNotifier {
     _localPlayerEventSubscription?.cancel();
     _playerUpdatedEventSubscription?.cancel();
     _playerAddedEventSubscription?.cancel();
+    _mediaItemAddedEventSubscription?.cancel();
+    _mediaItemDeletedEventSubscription?.cancel();
     _positionTracker.dispose();
     _pcmAudioPlayer?.dispose();
     _sendspinService?.dispose();

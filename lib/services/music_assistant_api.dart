@@ -304,6 +304,11 @@ class MusicAssistantAPI {
            _logger.log('Event data: ${jsonEncode(eventData)} (player_id: $objectId)');
         }
 
+        // Debug: Log media_item events to understand structure
+        if (eventType == 'media_item_added' || eventType == 'media_item_deleted' || eventType == 'media_item_updated') {
+           _logger.log('📦 Media event data: ${jsonEncode(eventData)} (object_id: $objectId)');
+        }
+
         // Include object_id in event data so listeners can filter by player
         final enrichedData = {
           ...eventData,
@@ -2571,6 +2576,22 @@ class MusicAssistantAPI {
       _eventStreams['player_added'] = StreamController<Map<String, dynamic>>.broadcast();
     }
     return _eventStreams['player_added']!.stream;
+  }
+
+  /// Stream of media_item_added events (for refreshing library when items are added)
+  Stream<Map<String, dynamic>> get mediaItemAddedEvents {
+    if (!_eventStreams.containsKey('media_item_added')) {
+      _eventStreams['media_item_added'] = StreamController<Map<String, dynamic>>.broadcast();
+    }
+    return _eventStreams['media_item_added']!.stream;
+  }
+
+  /// Stream of media_item_deleted events (for refreshing library when items are removed)
+  Stream<Map<String, dynamic>> get mediaItemDeletedEvents {
+    if (!_eventStreams.containsKey('media_item_deleted')) {
+      _eventStreams['media_item_deleted'] = StreamController<Map<String, dynamic>>.broadcast();
+    }
+    return _eventStreams['media_item_deleted']!.stream;
   }
 
   /// Register this device as a player with retry logic
