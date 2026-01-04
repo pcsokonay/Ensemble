@@ -424,7 +424,7 @@ class SearchScreenState extends State<SearchScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.background,
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -735,8 +735,8 @@ class SearchScreenState extends State<SearchScreen> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          colorScheme.background,
-                          colorScheme.background.withOpacity(0),
+                          colorScheme.surface,
+                          colorScheme.surface.withOpacity(0),
                         ],
                       ),
                     ),

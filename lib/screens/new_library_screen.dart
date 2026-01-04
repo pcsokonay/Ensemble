@@ -930,7 +930,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         // Only show disconnected state if we have no cached data at all
         if (!isConnected && !syncService.hasCache) {
           return Scaffold(
-            backgroundColor: colorScheme.background,
+            backgroundColor: colorScheme.surface,
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
@@ -954,7 +954,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         }
 
         return Scaffold(
-          backgroundColor: colorScheme.background,
+          backgroundColor: colorScheme.surface,
           body: SafeArea(
             child: Column(
               children: [
@@ -1017,8 +1017,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [
-                                  colorScheme.background,
-                                  colorScheme.background.withOpacity(0),
+                                  colorScheme.surface,
+                                  colorScheme.surface.withOpacity(0),
                                 ],
                               ),
                             ),
@@ -1397,6 +1397,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     fit: BoxFit.cover,
                     width: 48,
                     height: 48,
+                    memCacheWidth: 128,
+                    memCacheHeight: 128,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
                     placeholder: (_, __) => Text(
@@ -1482,6 +1484,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                                 fit: BoxFit.cover,
                                 width: size,
                                 height: size,
+                                memCacheWidth: 256,
+                                memCacheHeight: 256,
                                 fadeInDuration: Duration.zero,
                                 fadeOutDuration: Duration.zero,
                                 placeholder: (_, __) => Center(
@@ -1572,6 +1576,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 ? CachedNetworkImage(
                     imageUrl: imageUrl,
                     fit: BoxFit.cover,
+                    memCacheWidth: 256,
+                    memCacheHeight: 256,
                     placeholder: (_, __) => const SizedBox(),
                     errorWidget: (_, __, ___) => Icon(
                       MdiIcons.bookOutline,
@@ -1740,6 +1746,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                           ? CachedNetworkImage(
                               imageUrl: imageUrl,
                               fit: BoxFit.cover,
+                              memCacheWidth: 512,
+                              memCacheHeight: 512,
                               fadeInDuration: Duration.zero,
                               fadeOutDuration: Duration.zero,
                               placeholder: (_, __) => const SizedBox(),
@@ -1959,6 +1967,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 ? CachedNetworkImage(
                     imageUrl: firstCover,
                     fit: BoxFit.cover,
+                    memCacheWidth: 256,
+                    memCacheHeight: 256,
                     placeholder: (_, __) => Icon(
                       Icons.collections_bookmark_rounded,
                       color: colorScheme.onSurfaceVariant,
@@ -2973,6 +2983,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               ? CachedNetworkImage(
                   imageUrl: imageUrl,
                   fit: BoxFit.cover,
+                  memCacheWidth: 256,
+                  memCacheHeight: 256,
                   placeholder: (_, __) => const SizedBox(),
                   errorWidget: (_, __, ___) => Icon(
                     Icons.album_rounded,

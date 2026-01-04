@@ -804,7 +804,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
         }
       },
       child: Scaffold(
-        backgroundColor: colorScheme.background,
+        backgroundColor: colorScheme.surface,
         body: LayoutBuilder(
           builder: (context, constraints) {
             // Responsive cover size: 70% of screen width, clamped between 200-320
@@ -816,7 +816,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
           SliverAppBar(
             expandedHeight: expandedHeight,
             pinned: true,
-            backgroundColor: colorScheme.background,
+            backgroundColor: colorScheme.surface,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_rounded),
               onPressed: () {
