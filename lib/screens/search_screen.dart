@@ -1077,7 +1077,10 @@ class SearchScreenState extends State<SearchScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: showType
-            ? _buildTypePill('artist', colorScheme)
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [_buildTypePill('artist', colorScheme)],
+              )
             : Text(
                 S.of(context)!.artist,
                 style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
@@ -1569,7 +1572,10 @@ class SearchScreenState extends State<SearchScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: showType
-            ? _buildTypePill('radio', colorScheme)
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [_buildTypePill('radio', colorScheme)],
+              )
             : Text(
                 S.of(context)!.radio,
                 style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
@@ -1631,7 +1637,10 @@ class SearchScreenState extends State<SearchScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: showType
-            ? _buildTypePill('podcast', colorScheme)
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [_buildTypePill('podcast', colorScheme)],
+              )
             : Text(
                 S.of(context)!.podcasts,
                 style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
@@ -1930,7 +1939,7 @@ class SearchScreenState extends State<SearchScreen> {
       case 'podcast':
         backgroundColor = Colors.green.shade100;
         textColor = Colors.green.shade800;
-        label = S.of(context)!.podcasts;
+        label = S.of(context)!.podcastSingular;
         break;
       default:
         backgroundColor = colorScheme.surfaceVariant;
@@ -1974,7 +1983,7 @@ class SearchScreenState extends State<SearchScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(4),
@@ -1983,7 +1992,7 @@ class SearchScreenState extends State<SearchScreen> {
         label,
         style: TextStyle(
           color: textColor,
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),

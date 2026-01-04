@@ -2261,7 +2261,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
 
     // PERF: Request larger images from API but decode at appropriate size for memory
-    final cacheSize = _podcastsViewMode == 'grid3' ? 300 : 400; // Memory decode size
+    // Use consistent 400 for all views to improve hero animation smoothness (matches detail screen)
+    const cacheSize = 400;
 
     return RefreshIndicator(
       color: colorScheme.primary,

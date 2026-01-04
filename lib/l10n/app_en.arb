@@ -1212,6 +1212,11 @@
     "description": "Singular form of track for search type indicator"
   },
 
+  "podcastSingular": "Podcast",
+  "@podcastSingular": {
+    "description": "Singular form of podcast for search type indicator"
+  },
+
   "trackCount": "{count} {count, plural, =1{track} other{tracks}}",
   "@trackCount": {
     "description": "Track count with plural",

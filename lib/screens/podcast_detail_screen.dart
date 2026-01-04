@@ -322,8 +322,8 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                                   ? CachedNetworkImage(
                                       imageUrl: imageUrl,
                                       fit: BoxFit.cover,
-                                      memCacheWidth: 512,
-                                      memCacheHeight: 512,
+                                      memCacheWidth: 400,
+                                      memCacheHeight: 400,
                                       fadeInDuration: Duration.zero,
                                       fadeOutDuration: Duration.zero,
                                       placeholder: (_, __) => Center(
