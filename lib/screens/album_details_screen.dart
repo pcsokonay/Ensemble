@@ -36,6 +36,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
   List<Track> _tracks = [];
   bool _isLoading = true;
   bool _isFavorite = false;
+  bool _isInLibrary = false;
   ColorScheme? _lightColorScheme;
   ColorScheme? _darkColorScheme;
   int? _expandedTrackIndex;
@@ -52,6 +53,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
   void initState() {
     super.initState();
     _isFavorite = widget.album.favorite ?? false;
+    _isInLibrary = widget.album.inLibrary;
     _loadTracks();
     _loadAlbumDescription();
 
@@ -140,7 +142,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
               orElse: () => widget.album.providerMappings!.first,
             ),
           );
-          actualProvider = mapping.providerInstance;
+          // Use providerDomain (e.g., "spotify") not providerInstance (e.g., "spotify--xyz")
+          actualProvider = mapping.providerDomain;
           actualItemId = mapping.itemId;
         }
 
@@ -214,6 +217,93 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
     }
   }
 
+  /// Toggle library status
+  Future<void> _toggleLibrary() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+
+    try {
+      final newState = !_isInLibrary;
+      bool success;
+
+      if (newState) {
+        // Add to library
+        String actualProvider = widget.album.provider;
+        String actualItemId = widget.album.itemId;
+
+        if (widget.album.providerMappings != null && widget.album.providerMappings!.isNotEmpty) {
+          final mapping = widget.album.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => widget.album.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => widget.album.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        _logger.log('Adding album to library: provider=$actualProvider, itemId=$actualItemId');
+        success = await maProvider.addToLibrary(
+          mediaType: 'album',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+      } else {
+        // Remove from library
+        int? libraryItemId;
+        if (widget.album.provider == 'library') {
+          libraryItemId = int.tryParse(widget.album.itemId);
+        } else if (widget.album.providerMappings != null) {
+          final libraryMapping = widget.album.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.album.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) {
+          _logger.log('Cannot remove from library: no library ID found');
+          return;
+        }
+
+        _logger.log('Removing album from library: libraryItemId=$libraryItemId');
+        success = await maProvider.removeFromLibrary(
+          mediaType: 'album',
+          libraryItemId: libraryItemId,
+        );
+      }
+
+      if (success) {
+        setState(() {
+          _isInLibrary = newState;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isInLibrary ? S.of(context)!.addedToLibrary : S.of(context)!.removedFromLibrary,
+              ),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      _logger.log('Error toggling album library: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update library: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _toggleTrackFavorite(int trackIndex) async {
     if (trackIndex < 0 || trackIndex >= _tracks.length) return;
 
@@ -260,7 +350,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
               orElse: () => track.providerMappings!.first,
             ),
           );
-          actualProvider = mapping.providerInstance;
+          // Use providerDomain (e.g., "spotify") not providerInstance (e.g., "spotify--xyz")
+          actualProvider = mapping.providerDomain;
           actualItemId = mapping.itemId;
         }
 
@@ -906,6 +997,29 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                             _isFavorite ? Icons.favorite : Icons.favorite_border,
                             color: _isFavorite
                                 ? colorScheme.error
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      // Library Button
+                      SizedBox(
+                        height: 50,
+                        width: 50,
+                        child: FilledButton.tonal(
+                          onPressed: _toggleLibrary,
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Icon(
+                            _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                            color: _isInLibrary
+                                ? colorScheme.primary
                                 : colorScheme.onSurfaceVariant,
                           ),
                         ),

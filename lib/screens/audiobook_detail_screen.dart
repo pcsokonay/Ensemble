@@ -140,7 +140,8 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
               orElse: () => widget.audiobook.providerMappings!.first,
             ),
           );
-          actualProvider = mapping.providerInstance;
+          // Use providerDomain (e.g., "spotify") not providerInstance (e.g., "spotify--xyz")
+          actualProvider = mapping.providerDomain;
           actualItemId = mapping.itemId;
         }
 

@@ -1358,5 +1358,25 @@
   "dismissPlayerHint": "Swipe down, tap outside, or press back to return",
   "@dismissPlayerHint": {
     "description": "Hint explaining how to dismiss the player selector"
+  },
+
+  "playingAlbum": "Playing {albumName}",
+  "@playingAlbum": {
+    "description": "Message shown when starting to play an album",
+    "placeholders": {
+      "albumName": {
+        "type": "String"
+      }
+    }
+  },
+
+  "playingPlaylist": "Playing {playlistName}",
+  "@playingPlaylist": {
+    "description": "Message shown when starting to play a playlist",
+    "placeholders": {
+      "playlistName": {
+        "type": "String"
+      }
+    }
   }
 }

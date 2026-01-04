@@ -1988,6 +1988,86 @@ class MusicAssistantAPI {
     }
   }
 
+  /// Play album on player
+  Future<void> playAlbum(String playerId, Album album) async {
+    try {
+      final uri = album.uri ?? 'library://album/${album.itemId}';
+      _logger.log('💿 Playing album: ${album.name} with URI: $uri');
+
+      await _sendCommand(
+        'player_queues/play_media',
+        args: {
+          'queue_id': playerId,
+          'media': [uri],
+          'option': 'replace',
+        },
+      );
+    } catch (e) {
+      _logger.log('Error playing album: $e');
+      rethrow;
+    }
+  }
+
+  /// Add album tracks to queue
+  Future<void> addAlbumToQueue(String playerId, Album album) async {
+    try {
+      final uri = album.uri ?? 'library://album/${album.itemId}';
+      _logger.log('💿 Adding album to queue: ${album.name} with URI: $uri');
+
+      await _sendCommand(
+        'player_queues/play_media',
+        args: {
+          'queue_id': playerId,
+          'media': [uri],
+          'option': 'add',
+        },
+      );
+    } catch (e) {
+      _logger.log('Error adding album to queue: $e');
+      rethrow;
+    }
+  }
+
+  /// Add artist tracks to queue
+  Future<void> addArtistToQueue(String playerId, Artist artist) async {
+    try {
+      final uri = artist.uri ?? 'library://artist/${artist.itemId}';
+      _logger.log('🎤 Adding artist to queue: ${artist.name} with URI: $uri');
+
+      await _sendCommand(
+        'player_queues/play_media',
+        args: {
+          'queue_id': playerId,
+          'media': [uri],
+          'option': 'add',
+        },
+      );
+    } catch (e) {
+      _logger.log('Error adding artist to queue: $e');
+      rethrow;
+    }
+  }
+
+  /// Play playlist on player
+  Future<void> playPlaylist(String playerId, Playlist playlist) async {
+    try {
+      final uri = playlist.uri ?? 'library://playlist/${playlist.itemId}';
+      _logger.log('📝 Playing playlist: ${playlist.name} with URI: $uri');
+
+      await _sendCommand(
+        'player_queues/play_media',
+        args: {
+          'queue_id': playerId,
+          'media': [uri],
+          'option': 'replace',
+        },
+      );
+    } catch (e) {
+      _logger.log('Error playing playlist: $e');
+      rethrow;
+    }
+  }
+
   /// Play multiple tracks via queue
   /// If clearQueue is true, replaces the queue (default behavior)
   /// If startIndex is provided, only tracks from that index onwards will be queued

@@ -35,6 +35,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
   List<MediaItem> _episodes = [];
   bool _isLoadingEpisodes = false;
   bool _isDescriptionExpanded = false;
+  bool _isInLibrary = false;
   String? _expandedEpisodeId; // Track which episode is expanded for actions
 
   String get _heroTagSuffix => widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
@@ -42,6 +43,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _isInLibrary = _checkIfInLibrary(widget.podcast);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 350), () {
         if (mounted) {
@@ -50,6 +52,99 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
       });
       _loadEpisodes();
     });
+  }
+
+  /// Check if podcast is in library
+  bool _checkIfInLibrary(MediaItem podcast) {
+    if (podcast.provider == 'library') return true;
+    return podcast.providerMappings?.any((m) => m.providerInstance == 'library') ?? false;
+  }
+
+  /// Toggle library status
+  Future<void> _toggleLibrary() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+
+    try {
+      final newState = !_isInLibrary;
+      bool success;
+
+      if (newState) {
+        // Add to library
+        String actualProvider = widget.podcast.provider;
+        String actualItemId = widget.podcast.itemId;
+
+        if (widget.podcast.providerMappings != null && widget.podcast.providerMappings!.isNotEmpty) {
+          final mapping = widget.podcast.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => widget.podcast.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => widget.podcast.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        _logger.log('Adding podcast to library: provider=$actualProvider, itemId=$actualItemId');
+        success = await maProvider.addToLibrary(
+          mediaType: 'podcast',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+      } else {
+        // Remove from library
+        int? libraryItemId;
+        if (widget.podcast.provider == 'library') {
+          libraryItemId = int.tryParse(widget.podcast.itemId);
+        } else if (widget.podcast.providerMappings != null) {
+          final libraryMapping = widget.podcast.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.podcast.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) {
+          _logger.log('Cannot remove from library: no library ID found');
+          return;
+        }
+
+        _logger.log('Removing podcast from library: libraryItemId=$libraryItemId');
+        success = await maProvider.removeFromLibrary(
+          mediaType: 'podcast',
+          libraryItemId: libraryItemId,
+        );
+      }
+
+      if (success) {
+        setState(() {
+          _isInLibrary = newState;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isInLibrary ? S.of(context)!.addedToLibrary : S.of(context)!.removedFromLibrary,
+              ),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      _logger.log('Error toggling podcast library: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update library: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _extractColors() async {
@@ -381,6 +476,28 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                             textAlign: TextAlign.center,
                           ),
                         ],
+                        const SizedBox(height: 16),
+
+                        // Library button
+                        SizedBox(
+                          height: 50,
+                          width: 50,
+                          child: FilledButton.tonal(
+                            onPressed: _toggleLibrary,
+                            style: FilledButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Icon(
+                              _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                              color: _isInLibrary
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 16),
 
                         // Description

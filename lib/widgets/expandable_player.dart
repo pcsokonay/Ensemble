@@ -583,9 +583,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           final mappings = currentTrack.providerMappings as List<dynamic>?;
           if (mappings != null && mappings.isNotEmpty) {
             // Find a non-library provider mapping
+            // Use providerDomain (e.g., "spotify") not providerInstance (e.g., "spotify--xyz")
             for (final mapping in mappings) {
               if (mapping.available == true && mapping.providerInstance != 'library') {
-                actualProvider = mapping.providerInstance;
+                actualProvider = mapping.providerDomain;
                 actualItemId = mapping.itemId;
                 break;
               }
@@ -594,7 +595,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
             if (actualProvider == 'library') {
               for (final mapping in mappings) {
                 if (mapping.available == true) {
-                  actualProvider = mapping.providerInstance;
+                  actualProvider = mapping.providerDomain;
                   actualItemId = mapping.itemId;
                   break;
                 }
