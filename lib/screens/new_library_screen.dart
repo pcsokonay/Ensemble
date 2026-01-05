@@ -157,6 +157,23 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     _loadViewPreferences();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload artist filter setting when returning from settings
+    _reloadArtistFilterSetting();
+  }
+
+  Future<void> _reloadArtistFilterSetting() async {
+    final showOnlyArtistsWithAlbums = await SettingsService.getShowOnlyArtistsWithAlbums();
+    if (mounted && showOnlyArtistsWithAlbums != _showOnlyArtistsWithAlbums) {
+      DebugLogger().log('🎨 Reloaded setting showOnlyArtistsWithAlbums: $showOnlyArtistsWithAlbums (was $_showOnlyArtistsWithAlbums)');
+      setState(() {
+        _showOnlyArtistsWithAlbums = showOnlyArtistsWithAlbums;
+      });
+    }
+  }
+
   Future<void> _loadViewPreferences() async {
     final artistsMode = await SettingsService.getLibraryArtistsViewMode();
     final albumsMode = await SettingsService.getLibraryAlbumsViewMode();
