@@ -168,6 +168,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final radioMode = await SettingsService.getLibraryRadioViewMode();
     final podcastsMode = await SettingsService.getLibraryPodcastsViewMode();
     final showOnlyArtistsWithAlbums = await SettingsService.getShowOnlyArtistsWithAlbums();
+    DebugLogger().log('🎨 Loaded setting showOnlyArtistsWithAlbums: $showOnlyArtistsWithAlbums');
     if (mounted) {
       setState(() {
         _artistsViewMode = artistsMode;
@@ -2682,6 +2683,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   // ============ ARTISTS TAB ============
   Widget _buildArtistsTab(BuildContext context, S l10n) {
+    DebugLogger().log('🎨 _buildArtistsTab called, _showOnlyArtistsWithAlbums=$_showOnlyArtistsWithAlbums');
     // Use Selector for targeted rebuilds - only rebuild when artists, albums, or loading state changes
     return Selector<MusicAssistantProvider, (List<Artist>, List<Album>, bool)>(
       selector: (_, provider) => (provider.artists, provider.albums, provider.isLoading),
