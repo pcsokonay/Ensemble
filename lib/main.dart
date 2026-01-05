@@ -229,10 +229,17 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
               ColorScheme? darkColorScheme;
 
               if (themeProvider.useMaterialTheme && snapshot.hasData && snapshot.data != null) {
-                // Use system color schemes
+                // Use system color schemes, but override background to match app design
+                // Material You doesn't set background consistently, causing black screen issues
                 final (light, dark) = snapshot.data!;
-                lightColorScheme = light;
-                darkColorScheme = dark;
+                lightColorScheme = light.copyWith(
+                  surface: light.surface,
+                  background: const Color(0xFFFAFAFA), // App's preferred light background
+                );
+                darkColorScheme = dark.copyWith(
+                  surface: const Color(0xFF2a2a2a), // App's preferred dark surface
+                  background: const Color(0xFF1a1a1a), // App's preferred dark background
+                );
               } else {
                 // Use custom color from theme provider
                 lightColorScheme = generateLightColorScheme(themeProvider.customColor);
