@@ -4417,10 +4417,10 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   /// Get audiobooks with provider filtering applied
-  Future<List<Audiobook>> getAudiobooks({int? limit, bool favoriteOnly = false}) async {
+  Future<List<Audiobook>> getAudiobooks({int? limit, bool? favoriteOnly}) async {
     if (_api == null) return [];
     try {
-      final audiobooks = await _api!.getAudiobooks(limit: limit, favoriteOnly: favoriteOnly);
+      final audiobooks = await _api!.getAudiobooks(limit: limit, favoriteOnly: favoriteOnly ?? false);
       return filterByProvider(audiobooks);
     } catch (e) {
       _logger.log('❌ Failed to fetch audiobooks: $e');
