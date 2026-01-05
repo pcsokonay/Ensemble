@@ -2704,7 +2704,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   // ============ ARTISTS TAB ============
   Widget _buildArtistsTab(BuildContext context, S l10n) {
     // Use Selector for targeted rebuilds - only rebuild when artists, albums, or loading state changes
+    // Key includes _showOnlyArtistsWithAlbums to force rebuild when setting changes
     return Selector<MusicAssistantProvider, (List<Artist>, List<Album>, bool)>(
+      key: ValueKey('artists_selector_${_showOnlyArtistsWithAlbums}_$_showFavoritesOnly'),
       selector: (_, provider) => (provider.artists, provider.albums, provider.isLoading),
       builder: (context, data, _) {
             final (allArtists, allAlbums, isLoading) = data;

@@ -779,9 +779,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 value: _showOnlyArtistsWithAlbums,
-                onChanged: (value) {
+                onChanged: (value) async {
                   setState(() => _showOnlyArtistsWithAlbums = value);
-                  SettingsService.setShowOnlyArtistsWithAlbums(value);
+                  await SettingsService.setShowOnlyArtistsWithAlbums(value);
+                  // Verify it saved
+                  final saved = await SettingsService.getShowOnlyArtistsWithAlbums();
+                  debugPrint('🎨 Settings: Set showOnlyArtistsWithAlbums to $value, verified as $saved');
                 },
                 activeColor: colorScheme.primary,
                 contentPadding: EdgeInsets.zero,
