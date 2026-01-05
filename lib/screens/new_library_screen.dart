@@ -2708,9 +2708,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               }
             }
           }
+          debugPrint('🎨 Filter enabled: ${artists.length} artists, ${allAlbums.length} albums, ${artistNamesWithAlbums.length} artist names with albums');
+          debugPrint('🎨 Artist names with albums: $artistNamesWithAlbums');
+          final beforeCount = artists.length;
           artists = artists.where((a) =>
             artistNamesWithAlbums.contains(a.name.toLowerCase())
           ).toList();
+          debugPrint('🎨 Filtered from $beforeCount to ${artists.length} artists');
         }
 
         if (artists.isEmpty) {
