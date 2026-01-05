@@ -5,6 +5,7 @@ import '../models/media_item.dart';
 import 'database_service.dart';
 import 'debug_logger.dart';
 import 'music_assistant_api.dart';
+import 'settings_service.dart';
 
 /// Sync status for UI indicators
 enum SyncStatus {
@@ -150,10 +151,14 @@ class SyncService with ChangeNotifier {
     try {
       _logger.log('🔄 Starting background library sync...');
 
+      // Read artist filter setting - when ON, only fetch artists that have albums
+      final showOnlyArtistsWithAlbums = await SettingsService.getShowOnlyArtistsWithAlbums();
+      _logger.log('🎨 Sync using albumArtistsOnly: $showOnlyArtistsWithAlbums');
+
       // Fetch fresh data from MA API (in parallel for speed)
       final results = await Future.wait([
         api.getAlbums(limit: 1000),
-        api.getArtists(limit: 1000, albumArtistsOnly: false),
+        api.getArtists(limit: 1000, albumArtistsOnly: showOnlyArtistsWithAlbums),
         api.getAudiobooks(limit: 1000),
         api.getPlaylists(limit: 1000),
       ]);

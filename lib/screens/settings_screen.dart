@@ -782,9 +782,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) async {
                   setState(() => _showOnlyArtistsWithAlbums = value);
                   await SettingsService.setShowOnlyArtistsWithAlbums(value);
-                  // Verify it saved
-                  final saved = await SettingsService.getShowOnlyArtistsWithAlbums();
-                  debugPrint('🎨 Settings: Set showOnlyArtistsWithAlbums to $value, verified as $saved');
+                  // Refresh library to apply the new filter at API level
+                  if (mounted) {
+                    context.read<MusicAssistantProvider>().loadLibrary();
+                  }
                 },
                 activeColor: colorScheme.primary,
                 contentPadding: EdgeInsets.zero,

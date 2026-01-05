@@ -49,7 +49,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   bool _isLoadingTracks = false;
   bool _isLoadingAudiobooks = false;
   bool _showFavoritesOnly = false;
-  bool _showOnlyArtistsWithAlbums = false;
 
   // PERF: Pre-sorted lists - computed once on data load, not on every build
   List<Playlist> _sortedPlaylists = [];
@@ -157,23 +156,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     _loadViewPreferences();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Reload artist filter setting when returning from settings
-    _reloadArtistFilterSetting();
-  }
-
-  Future<void> _reloadArtistFilterSetting() async {
-    final showOnlyArtistsWithAlbums = await SettingsService.getShowOnlyArtistsWithAlbums();
-    if (mounted && showOnlyArtistsWithAlbums != _showOnlyArtistsWithAlbums) {
-      DebugLogger().log('🎨 Reloaded setting showOnlyArtistsWithAlbums: $showOnlyArtistsWithAlbums (was $_showOnlyArtistsWithAlbums)');
-      setState(() {
-        _showOnlyArtistsWithAlbums = showOnlyArtistsWithAlbums;
-      });
-    }
-  }
-
   Future<void> _loadViewPreferences() async {
     final artistsMode = await SettingsService.getLibraryArtistsViewMode();
     final albumsMode = await SettingsService.getLibraryAlbumsViewMode();
@@ -184,8 +166,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final seriesMode = await SettingsService.getLibrarySeriesViewMode();
     final radioMode = await SettingsService.getLibraryRadioViewMode();
     final podcastsMode = await SettingsService.getLibraryPodcastsViewMode();
-    final showOnlyArtistsWithAlbums = await SettingsService.getShowOnlyArtistsWithAlbums();
-    DebugLogger().log('🎨 Loaded setting showOnlyArtistsWithAlbums: $showOnlyArtistsWithAlbums');
     if (mounted) {
       setState(() {
         _artistsViewMode = artistsMode;
@@ -197,7 +177,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         _seriesViewMode = seriesMode;
         _radioViewMode = radioMode;
         _podcastsViewMode = podcastsMode;
-        _showOnlyArtistsWithAlbums = showOnlyArtistsWithAlbums;
       });
     }
   }
@@ -542,9 +521,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     // No setState needed - ValueListenableBuilder will rebuild only the filter chips
     _selectedTabIndex.value = index;
     _tabIndexNotifier.value = index;
-
-    // Reload artist filter setting when switching tabs (catches changes from settings screen)
-    _reloadArtistFilterSetting();
   }
 
   /// Handle scroll notifications to hide/show filter bars
@@ -2703,42 +2679,22 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   // ============ ARTISTS TAB ============
   Widget _buildArtistsTab(BuildContext context, S l10n) {
-    // Use Selector for targeted rebuilds - only rebuild when artists, albums, or loading state changes
-    // Key includes _showOnlyArtistsWithAlbums to force rebuild when setting changes
-    return Selector<MusicAssistantProvider, (List<Artist>, List<Album>, bool)>(
-      key: ValueKey('artists_selector_${_showOnlyArtistsWithAlbums}_$_showFavoritesOnly'),
-      selector: (_, provider) => (provider.artists, provider.albums, provider.isLoading),
+    // Use Selector for targeted rebuilds - only rebuild when artists or loading state changes
+    // Artist filtering (albumArtistsOnly) is now done at API level in library_provider
+    return Selector<MusicAssistantProvider, (List<Artist>, bool)>(
+      selector: (_, provider) => (provider.artists, provider.isLoading),
       builder: (context, data, _) {
-            final (allArtists, allAlbums, isLoading) = data;
+            final (allArtists, isLoading) = data;
             final colorScheme = Theme.of(context).colorScheme;
 
             if (isLoading) {
               return Center(child: CircularProgressIndicator(color: colorScheme.primary));
             }
 
-            // Filter by favorites if enabled
-            var artists = _showFavoritesOnly
+            // Filter by favorites if enabled (artist filter is done at API level)
+            final artists = _showFavoritesOnly
                 ? allArtists.where((a) => a.favorite == true).toList()
-                : allArtists.toList();
-
-            // Filter to only show artists that have albums in library
-            if (_showOnlyArtistsWithAlbums) {
-              final artistNamesWithAlbums = <String>{};
-              for (final album in allAlbums) {
-                if (album.artists != null && album.artists!.isNotEmpty) {
-                  for (final artist in album.artists!) {
-                    artistNamesWithAlbums.add(artist.name.toLowerCase());
-                  }
-                }
-              }
-              final beforeCount = artists.length;
-              artists = artists.where((a) =>
-                artistNamesWithAlbums.contains(a.name.toLowerCase())
-              ).toList();
-              DebugLogger().log('🎨 Artist filter ON: $beforeCount → ${artists.length} artists (${artistNamesWithAlbums.length} with albums)');
-            } else {
-              DebugLogger().log('🎨 Artist filter OFF: showing all ${artists.length} artists');
-            }
+                : allArtists;
 
             if (artists.isEmpty) {
               if (_showFavoritesOnly) {
@@ -2771,7 +2727,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 child: _artistsViewMode == 'list'
                     ? ListView.builder(
                         controller: _artistsScrollController,
-                        key: PageStorageKey<String>('library_artists_list_${_showFavoritesOnly ? 'fav' : 'all'}_${_showOnlyArtistsWithAlbums ? 'albums' : 'all'}_$_artistsViewMode'),
+                        key: PageStorageKey<String>('library_artists_list_${_showFavoritesOnly ? 'fav' : 'all'}_$_artistsViewMode'),
                         cacheExtent: 1000,
                         addAutomaticKeepAlives: false,
                         addRepaintBoundaries: false,
@@ -2788,7 +2744,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                       )
                     : GridView.builder(
                         controller: _artistsScrollController,
-                        key: PageStorageKey<String>('library_artists_grid_${_showFavoritesOnly ? 'fav' : 'all'}_${_showOnlyArtistsWithAlbums ? 'albums' : 'all'}_$_artistsViewMode'),
+                        key: PageStorageKey<String>('library_artists_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_artistsViewMode'),
                         cacheExtent: 1000,
                         addAutomaticKeepAlives: false,
                         addRepaintBoundaries: false,

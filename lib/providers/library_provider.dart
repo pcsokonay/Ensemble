@@ -4,6 +4,7 @@ import '../services/music_assistant_api.dart';
 import '../services/debug_logger.dart';
 import '../services/error_handler.dart';
 import '../services/cache_service.dart';
+import '../services/settings_service.dart';
 import '../constants/timings.dart';
 
 /// Provider for managing library data (artists, albums, tracks, playlists)
@@ -138,8 +139,12 @@ class LibraryProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      // Read artist filter setting - when ON, only fetch artists that have albums
+      final showOnlyArtistsWithAlbums = await SettingsService.getShowOnlyArtistsWithAlbums();
+      _logger.log('🎨 loadLibrary using albumArtistsOnly: $showOnlyArtistsWithAlbums');
+
       final results = await Future.wait([
-        _api!.getArtists(limit: LibraryConstants.maxLibraryItems, albumArtistsOnly: false),
+        _api!.getArtists(limit: LibraryConstants.maxLibraryItems, albumArtistsOnly: showOnlyArtistsWithAlbums),
         _api!.getAlbums(limit: LibraryConstants.maxLibraryItems),
         _api!.getTracks(limit: LibraryConstants.maxLibraryItems),
       ]);
@@ -166,11 +171,14 @@ class LibraryProvider with ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      // Read artist filter setting - when ON, only fetch artists that have albums
+      final showOnlyArtistsWithAlbums = await SettingsService.getShowOnlyArtistsWithAlbums();
+
       _artists = await _api!.getArtists(
         limit: limit ?? LibraryConstants.maxLibraryItems,
         offset: offset,
         search: search,
-        albumArtistsOnly: false, // Show ALL library artists, not just those with albums
+        albumArtistsOnly: showOnlyArtistsWithAlbums,
       );
 
       _isLoading = false;
