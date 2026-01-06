@@ -35,10 +35,15 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Clear Gradle cache for fresh mirror downloads
-        run: |
-          rm -rf ~/.gradle/caches/modules-2/files-2.1/
-          rm -rf ~/.gradle/caches/modules-2/metadata-*/
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Get dependencies
         run: flutter pub get
@@ -70,7 +75,12 @@ jobs:
           EOF
 
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          # Use init.gradle to force Maven mirrors (workaround for Maven Central 403)
+          mkdir -p ~/.gradle
+          cp android/init.gradle ~/.gradle/init.gradle
+
+          flutter build apk --release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
