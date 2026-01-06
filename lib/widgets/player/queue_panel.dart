@@ -157,9 +157,9 @@ class _QueuePanelState extends State<QueuePanel> {
         final isCurrentItem = index == currentIndex;
         final isPastItem = index < currentIndex;
 
-        return data.measuring
-            ? _buildQueueItem(item, index, isCurrentItem, isPastItem, measuring: true)
-            : _buildDismissibleQueueItem(item, index, isCurrentItem, isPastItem);
+        // Always return same widget structure (with Dismissible) for consistency
+        // Only vary the measuring flag for image loading optimization
+        return _buildDismissibleQueueItem(item, index, isCurrentItem, isPastItem, measuring: data.measuring);
       },
       listController: _listController,
       reorderModel: AnimatedListReorderModel(
@@ -175,7 +175,7 @@ class _QueuePanelState extends State<QueuePanel> {
     );
   }
 
-  Widget _buildDismissibleQueueItem(QueueItem item, int index, bool isCurrentItem, bool isPastItem) {
+  Widget _buildDismissibleQueueItem(QueueItem item, int index, bool isCurrentItem, bool isPastItem, {bool measuring = false}) {
     return Dismissible(
       key: ValueKey(item.queueItemId),
       direction: DismissDirection.endToStart, // Swipe left to delete only
@@ -195,7 +195,7 @@ class _QueuePanelState extends State<QueuePanel> {
       onDismissed: (direction) {
         _handleDelete(item);
       },
-      child: _buildQueueItem(item, index, isCurrentItem, isPastItem),
+      child: _buildQueueItem(item, index, isCurrentItem, isPastItem, measuring: measuring),
     );
   }
 
