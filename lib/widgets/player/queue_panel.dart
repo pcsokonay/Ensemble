@@ -39,7 +39,6 @@ class QueuePanel extends StatefulWidget {
 class _QueuePanelState extends State<QueuePanel> {
   final AnimatedListController _listController = AnimatedListController();
   List<QueueItem> _items = [];
-  int? _draggingIndex;
 
   @override
   void initState() {
@@ -167,7 +166,6 @@ class _QueuePanelState extends State<QueuePanel> {
         onReorderFeedback: (index, dropIndex, offset, dx, dy) => null,
         onReorderMove: (index, dropIndex) => true,
         onReorderComplete: (index, dropIndex, slot) {
-          _draggingIndex = null;
           _handleReorder(index, dropIndex);
           return true;
         },
@@ -281,29 +279,29 @@ class _QueuePanelState extends State<QueuePanel> {
                 if (isCurrentItem)
                   Icon(Icons.play_arrow_rounded, color: widget.primaryColor, size: 20)
                 else if (!measuring)
-                  GestureDetector(
-                    onVerticalDragStart: (details) {
-                      _draggingIndex = index;
-                      _listController.notifyStartReorder(index, details.localPosition.dx, details.localPosition.dy);
-                    },
-                    onVerticalDragUpdate: (details) {
-                      if (_draggingIndex != null) {
-                        _listController.notifyUpdateReorder(details.delta.dx, details.delta.dy);
-                      }
-                    },
-                    onVerticalDragEnd: (details) {
-                      if (_draggingIndex != null) {
+                  Builder(
+                    builder: (itemContext) => GestureDetector(
+                      onVerticalDragStart: (details) {
+                        _listController.notifyStartReorder(
+                          itemContext,
+                          details.localPosition.dx,
+                          details.localPosition.dy,
+                        );
+                      },
+                      onVerticalDragUpdate: (details) {
+                        _listController.notifyUpdateReorder(
+                          details.localPosition.dx,
+                          details.localPosition.dy,
+                        );
+                      },
+                      onVerticalDragEnd: (details) {
                         _listController.notifyStopReorder(false);
-                        _draggingIndex = null;
-                      }
-                    },
-                    onVerticalDragCancel: () {
-                      if (_draggingIndex != null) {
+                      },
+                      onVerticalDragCancel: () {
                         _listController.notifyStopReorder(true);
-                        _draggingIndex = null;
-                      }
-                    },
-                    child: Icon(Icons.drag_handle, color: widget.textColor.withOpacity(0.3), size: 20),
+                      },
+                      child: Icon(Icons.drag_handle, color: widget.textColor.withOpacity(0.3), size: 20),
+                    ),
                   )
                 else
                   Icon(Icons.drag_handle, color: widget.textColor.withOpacity(0.3), size: 20),
