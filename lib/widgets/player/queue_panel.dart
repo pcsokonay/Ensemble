@@ -65,6 +65,12 @@ class _QueuePanelState extends State<QueuePanel> {
   }
 
   void _handleDelete(QueueItem item, int index) async {
+    // Remove from local list immediately to prevent double animation
+    // (Dismissible already animated it out, don't let AutomaticAnimatedListView do it again)
+    setState(() {
+      _items = List.from(_items)..removeAt(index);
+    });
+
     // Remove from queue via API - use playerId as queue ID
     final playerId = widget.queue?.playerId;
     if (playerId != null) {
@@ -175,10 +181,9 @@ class _QueuePanelState extends State<QueuePanel> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        margin: EdgeInsets.symmetric(vertical: Spacing.xxs),
         decoration: BoxDecoration(
           color: Colors.red.shade700,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: BorderRadius.zero,
         ),
         child: const Icon(Icons.delete_outline, color: Colors.white, size: 24),
       ),
@@ -201,10 +206,10 @@ class _QueuePanelState extends State<QueuePanel> {
       child: Opacity(
         opacity: isPastItem ? 0.5 : 1.0,
         child: Container(
-          margin: EdgeInsets.symmetric(vertical: Spacing.xxs),
+          // Use background color with zero radius to cover any grey from list package
           decoration: BoxDecoration(
-            color: isCurrentItem ? widget.primaryColor.withOpacity(0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(Radii.md),
+            color: isCurrentItem ? widget.primaryColor.withOpacity(0.15) : widget.backgroundColor,
+            borderRadius: BorderRadius.zero,
           ),
           child: ListTile(
             dense: true,
