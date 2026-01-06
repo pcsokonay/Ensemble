@@ -49,10 +49,10 @@ class _QueuePanelState extends State<QueuePanel> {
   @override
   void didUpdateWidget(QueuePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Update items when queue changes
-    final newItems = widget.queue?.items ?? [];
-    if (newItems != _items) {
-      _items = newItems;
+    // Only sync items when switching to a different queue (different player)
+    // Don't reset during normal rebuilds - we manage local state for animations
+    if (widget.queue?.playerId != oldWidget.queue?.playerId) {
+      _items = widget.queue?.items ?? [];
     }
   }
 
