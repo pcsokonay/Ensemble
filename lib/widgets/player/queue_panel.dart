@@ -519,20 +519,12 @@ class _QueuePanelState extends State<QueuePanel> {
             : SizedBox(
                 width: 48,
                 height: 48,
-                child: GestureDetector(
+                child: Listener(
                   behavior: HitTestBehavior.opaque,
-                  onPanStart: (details) {
-                    _startDrag(index, itemContext, details.globalPosition);
+                  onPointerDown: (event) {
+                    _startDrag(index, itemContext, event.position);
                   },
-                  onPanUpdate: (details) {
-                    _updateDragPointer(details.globalPosition);
-                  },
-                  onPanEnd: (details) {
-                    _endDrag();
-                  },
-                  onPanCancel: () {
-                    _cancelDrag();
-                  },
+                  // Move/up/cancel handled by parent Listener on Stack
                   child: Center(
                     child: Icon(Icons.drag_handle, color: widget.textColor.withOpacity(0.3), size: 20),
                   ),
