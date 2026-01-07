@@ -531,7 +531,7 @@ class _QueuePanelState extends State<QueuePanel> {
                   _cancelDrag();
                 },
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                   child: Icon(Icons.drag_handle, color: widget.textColor.withOpacity(0.3), size: 20),
                 ),
               ),
