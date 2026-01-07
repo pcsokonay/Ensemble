@@ -13,6 +13,8 @@ import '../widgets/artist_row.dart';
 import '../widgets/track_row.dart';
 import '../widgets/audiobook_row.dart';
 import '../widgets/series_row.dart';
+import '../widgets/playlist_row.dart';
+import '../widgets/radio_station_row.dart';
 import '../widgets/common/disconnected_state.dart';
 import 'settings_screen.dart';
 import 'search_screen.dart';
@@ -35,6 +37,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   bool _showFavoriteAlbums = false;
   bool _showFavoriteArtists = false;
   bool _showFavoriteTracks = false;
+  bool _showFavoritePlaylists = false;
+  bool _showFavoriteRadioStations = false;
   // Audiobook rows (default off)
   bool _showContinueListeningAudiobooks = false;
   bool _showDiscoverAudiobooks = false;
@@ -73,6 +77,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     final showFavAlbums = await SettingsService.getShowFavoriteAlbums();
     final showFavArtists = await SettingsService.getShowFavoriteArtists();
     final showFavTracks = await SettingsService.getShowFavoriteTracks();
+    final showFavPlaylists = await SettingsService.getShowFavoritePlaylists();
+    final showFavRadio = await SettingsService.getShowFavoriteRadioStations();
     final showContAudiobooks = await SettingsService.getShowContinueListeningAudiobooks();
     final showDiscAudiobooks = await SettingsService.getShowDiscoverAudiobooks();
     final showDiscSeries = await SettingsService.getShowDiscoverSeries();
@@ -85,6 +91,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         _showFavoriteAlbums = showFavAlbums;
         _showFavoriteArtists = showFavArtists;
         _showFavoriteTracks = showFavTracks;
+        _showFavoritePlaylists = showFavPlaylists;
+        _showFavoriteRadioStations = showFavRadio;
         _showContinueListeningAudiobooks = showContAudiobooks;
         _showDiscoverAudiobooks = showDiscAudiobooks;
         _showDiscoverSeries = showDiscSeries;
@@ -371,6 +379,24 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           key: const ValueKey('favorite-tracks'),
           title: S.of(context)!.favoriteTracks,
           loadTracks: () => provider.getFavoriteTracks(),
+          rowHeight: rowHeight,
+        );
+      case 'favorite-playlists':
+        if (!_showFavoritePlaylists) return null;
+        return PlaylistRow(
+          key: const ValueKey('favorite-playlists'),
+          title: S.of(context)!.favoritePlaylists,
+          loadPlaylists: () => provider.getFavoritePlaylists(),
+          heroTagSuffix: 'home',
+          rowHeight: rowHeight,
+        );
+      case 'favorite-radio-stations':
+        if (!_showFavoriteRadioStations) return null;
+        return RadioStationRow(
+          key: const ValueKey('favorite-radio-stations'),
+          title: S.of(context)!.favoriteRadioStations,
+          loadRadioStations: () => provider.getFavoriteRadioStations(),
+          heroTagSuffix: 'home',
           rowHeight: rowHeight,
         );
       default:

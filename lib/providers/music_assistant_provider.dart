@@ -2799,6 +2799,29 @@ class MusicAssistantProvider with ChangeNotifier {
     return _cachedFavoriteTracks;
   }
 
+  /// Get favorite playlists from the library
+  Future<List<Playlist>> getFavoritePlaylists() async {
+    if (_api == null) return [];
+    try {
+      return await getPlaylists(favoriteOnly: true);
+    } catch (e) {
+      _logger.log('❌ Failed to fetch favorite playlists: $e');
+      return [];
+    }
+  }
+
+  /// Get favorite radio stations from the library
+  Future<List<MediaItem>> getFavoriteRadioStations() async {
+    if (_api == null) return [];
+    try {
+      final stations = await _api!.getRadioStations(favoriteOnly: true);
+      return filterByProvider(stations);
+    } catch (e) {
+      _logger.log('❌ Failed to fetch favorite radio stations: $e');
+      return [];
+    }
+  }
+
   // ============================================================================
   // AUDIOBOOK HOME SCREEN ROWS
   // ============================================================================

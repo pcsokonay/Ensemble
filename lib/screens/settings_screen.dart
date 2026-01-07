@@ -29,6 +29,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _showFavoriteAlbums = false;
   bool _showFavoriteArtists = false;
   bool _showFavoriteTracks = false;
+  bool _showFavoritePlaylists = false;
+  bool _showFavoriteRadioStations = false;
   // Audiobook home rows (default off)
   bool _showContinueListeningAudiobooks = false;
   bool _showDiscoverAudiobooks = false;
@@ -71,6 +73,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final showFavAlbums = await SettingsService.getShowFavoriteAlbums();
     final showFavArtists = await SettingsService.getShowFavoriteArtists();
     final showFavTracks = await SettingsService.getShowFavoriteTracks();
+    final showFavPlaylists = await SettingsService.getShowFavoritePlaylists();
+    final showFavRadio = await SettingsService.getShowFavoriteRadioStations();
 
     // Load audiobook home row settings
     final showContinueAudiobooks = await SettingsService.getShowContinueListeningAudiobooks();
@@ -109,6 +113,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _showFavoriteAlbums = showFavAlbums;
         _showFavoriteArtists = showFavArtists;
         _showFavoriteTracks = showFavTracks;
+        _showFavoritePlaylists = showFavPlaylists;
+        _showFavoriteRadioStations = showFavRadio;
         _showContinueListeningAudiobooks = showContinueAudiobooks;
         _showDiscoverAudiobooks = showDiscAudiobooks;
         _showDiscoverSeries = showDiscSeries;
@@ -153,6 +159,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return {'title': s.favoriteArtists, 'subtitle': s.showFavoriteArtists};
       case 'favorite-tracks':
         return {'title': s.favoriteTracks, 'subtitle': s.showFavoriteTracks};
+      case 'favorite-playlists':
+        return {'title': s.favoritePlaylists, 'subtitle': s.showFavoritePlaylists};
+      case 'favorite-radio-stations':
+        return {'title': s.favoriteRadioStations, 'subtitle': s.showFavoriteRadioStations};
       default:
         return {'title': rowId, 'subtitle': ''};
     }
@@ -179,6 +189,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return _showFavoriteArtists;
       case 'favorite-tracks':
         return _showFavoriteTracks;
+      case 'favorite-playlists':
+        return _showFavoritePlaylists;
+      case 'favorite-radio-stations':
+        return _showFavoriteRadioStations;
       default:
         return false;
     }
@@ -223,6 +237,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         case 'favorite-tracks':
           _showFavoriteTracks = value;
           SettingsService.setShowFavoriteTracks(value);
+          break;
+        case 'favorite-playlists':
+          _showFavoritePlaylists = value;
+          SettingsService.setShowFavoritePlaylists(value);
+          break;
+        case 'favorite-radio-stations':
+          _showFavoriteRadioStations = value;
+          SettingsService.setShowFavoriteRadioStations(value);
           break;
       }
     });

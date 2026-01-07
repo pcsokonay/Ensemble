@@ -251,6 +251,16 @@
     "description": "Home screen section title"
   },
 
+  "favoritePlaylists": "Favorite Playlists",
+  "@favoritePlaylists": {
+    "description": "Home screen section title"
+  },
+
+  "favoriteRadioStations": "Favorite Radio Stations",
+  "@favoriteRadioStations": {
+    "description": "Home screen section title"
+  },
+
   "searchMusic": "Search music...",
   "@searchMusic": {
     "description": "Search placeholder text"
@@ -1062,6 +1072,8 @@
   "showFavoriteAlbums": "Show a row of your favorite albums",
   "showFavoriteArtists": "Show a row of your favorite artists",
   "showFavoriteTracks": "Show a row of your favorite tracks",
+  "showFavoritePlaylists": "Show a row of your favorite playlists",
+  "showFavoriteRadioStations": "Show a row of your favorite radio stations",
   "extractColorsFromArtwork": "Extract colors from album and artist artwork",
   "chooseHomeScreenRows": "Choose which rows to display on the home screen",
   "addedToFavorites": "Added to favorites",

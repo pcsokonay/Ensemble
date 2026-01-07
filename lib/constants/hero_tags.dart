@@ -28,4 +28,16 @@ class HeroTags {
 
   /// Podcast cover hero tag prefix
   static const String podcastCover = 'podcast_cover_';
+
+  /// Playlist cover hero tag prefix
+  static const String playlistCover = 'playlist_cover_';
+
+  /// Playlist title hero tag prefix
+  static const String playlistTitle = 'playlist_title_';
+
+  /// Radio station cover hero tag prefix
+  static const String radioCover = 'radio_cover_';
+
+  /// Radio station title hero tag prefix
+  static const String radioTitle = 'radio_title_';
 }

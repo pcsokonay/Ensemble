@@ -35,6 +35,8 @@ class SettingsService {
   static const String _keyShowFavoriteAlbums = 'show_favorite_albums';
   static const String _keyShowFavoriteArtists = 'show_favorite_artists';
   static const String _keyShowFavoriteTracks = 'show_favorite_tracks';
+  static const String _keyShowFavoritePlaylists = 'show_favorite_playlists';
+  static const String _keyShowFavoriteRadioStations = 'show_favorite_radio_stations';
   static const String _keyShowOnlyArtistsWithAlbums = 'show_only_artists_with_albums'; // Library artists filter
   static const String _keyHomeRowOrder = 'home_row_order'; // JSON list of row IDs
 
@@ -49,6 +51,8 @@ class SettingsService {
     'favorite-albums',
     'favorite-artists',
     'favorite-tracks',
+    'favorite-playlists',
+    'favorite-radio-stations',
   ];
 
   // View Mode Settings
@@ -491,6 +495,26 @@ class SettingsService {
   static Future<void> setShowFavoriteTracks(bool show) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyShowFavoriteTracks, show);
+  }
+
+  static Future<bool> getShowFavoritePlaylists() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyShowFavoritePlaylists) ?? false;
+  }
+
+  static Future<void> setShowFavoritePlaylists(bool show) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyShowFavoritePlaylists, show);
+  }
+
+  static Future<bool> getShowFavoriteRadioStations() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyShowFavoriteRadioStations) ?? false;
+  }
+
+  static Future<void> setShowFavoriteRadioStations(bool show) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyShowFavoriteRadioStations, show);
   }
 
   // Library Artists Filter - show only artists that have albums in library
