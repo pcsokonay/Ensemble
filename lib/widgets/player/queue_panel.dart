@@ -55,6 +55,9 @@ class _QueuePanelState extends State<QueuePanel> {
   double _listTopOffset = 0; // Offset of the list from top of stack
   bool _pendingReorder = false; // True while waiting for API confirmation
 
+  // Optimistic update for tap-to-skip
+  int? _optimisticCurrentIndex;
+
 
   @override
   void initState() {
@@ -65,6 +68,15 @@ class _QueuePanelState extends State<QueuePanel> {
   @override
   void didUpdateWidget(QueuePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // Clear optimistic state when server catches up
+    if (_optimisticCurrentIndex != null) {
+      final serverIndex = widget.queue?.currentIndex;
+      if (serverIndex == _optimisticCurrentIndex) {
+        // Server caught up - clear optimistic state
+        _optimisticCurrentIndex = null;
+      }
+    }
 
     // Don't update items while dragging or waiting for reorder confirmation
     if (_dragIndex != null || _pendingReorder) return;
@@ -238,6 +250,33 @@ class _QueuePanelState extends State<QueuePanel> {
     widget.onDraggingChanged?.call(false);
   }
 
+  void _handleTapToSkip(QueueItem item, int index, bool isCurrentItem) async {
+    if (isCurrentItem) return;
+
+    final playerId = widget.queue?.playerId;
+    if (playerId == null) return;
+
+    // Optimistic update: immediately show tapped track as current
+    setState(() {
+      _optimisticCurrentIndex = index;
+    });
+
+    // Call API
+    try {
+      await widget.maProvider.api?.queueCommandPlayIndex(playerId, item.queueItemId);
+    } catch (e) {
+      debugPrint('QueuePanel: Error playing index: $e');
+    }
+
+    // Clear optimistic state after delay - server state will take over
+    await Future.delayed(const Duration(milliseconds: 1500));
+    if (mounted) {
+      setState(() {
+        _optimisticCurrentIndex = null;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Swipe-to-close is now handled by expandable_player's gesture-driven close
@@ -322,7 +361,8 @@ class _QueuePanelState extends State<QueuePanel> {
   }
 
   Widget _buildQueueList() {
-    final currentIndex = widget.queue!.currentIndex ?? 0;
+    // Use optimistic index if set, otherwise use server state
+    final currentIndex = _optimisticCurrentIndex ?? widget.queue!.currentIndex ?? 0;
 
     return ListView.builder(
       key: const PageStorageKey('queue_list'),
@@ -465,13 +505,7 @@ class _QueuePanelState extends State<QueuePanel> {
                 dragHandle ?? Icon(Icons.drag_handle, color: widget.textColor.withOpacity(0.3), size: 20),
               ],
             ),
-            onTap: () {
-              // Skip to this track in the queue
-              final playerId = widget.queue?.playerId;
-              if (playerId != null && !isCurrentItem) {
-                widget.maProvider.api?.queueCommandPlayIndex(playerId, item.queueItemId);
-              }
-            },
+            onTap: () => _handleTapToSkip(item, index, isCurrentItem),
           ),
         ),
       ),
