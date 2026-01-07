@@ -34,8 +34,11 @@ class RadioStationCard extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap ?? () {
           HapticFeedback.mediumImpact();
-          // Play the radio station
-          maProvider.playMedia(radioStation);
+          // Play the radio station on selected player
+          final selectedPlayer = maProvider.selectedPlayer;
+          if (selectedPlayer != null) {
+            maProvider.api?.playRadioStation(selectedPlayer.playerId, radioStation);
+          }
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
