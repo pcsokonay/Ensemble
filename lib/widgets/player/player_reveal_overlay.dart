@@ -421,7 +421,7 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                   child: Padding(
                                     padding: const EdgeInsets.only(bottom: cardSpacing),
                                     child: TweenAnimationBuilder<double>(
-                                      tween: Tween(begin: 1.0, end: shouldDarken ? 0.5 : 1.0),
+                                      tween: Tween(begin: 1.0, end: shouldDarken ? 0.75 : 1.0),
                                       duration: const Duration(milliseconds: 200),
                                       builder: (context, saturation, child) {
                                         return ColorFiltered(
@@ -469,7 +469,7 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                                 duration: const Duration(milliseconds: 200),
                                                 child: Container(
                                                   decoration: BoxDecoration(
-                                                    color: Colors.black.withOpacity(0.6),
+                                                    color: Colors.black.withOpacity(0.3),
                                                     borderRadius: BorderRadius.circular(16), // Match card radius
                                                   ),
                                                 ),
@@ -525,7 +525,7 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                             child: Padding(
                               padding: const EdgeInsets.only(bottom: 12),
                               child: TweenAnimationBuilder<double>(
-                                tween: Tween(begin: 1.0, end: shouldDarken ? 0.5 : 1.0),
+                                tween: Tween(begin: 1.0, end: shouldDarken ? 0.75 : 1.0),
                                 duration: const Duration(milliseconds: 200),
                                 builder: (context, saturation, child) {
                                   return ColorFiltered(
@@ -584,7 +584,7 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                           duration: const Duration(milliseconds: 200),
                                           child: Container(
                                             decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(0.6),
+                                              color: Colors.black.withOpacity(0.3),
                                               borderRadius: BorderRadius.circular(16), // Match card radius
                                             ),
                                           ),
