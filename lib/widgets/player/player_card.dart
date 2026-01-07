@@ -4,6 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/music_assistant_provider.dart';
 import '../../theme/design_tokens.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/debug_logger.dart';
+
+final _volumeLogger = DebugLogger();
 
 /// A player card that matches the mini player's visual style.
 /// Used in the player reveal overlay when swiping down or tapping the device button.
@@ -300,9 +303,20 @@ class _PlayerCardState extends State<PlayerCard> {
     // Otherwise, read fresh from player state
     final useLocalVolume = _hasLocalVolumeOverride && isWithinWindow;
 
+    final playerVolume = (widget.player.volumeLevel ?? 0).toDouble() / 100.0;
     final startVolume = useLocalVolume
         ? _dragVolumeLevel // Continue from where last swipe ended
-        : (widget.player.volumeLevel ?? 0).toDouble() / 100.0; // Fresh from player
+        : playerVolume; // Fresh from player
+
+    _volumeLogger.debug(
+      'DRAG_START [${widget.player.name}]: '
+      'useLocal=$useLocalVolume, hasOverride=$_hasLocalVolumeOverride, '
+      'inWindow=$isWithinWindow (${timeSinceLastDrag}ms ago), '
+      'localVol=${(_dragVolumeLevel * 100).round()}%, '
+      'playerVol=${(playerVolume * 100).round()}%, '
+      'startVol=${(startVolume * 100).round()}%',
+      context: 'Volume',
+    );
 
     setState(() {
       _isDraggingVolume = true;
@@ -339,6 +353,11 @@ class _PlayerCardState extends State<PlayerCard> {
 
   void _onDragEnd(DragEndDetails details) {
     // Send final volume on release
+    _volumeLogger.debug(
+      'DRAG_END [${widget.player.name}]: '
+      'finalVol=${(_dragVolumeLevel * 100).round()}%',
+      context: 'Volume',
+    );
     widget.onVolumeChange?.call(_dragVolumeLevel);
     _lastDragEndTime = DateTime.now().millisecondsSinceEpoch; // Track for consecutive swipes
     _hasLocalVolumeOverride = true; // Mark that we have a local volume value
