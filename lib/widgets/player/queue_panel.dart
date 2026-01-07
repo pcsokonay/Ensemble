@@ -74,12 +74,13 @@ class _QueuePanelState extends State<QueuePanel> {
 
     final newItems = widget.queue?.items ?? [];
 
-    // Sync items when player/queue changes
+    // Only sync when player changes or item count changes (additions/deletions)
+    // Don't sync on order changes - trust our local order after user reorders
+    // This prevents stale server state from overwriting recent local changes
     final playerChanged = widget.queue?.playerId != oldWidget.queue?.playerId;
     final countChanged = newItems.length != _items.length;
-    final orderChanged = !_itemListsEqual(newItems, _items);
 
-    if (playerChanged || countChanged || orderChanged) {
+    if (playerChanged || countChanged) {
       setState(() {
         _items = List.from(newItems);
       });
