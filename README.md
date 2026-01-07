@@ -20,44 +20,63 @@ This application was built with AI-assisted development using **Claude Code** an
 ## Features
 
 ### Local Playback
-- **Stream to Your Phone** - Play music from your Music Assistant library directly on your mobile device
+- **Stream to Your Phone** - Play music from your Music Assistant library directly on your mobile device via Sendspin protocol
 - **Background Playback** - Music continues playing when the app is minimized
 - **Media Notifications** - Control playback from your notification shade with album art display
+- **Instant Response** - Pause/resume in ~300ms
 
 ### Remote Control
 - **Multi-Player Support** - Control any speaker or device connected to Music Assistant
-- **Device Selector** - Quickly switch between your phone and other players
+- **Device Selector** - Swipe down on mini player to reveal all your devices
+- **Multi-Room Grouping** - Long-press any player to sync it with the current player
 - **Full Playback Controls** - Play, pause, skip, seek, and adjust volume
-- **Queue Management** - View and manage the playback queue
+- **Volume Precision Mode** - Hold the volume slider for fine-grained control with haptic feedback
+- **Power Control** - Turn players on/off directly from the mini player
+
+### Queue Management
+- **View & Manage Queue** - See upcoming tracks in the playback queue
+- **Drag to Reorder** - Instant drag handles for reordering tracks
+- **Swipe to Delete** - Remove tracks with a simple swipe gesture
 
 ### Home Screen
-- **Customizable Rows** - Toggle Recently Played, Discover Artists, and Discover Albums
-- **Favorites Rows** - Optional rows for Favorite Albums, Artists, and Tracks
+- **Customizable Rows** - Toggle and reorder: Recently Played, Discover Artists, Discover Albums
+- **Favorites Rows** - Optional rows for Favorite Albums, Artists, Tracks, Playlists, and Radio Stations
 - **Adaptive Layout** - Rows scale properly for different screen sizes and aspect ratios
 - **Pull to Refresh** - Refresh content with a simple pull gesture
 
-### Library Browsing
-- **Browse Your Collection** - Artists, albums, playlists, and tracks from all your music sources
+### Library
+- **Music** - Browse artists, albums, playlists, and tracks from all your music sources
+- **Radio Stations** - Browse and play radio stations with list or grid view
+- **Podcasts** - Browse podcasts, view episodes with descriptions and publish dates
+- **Audiobooks** - Browse by title, series, or author with progress tracking
 - **Favorites Filter** - Toggle to show only your favorite items
-- **Album Details** - View track listings with artwork
-- **Artist Details** - View artist albums and top tracks
-- **Playlist Support** - Browse and play your playlists
-- **Search** - Find music across your entire library
+- **Letter Scrollbar** - Fast navigation through long lists
+
+### Search
+- **Universal Search** - Find music, podcasts, radio stations, playlists, and audiobooks
+- **Fuzzy Matching** - Typo-tolerant search (e.g., "beetles" finds "Beatles")
+- **Smart Scoring** - Results ranked by relevance with colored type indicators
+- **Search History** - Quickly access your recent searches
+- **Quick Actions** - Long-press any result to add to queue or play next
 
 ### Audiobooks
-- **Audiobooks Tab** - Browse your audiobook library with grid/list view options
-- **Series Support** - View audiobooks organized by series with collage cover art
-- **Author Browsing** - Browse audiobooks by author
 - **Chapter Navigation** - Jump between chapters with timestamp display
 - **Progress Tracking** - Track your listening progress across sessions
 - **Continue Listening** - Pick up where you left off
 - **Mark as Finished/Unplayed** - Manage your reading progress
+- **Series Support** - View audiobooks organized by series with collage cover art
+
+### Podcasts
+- **Episode Browser** - View full episode list with artwork and descriptions
+- **Skip Controls** - Skip forward/backward during playback
+- **High-Resolution Artwork** - Fetched via iTunes for best quality
 
 ### Smart Features
 - **Instant App Restore** - App loads instantly with cached library data while syncing in background
 - **Auto-Reconnect** - Automatically reconnects when connection is lost
 - **Offline Browsing** - Browse your cached library even when disconnected
 - **Hero Animations** - Smooth transitions between screens
+- **Welcome Screen** - Guided onboarding for first-time users
 
 ### Theming
 - **Material You** - Dynamic theming based on your device's wallpaper
@@ -86,9 +105,29 @@ Download the latest release from the [Releases page](https://github.com/CollotsS
 ## Setup
 
 1. Launch the app
-2. Enter your Music Assistant server URL (e.g., `music.example.com` or `192.168.1.100`)
+2. Enter your Music Assistant server URL
 3. Connect to your server
-4. Start playing! Music plays on your phone by default, or tap the device icon to choose a different player.
+4. Start playing! Music plays on your phone by default, or swipe down on the mini player to choose a different player.
+
+### Finding Your Server URL
+
+**Important:** You need the **Music Assistant** URL, not your Home Assistant URL.
+
+To find the correct URL:
+1. Open Music Assistant web UI
+2. Go to **Settings** > **About**
+3. Look for **Base URL** (e.g., `http://192.168.1.100:8095`)
+
+### Home Assistant Add-on Users
+
+If you run Music Assistant as a Home Assistant add-on:
+- Use the IP address of your Home Assistant server
+- Enter `8095` in the port field
+- Do **not** use your Home Assistant URL or ingress URL
+
+### Remote Access
+
+For access outside your home network, you'll need to expose Music Assistant through a reverse proxy (e.g., Nginx Proxy Manager, Cloudflare Tunnel).
 
 ## Authentication
 
@@ -105,7 +144,7 @@ Ensemble supports multiple authentication methods:
 
 ## Requirements
 
-- Music Assistant server (v2.7.0 beta 20 or later)
+- Music Assistant server (v2.7.0 beta 20 or later recommended)
 - Network connectivity to your Music Assistant server
 - Android device (Android 5.0+)
 - Audiobookshelf provider configured in Music Assistant (for audiobook features)
