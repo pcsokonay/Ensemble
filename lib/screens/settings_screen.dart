@@ -287,13 +287,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Logo - same size as login screen (50% of screen width)
+            // Use color filter to make logo dark in light theme
             Padding(
               padding: const EdgeInsets.only(top: 8.0, bottom: 48.0),
-              child: Image.asset(
-                'assets/images/ensemble_icon_transparent.png',
-                width: MediaQuery.of(context).size.width * 0.5,
-                fit: BoxFit.contain,
-              ),
+              child: Theme.of(context).brightness == Brightness.light
+                  ? ColorFiltered(
+                      colorFilter: const ColorFilter.mode(
+                        Color(0xFF1a1a1a), // Dark color for light theme
+                        BlendMode.srcIn,
+                      ),
+                      child: Image.asset(
+                        'assets/images/ensemble_icon_transparent.png',
+                        width: MediaQuery.of(context).size.width * 0.5,
+                        fit: BoxFit.contain,
+                      ),
+                    )
+                  : Image.asset(
+                      'assets/images/ensemble_icon_transparent.png',
+                      width: MediaQuery.of(context).size.width * 0.5,
+                      fit: BoxFit.contain,
+                    ),
             ),
 
             // Connection status box - centered with border radius like theme boxes

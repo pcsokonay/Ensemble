@@ -1245,10 +1245,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final collapsedTextColor = themeProvider.adaptiveTheme && adaptiveScheme != null
         ? adaptiveScheme.onPrimaryContainer
         : colorScheme.onPrimaryContainer;
-    final expandedTextColor = adaptiveScheme?.onSurface ?? Colors.white;
+    // Use colorScheme.onSurface as fallback instead of Colors.white for light theme support
+    final expandedTextColor = adaptiveScheme?.onSurface ?? colorScheme.onSurface;
     final textColor = Color.lerp(collapsedTextColor, expandedTextColor, t)!;
 
-    final primaryColor = adaptiveScheme?.primary ?? Colors.white;
+    // Use colorScheme.primary as fallback instead of Colors.white for light theme support
+    final primaryColor = adaptiveScheme?.primary ?? colorScheme.primary;
 
     // Always position above bottom nav bar
     // Overlap by 2px when expanded to eliminate any subpixel rendering gaps
@@ -2446,11 +2448,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   }
 
   Widget _buildPlaceholderArt(ColorScheme colorScheme, double t) {
+    // Use theme-aware colors for both collapsed and expanded states
+    final expandedBgColor = colorScheme.surfaceContainerHighest;
+    final expandedIconColor = colorScheme.onSurface.withOpacity(0.24);
     return Container(
-      color: Color.lerp(colorScheme.surfaceVariant, const Color(0xFF2a2a2a), t),
+      color: Color.lerp(colorScheme.surfaceVariant, expandedBgColor, t),
       child: Icon(
         Icons.music_note_rounded,
-        color: Color.lerp(colorScheme.onSurfaceVariant, Colors.white24, t),
+        color: Color.lerp(colorScheme.onSurfaceVariant, expandedIconColor, t),
         size: _lerpDouble(24, 120, t),
       ),
     );

@@ -71,13 +71,16 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Set system UI overlay style
+  // Set initial system UI overlay style based on platform brightness
+  // SystemUIWrapper will update this dynamically when theme changes
+  final platformBrightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+  final isDark = platformBrightness == Brightness.dark;
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
+    SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF1a1a1a),
-      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor: isDark ? const Color(0xFF1a1a1a) : const Color(0xFFF5F5F5),
+      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
     ),
   );
 
@@ -339,8 +342,8 @@ class _SystemUIWrapperState extends State<SystemUIWrapper> {
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
           systemNavigationBarColor: isDark
-              ? widget.darkColorScheme.background
-              : widget.lightColorScheme.background,
+              ? widget.darkColorScheme.surface
+              : widget.lightColorScheme.surface,
           systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         ),
       );
