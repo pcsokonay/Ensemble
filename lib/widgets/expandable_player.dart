@@ -603,7 +603,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   /// Open queue panel with spring physics for natural feel
   void _openQueuePanelWithSpring() {
     HapticFeedback.lightImpact();
-    _queuePanelTargetOpen = true; // Set target state immediately
+    // setState ensures PopScope rebuilds with correct canPop value
+    setState(() {
+      _queuePanelTargetOpen = true;
+    });
     // Use overdamped spring - settles cleanly without oscillation or snap
     final simulation = SpringSimulation(
       _queueSpring,
@@ -617,7 +620,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   /// Close queue panel with spring physics
   /// [withHaptic]: Set to false for Android back gesture (system provides haptic)
   void _closeQueuePanelWithSpring({double velocity = 0.0, bool withHaptic = true}) {
-    _queuePanelTargetOpen = false; // Set target state immediately
+    // setState ensures PopScope rebuilds with correct canPop value
+    setState(() {
+      _queuePanelTargetOpen = false;
+    });
     if (withHaptic) {
       HapticFeedback.lightImpact();
     }
