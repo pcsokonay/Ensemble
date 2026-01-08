@@ -48,7 +48,6 @@ class _VolumeControlState extends State<VolumeControl> {
 
   // Hint display state
   bool _showHints = true;
-  bool _showPrecisionHint = false;
 
   // Button tap indicator state
   bool _showButtonIndicator = false;
@@ -98,18 +97,16 @@ class _VolumeControlState extends State<VolumeControl> {
       _inPrecisionMode = true;
       _precisionZoomCenter = _pendingVolume ?? 0.5;
       _precisionStartX = _lastLocalX;
-      if (_showHints) {
-        _showPrecisionHint = true;
-      }
     });
 
-    // Hide hint after 2 seconds
-    if (_showHints) {
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          setState(() => _showPrecisionHint = false);
-        }
-      });
+    // Show snackbar hint if hints are enabled
+    if (_showHints && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Precision mode enabled'),
+          duration: Duration(seconds: 1),
+        ),
+      );
     }
   }
 
@@ -119,7 +116,6 @@ class _VolumeControlState extends State<VolumeControl> {
     if (_inPrecisionMode) {
       setState(() {
         _inPrecisionMode = false;
-        _showPrecisionHint = false;
       });
     }
   }
@@ -199,8 +195,9 @@ class _VolumeControlState extends State<VolumeControl> {
 
     _isLocalPlayer = _localPlayerId != null && player.playerId == _localPlayerId;
 
-    final currentVolume = _isDragging
-        ? (_pendingVolume ?? 0.5)
+    // Use pending volume during drag or button tap to prevent stale state issues
+    final currentVolume = (_isDragging || _showButtonIndicator)
+        ? (_pendingVolume ?? (_isLocalPlayer ? (_systemVolume ?? 0.5) : player.volume.toDouble() / 100.0))
         : _isLocalPlayer
             ? (_systemVolume ?? 0.5)
             : player.volume.toDouble() / 100.0;
@@ -358,30 +355,6 @@ class _VolumeControlState extends State<VolumeControl> {
                           painter: _TeardropPainter(
                             color: _inPrecisionMode ? accentColor : Colors.white,
                             volume: (currentVolume * 100).round(),
-                          ),
-                        ),
-                      ),
-                    // Precision mode hint (only when hints enabled)
-                    if (_showPrecisionHint)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        top: -52,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: accentColor,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              'Precision mode',
-                              style: TextStyle(
-                                color: accentColor.computeLuminance() > 0.5 ? Colors.black : Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
                           ),
                         ),
                       ),
