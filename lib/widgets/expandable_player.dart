@@ -2445,37 +2445,23 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                                     _isQueueDragging = isDragging;
                                   },
                                   onSwipeStart: () {
-                                    // Stop any running animation before gesture control
-                                    _queuePanelController.stop();
-                                    // Haptic feedback when swipe gesture starts
+                                    // Haptic feedback when swipe gesture recognized
                                     HapticFeedback.selectionClick();
                                   },
-                                  onSwipeUpdate: (dx) {
-                                    // dx is distance from swipe start, convert to controller value
-                                    // Panel is open at value=1, closed at value=0
-                                    final screenWidth = MediaQuery.of(context).size.width;
-                                    final newValue = (1.0 - dx / screenWidth).clamp(0.0, 1.0);
-                                    _queuePanelController.value = newValue;
+                                  onSwipeUpdate: (_) {
+                                    // No finger tracking - just wait for swipe end
+                                    // This avoids jank from direct value manipulation
                                   },
-                                  onSwipeEnd: (velocity) {
-                                    // Decide whether to close or snap back based on velocity and position
-                                    // Lower threshold (200) for easier close, and be more forgiving with position (0.65)
-                                    final currentValue = _queuePanelController.value;
-                                    final shouldClose = velocity > 200 || (velocity >= 0 && currentValue < 0.65);
+                                  onSwipeEnd: (velocity, totalDx) {
+                                    // Decide based on velocity and total displacement
+                                    final screenWidth = MediaQuery.of(context).size.width;
+                                    final swipeProgress = totalDx / screenWidth;
+                                    final shouldClose = velocity > 150 || swipeProgress > 0.25;
 
                                     if (shouldClose) {
-                                      // Use spring physics with velocity for natural feel
-                                      _closeQueuePanelWithSpring(velocity: velocity / 500);
-                                    } else {
-                                      // Snap back with overdamped spring - no oscillation
-                                      final simulation = SpringSimulation(
-                                        _queueSpring,
-                                        _queuePanelController.value,
-                                        1.0,
-                                        -velocity / 500, // Convert velocity to spring units
-                                      );
-                                      _queuePanelController.animateWith(simulation);
+                                      _closeQueuePanelWithSpring();
                                     }
+                                    // If not closing, panel stays open (no snap-back needed since we didn't move it)
                                   },
                                 ),
                         ),

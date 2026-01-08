@@ -26,7 +26,7 @@ class QueuePanel extends StatefulWidget {
   final ValueChanged<bool>? onDraggingChanged;
   final VoidCallback? onSwipeStart;
   final ValueChanged<double>? onSwipeUpdate; // dx delta from start
-  final ValueChanged<double>? onSwipeEnd; // velocity
+  final void Function(double velocity, double totalDx)? onSwipeEnd; // velocity and total displacement
 
   const QueuePanel({
     super.key,
@@ -417,19 +417,16 @@ class _QueuePanelState extends State<QueuePanel> {
         }
       },
       onPointerUp: (event) {
-        if (_isSwiping) {
-          // Use averaged velocity for smoother behavior
+        if (_isSwiping && _swipeStart != null) {
           final velocity = _calculateAverageVelocity();
-          // Also consider total displacement for slow swipes
           final totalDx = event.position.dx - _swipeStart!.dx;
-          final effectiveVelocity = velocity > 50 ? velocity : (totalDx > 80 ? 300.0 : 0.0);
-          widget.onSwipeEnd?.call(effectiveVelocity);
+          widget.onSwipeEnd?.call(velocity, totalDx);
         }
         _resetSwipeState();
       },
       onPointerCancel: (_) {
         if (_isSwiping) {
-          widget.onSwipeEnd?.call(0); // Cancel with zero velocity = snap back
+          widget.onSwipeEnd?.call(0, 0); // Cancel - no action
         }
         _resetSwipeState();
       },
