@@ -1420,26 +1420,29 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Art sizing - larger on bigger screens, max 85% of width
     final maxArtSize = screenSize.width - (contentPadding * 2);
     final expandedArtSize = (maxArtSize * 0.92).clamp(280.0, 400.0);
-    final artSize = _lerpDouble(_collapsedArtSize, expandedArtSize, t);
     final artBorderRadius = _lerpDouble(0, 12, t); // Square in mini player, rounded when expanded
 
-    // Art position - uses curved interpolation for Hero-like arc animation
-    // X moves faster (centers early), Y moves slower (gradual rise)
+    // Art position - uses MaterialRectCenterArcTween for Hero-like curved arc path
+    // This creates a natural arc trajectory instead of straight diagonal movement
     final collapsedArtLeft = 0.0;
+    final collapsedArtTop = (_collapsedHeight - _collapsedArtSize) / 2;
     final expandedArtLeft = (screenSize.width - expandedArtSize) / 2;
-    final artLeft = _lerpX(collapsedArtLeft, expandedArtLeft, t);
-
-    final collapsedArtTop = (_collapsedHeight - _collapsedArtSize) / 2; // Center vertically
     final expandedArtTop = topPadding + headerHeight + 16;
-    final artTop = _lerpY(collapsedArtTop, expandedArtTop, t);
+
+    final collapsedArtRect = Rect.fromLTWH(collapsedArtLeft, collapsedArtTop, _collapsedArtSize, _collapsedArtSize);
+    final expandedArtRect = Rect.fromLTWH(expandedArtLeft, expandedArtTop, expandedArtSize, expandedArtSize);
+    final artRect = MaterialRectCenterArcTween(begin: collapsedArtRect, end: expandedArtRect).lerp(t)!;
+    final artLeft = artRect.left;
+    final artTop = artRect.top;
+    final artSize = artRect.width;
 
     // Typography - uses shared MiniPlayerLayout constants for collapsed state
     final titleFontSize = _lerpDouble(MiniPlayerLayout.primaryFontSize, 24.0, t);
     final artistFontSize = _lerpDouble(MiniPlayerLayout.secondaryFontSize, 18.0, t);
 
-    // Text position - uses curved interpolation for Hero-like arc animation
+    // Text position - left edge position (alignment handles centering smoothly)
     final expandedTitleLeft = contentPadding;
-    final titleLeft = _lerpX(MiniPlayerLayout.textLeft, expandedTitleLeft, t);
+    final titleLeft = _lerpDouble(MiniPlayerLayout.textLeft, expandedTitleLeft, t);
 
     final collapsedTitleTop = MiniPlayerLayout.primaryTop;
 
@@ -1498,18 +1501,18 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Center the track info block in available space
     final trackInfoTopMargin = (availableSpace - trackInfoBlockHeight) / 2;
     final expandedTitleTop = artBottom + trackInfoTopMargin;
-    final titleTop = _lerpY(collapsedTitleTop, expandedTitleTop, t);
+    final titleTop = _lerpDouble(collapsedTitleTop, expandedTitleTop, t);
 
     // Artist positioned dynamically based on actual title height
     final collapsedArtistTop = MiniPlayerLayout.secondaryTop;
     final expandedArtistTop = expandedTitleTop + expandedTitleHeight + titleToArtistGap;
-    final artistTop = _lerpY(collapsedArtistTop, expandedArtistTop, t);
+    final artistTop = _lerpDouble(collapsedArtistTop, expandedArtistTop, t);
 
     // Player name - animated to move with other text elements
     // Starts at tertiary position, animates toward artist position as it fades out
     final collapsedPlayerNameTop = MiniPlayerLayout.tertiaryTop;
     final expandedPlayerNameTop = expandedArtistTop; // Animates toward artist final position
-    final playerNameTop = _lerpY(collapsedPlayerNameTop, expandedPlayerNameTop, t);
+    final playerNameTop = _lerpDouble(collapsedPlayerNameTop, expandedPlayerNameTop, t);
 
     // Album - subtle, below artist
     final expandedAlbumTop = expandedArtistTop + artistHeight + artistToAlbumGap;
@@ -1518,7 +1521,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final collapsedControlsRight = 8.0;
     final collapsedControlsTop = (_collapsedHeight - 34) / 2 - 6;
     final expandedControlsTop = expandedProgressTop + 64;
-    final controlsTop = _lerpY(collapsedControlsTop, expandedControlsTop, t);
+    final controlsTop = _lerpDouble(collapsedControlsTop, expandedControlsTop, t);
 
     // Button sizes - larger in expanded for better touch targets
     final skipButtonSize = _lerpDouble(28, 36, t);
@@ -1931,25 +1934,32 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
                 // Track title - with slide animation when collapsed
                 // Hidden when hint is visible
+                // Uses Align.lerp for smooth left-to-center transition (textAlign can't be animated)
                 if (!(widget.isHintVisible && t < 0.5) && !(_inTransition && t < 0.1 && _peekPlayer != null))
                   Positioned(
                     left: titleLeft + miniPlayerSlideOffset,
                     top: titleTop,
                     child: SizedBox(
                       width: titleWidth,
-                      child: Text(
-                        currentTrack.name,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: titleFontSize,
-                          fontWeight: t > 0.5 ? FontWeight.w600 : MiniPlayerLayout.primaryFontWeight,
-                          letterSpacing: t > 0.5 ? -0.5 : 0,
-                          height: t > 0.5 ? 1.2 : null, // Only use line height when expanded
+                      child: Align(
+                        // Smooth transition from left-aligned to centered
+                        alignment: Alignment.lerp(Alignment.centerLeft, Alignment.center, t)!,
+                        child: Text(
+                          currentTrack.name,
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: titleFontSize,
+                            // Lerp font weight smoothly (w500 to w600)
+                            fontWeight: FontWeight.lerp(MiniPlayerLayout.primaryFontWeight, FontWeight.w600, t),
+                            // Lerp letter spacing smoothly (0 to -0.5)
+                            letterSpacing: _lerpDouble(0, -0.5, t),
+                            // Lerp line height smoothly (1.0 default to 1.2)
+                            height: _lerpDouble(1.0, 1.2, t),
+                          ),
+                          textAlign: TextAlign.left, // Keep static, Align handles centering
+                          maxLines: 2, // Allow 2 lines throughout, text will naturally use 1 when short
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
-                        maxLines: t > 0.5 ? 2 : 1,
-                        softWrap: t > 0.5, // false in collapsed to ensure ellipsis truncation
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
@@ -1960,49 +1970,61 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                 // For audiobooks: show author from audiobook context
                 // Hidden during transition to prevent flash
                 // FALLBACK: Show if transition active but no peek content available
-                // GPU PERF: Use conditional instead of Opacity to avoid saveLayer
+                // Uses Align.lerp for smooth left-to-center transition
                 if (!(_inTransition && t < 0.1 && _peekPlayer != null) && !(widget.isHintVisible && t < 0.5))
                   Positioned(
                     left: titleLeft + miniPlayerSlideOffset,
                     top: artistTop,
                     child: SizedBox(
                       width: titleWidth,
-                      child: Text(
-                        // Always show artist/author/podcast name (was showing "Now Playing" when device reveal visible)
-                        maProvider.isPlayingAudiobook
-                            ? (maProvider.currentAudiobook?.authorsString ?? S.of(context)!.unknownAuthor)
-                            : maProvider.isPlayingPodcast
-                                ? (maProvider.currentPodcastName ?? S.of(context)!.podcasts)
-                                : currentTrack.artistsString,
-                        style: TextStyle(
-                          color: textColor.withOpacity(t > 0.5 ? 0.7 : MiniPlayerLayout.secondaryTextOpacity),
-                          fontSize: artistFontSize,
-                          fontWeight: t > 0.5 ? FontWeight.w400 : FontWeight.normal,
+                      child: Align(
+                        // Smooth transition from left-aligned to centered
+                        alignment: Alignment.lerp(Alignment.centerLeft, Alignment.center, t)!,
+                        child: Text(
+                          // Always show artist/author/podcast name (was showing "Now Playing" when device reveal visible)
+                          maProvider.isPlayingAudiobook
+                              ? (maProvider.currentAudiobook?.authorsString ?? S.of(context)!.unknownAuthor)
+                              : maProvider.isPlayingPodcast
+                                  ? (maProvider.currentPodcastName ?? S.of(context)!.podcasts)
+                                  : currentTrack.artistsString,
+                          style: TextStyle(
+                            // Lerp opacity smoothly
+                            color: textColor.withOpacity(_lerpDouble(MiniPlayerLayout.secondaryTextOpacity, 0.7, t)),
+                            fontSize: artistFontSize,
+                            // Lerp font weight smoothly
+                            fontWeight: FontWeight.lerp(FontWeight.normal, FontWeight.w400, t),
+                          ),
+                          textAlign: TextAlign.left, // Keep static, Align handles centering
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        textAlign: t > 0.5 ? TextAlign.center : TextAlign.left,
-                        maxLines: 1,
-                        softWrap: t > 0.5, // false in collapsed to ensure ellipsis truncation
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
 
-                // Player name - third line, only visible when collapsed
-                // Same size as artist, same color as track
+                // Player name - third line, fades out during first half of expansion
+                // Uses staggered opacity: fully visible at t=0, fully faded at t=0.4
+                // Position animates smoothly throughout
                 if (t < 0.5 && !(_inTransition && t < 0.1 && _peekPlayer != null) && !(widget.isHintVisible && t < 0.5))
                   Positioned(
                     left: titleLeft + miniPlayerSlideOffset,
                     top: playerNameTop,
                     child: SizedBox(
                       width: titleWidth,
-                      child: Text(
-                        selectedPlayer.name,
-                        style: TextStyle(
-                          color: textColor.withOpacity(1.0 - t * 2), // Fade out as expanding
-                          fontSize: MiniPlayerLayout.tertiaryFontSize,
+                      child: Align(
+                        // Smooth transition from left-aligned to centered
+                        alignment: Alignment.lerp(Alignment.centerLeft, Alignment.center, t)!,
+                        child: Text(
+                          selectedPlayer.name,
+                          style: TextStyle(
+                            // Staggered fade: 1.0 at t=0, 0.0 at t=0.4
+                            color: textColor.withOpacity((1.0 - t / 0.4).clamp(0.0, 1.0)),
+                            fontSize: MiniPlayerLayout.tertiaryFontSize,
+                          ),
+                          textAlign: TextAlign.left, // Keep static, Align handles centering
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
@@ -2287,11 +2309,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                             )
                           // Wrap in Align for smooth transition from right to center
                           : Align(
-                    // Curved alignment: x moves from 1.0 (right) to 0.0 (center) with easeOutQuad
-                    alignment: Alignment(_lerpX(1.0, 0.0, t), 0),
-                    child: Padding(
-                    // Right padding in collapsed state, fades to 0 when expanded
-                    padding: EdgeInsets.only(right: _lerpX(collapsedControlsRight - miniPlayerSlideOffset, 0, t)),
+                    // Smooth alignment: lerp from right (1.0) to center (0.0)
+                    alignment: Alignment.lerp(
+                      Alignment(1.0 - (collapsedControlsRight / (width / 2)), 0), // Right with margin
+                      Alignment.center,
+                      t,
+                    )!,
                     child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2352,7 +2375,6 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                           onPressed: _isLoadingQueue ? null : _cycleRepeat,
                         ),
                     ],
-                  ),
                   ),
                 ),
                 ),
@@ -2913,23 +2935,5 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
   double _lerpDouble(double a, double b, double t) {
     return a + (b - a) * t;
-  }
-
-  /// Curved interpolation for X axis - faster ease-out for horizontal centering
-  /// Elements center horizontally early in the animation, creating an arc path
-  double _lerpX(double a, double b, double t) {
-    // Use easeOutQuad - horizontal movement completes early
-    final curvedT = 1 - (1 - t) * (1 - t);
-    return a + (b - a) * curvedT;
-  }
-
-  /// Curved interpolation for Y axis - slower ease-in-out for vertical movement
-  /// Elements move up gradually, creating smooth arc when combined with _lerpX
-  double _lerpY(double a, double b, double t) {
-    // Use easeInOutCubic - vertical movement is gradual
-    final curvedT = t < 0.5
-        ? 4 * t * t * t
-        : 1 - ((-2 * t + 2) * (-2 * t + 2) * (-2 * t + 2)) / 2;
-    return a + (b - a) * curvedT;
   }
 }
