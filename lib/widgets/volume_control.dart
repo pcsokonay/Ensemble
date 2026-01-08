@@ -362,12 +362,12 @@ class _VolumeControlState extends State<VolumeControl> {
                           ),
                         ),
                       ),
-                    // Precision mode hint (styled like snackbar, below slider)
+                    // Precision mode hint (styled like snackbar, above slider)
                     if (_showPrecisionHint)
                       Positioned(
                         left: 0,
                         right: 0,
-                        bottom: -36,
+                        top: -40,
                         child: Center(
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
