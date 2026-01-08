@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -176,15 +177,17 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Animation debugging - record every frame
     _controller.addListener(_recordAnimationFrame);
 
-    // Queue panel animation
+    // Queue panel animation - spring physics for smoother motion
     _queuePanelController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
     _queuePanelAnimation = CurvedAnimation(
       parent: _queuePanelController,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
+      // Use fastOutSlowIn for smoother deceleration on open
+      curve: Curves.fastOutSlowIn,
+      // Use easeOutCubic for snappy close
+      reverseCurve: Curves.easeOutCubic,
     );
 
     // Slide animation for device switching - used for snap/spring animations
@@ -285,8 +288,15 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   // Animation durations - asymmetric for snappier collapse
   static const Duration _expandDuration = Duration(milliseconds: 280);
   static const Duration _collapseDuration = Duration(milliseconds: 200);
-  static const Duration _queueOpenDuration = Duration(milliseconds: 250);
-  static const Duration _queueCloseDuration = Duration(milliseconds: 180);
+  static const Duration _queueOpenDuration = Duration(milliseconds: 320);
+  static const Duration _queueCloseDuration = Duration(milliseconds: 220);
+
+  // Spring description for queue panel animations
+  static const SpringDescription _queueSpring = SpringDescription(
+    mass: 1.0,
+    stiffness: 300.0,
+    damping: 25.0,
+  );
 
   void expand() {
     if (_isVerticalDragging) return;
@@ -580,12 +590,40 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   void _toggleQueuePanel() {
     if (_queuePanelController.isAnimating) return;
     if (_queuePanelController.value == 0) {
-      _queuePanelController.duration = _queueOpenDuration;
-      _queuePanelController.forward();
+      _openQueuePanelWithSpring();
     } else {
-      _queuePanelController.duration = _queueCloseDuration;
-      _queuePanelController.reverse();
+      _closeQueuePanelWithSpring();
     }
+  }
+
+  /// Open queue panel with spring physics for natural feel
+  void _openQueuePanelWithSpring() {
+    HapticFeedback.lightImpact();
+    final simulation = SpringSimulation(
+      _queueSpring,
+      _queuePanelController.value,
+      1.0,
+      0.0, // velocity
+    );
+    _queuePanelController.animateWith(simulation);
+  }
+
+  /// Close queue panel with spring physics
+  void _closeQueuePanelWithSpring({double velocity = 0.0}) {
+    HapticFeedback.lightImpact();
+    // Use slightly stiffer spring for close to feel snappy
+    const closeSpring = SpringDescription(
+      mass: 1.0,
+      stiffness: 350.0,
+      damping: 28.0,
+    );
+    final simulation = SpringSimulation(
+      closeSpring,
+      _queuePanelController.value,
+      0.0,
+      velocity,
+    );
+    _queuePanelController.animateWith(simulation);
   }
 
   bool get isQueuePanelOpen => _queuePanelController.value > 0.5;
@@ -593,8 +631,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   /// Close queue panel if open (for external access via GlobalPlayerOverlay)
   void closeQueuePanel() {
     if (isQueuePanelOpen && !_queuePanelController.isAnimating) {
-      _queuePanelController.duration = _queueCloseDuration;
-      _queuePanelController.reverse();
+      _closeQueuePanelWithSpring();
     }
   }
 
@@ -2407,6 +2444,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                                   onSwipeStart: () {
                                     // Stop any running animation before gesture control
                                     _queuePanelController.stop();
+                                    // Haptic feedback when swipe gesture starts
+                                    HapticFeedback.selectionClick();
                                   },
                                   onSwipeUpdate: (dx) {
                                     // dx is distance from swipe start, convert to controller value
@@ -2417,15 +2456,22 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                                   },
                                   onSwipeEnd: (velocity) {
                                     // Decide whether to close or snap back based on velocity and position
+                                    // Lower threshold (200) for easier close, and be more forgiving with position (0.65)
                                     final currentValue = _queuePanelController.value;
-                                    final shouldClose = velocity > 300 || (velocity >= 0 && currentValue < 0.5);
+                                    final shouldClose = velocity > 200 || (velocity >= 0 && currentValue < 0.65);
 
                                     if (shouldClose) {
-                                      _queuePanelController.duration = _queueCloseDuration;
-                                      _queuePanelController.reverse();
+                                      // Use spring physics with velocity for natural feel
+                                      _closeQueuePanelWithSpring(velocity: velocity / 500);
                                     } else {
-                                      _queuePanelController.duration = _queueOpenDuration;
-                                      _queuePanelController.forward();
+                                      // Snap back with spring
+                                      final simulation = SpringSimulation(
+                                        _queueSpring,
+                                        _queuePanelController.value,
+                                        1.0,
+                                        -velocity / 500, // Convert velocity to spring units
+                                      );
+                                      _queuePanelController.animateWith(simulation);
                                     }
                                   },
                                 ),

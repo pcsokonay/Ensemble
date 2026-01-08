@@ -72,7 +72,12 @@ class _QueuePanelState extends State<QueuePanel> {
   Offset? _swipeLast;
   int? _swipeLastTime; // milliseconds since epoch
   bool _isSwiping = false;
-  static const _swipeMinDistance = 10.0; // Min distance to start tracking
+  bool _swipeLocked = false; // Lock direction once established
+  static const _swipeMinDistance = 8.0; // Min distance to start tracking (reduced for responsiveness)
+
+  // Velocity tracking with multiple samples for smoother calculation
+  final List<_VelocitySample> _velocitySamples = [];
+  static const _maxVelocitySamples = 5;
 
 
   @override
@@ -163,6 +168,38 @@ class _QueuePanelState extends State<QueuePanel> {
     _swipeLast = null;
     _swipeLastTime = null;
     _isSwiping = false;
+    _swipeLocked = false;
+    _velocitySamples.clear();
+  }
+
+  void _addVelocitySample(Offset position, int timeMs) {
+    _velocitySamples.add(_VelocitySample(position, timeMs));
+    if (_velocitySamples.length > _maxVelocitySamples) {
+      _velocitySamples.removeAt(0);
+    }
+  }
+
+  double _calculateAverageVelocity() {
+    if (_velocitySamples.length < 2) return 0.0;
+
+    // Use weighted average of recent samples (more recent = higher weight)
+    double totalVelocity = 0.0;
+    double totalWeight = 0.0;
+
+    for (int i = 1; i < _velocitySamples.length; i++) {
+      final prev = _velocitySamples[i - 1];
+      final curr = _velocitySamples[i];
+      final dt = curr.timeMs - prev.timeMs;
+      if (dt > 0 && dt < 100) { // Only use samples within 100ms
+        final dx = curr.position.dx - prev.position.dx;
+        final velocity = (dx / dt) * 1000; // px/s
+        final weight = i.toDouble(); // Later samples get higher weight
+        totalVelocity += velocity * weight;
+        totalWeight += weight;
+      }
+    }
+
+    return totalWeight > 0 ? totalVelocity / totalWeight : 0.0;
   }
 
   void _startDrag(int index, BuildContext itemContext, Offset globalPosition) {
@@ -340,6 +377,9 @@ class _QueuePanelState extends State<QueuePanel> {
           _swipeLast = event.position;
           _swipeLastTime = DateTime.now().millisecondsSinceEpoch;
           _isSwiping = false;
+          _swipeLocked = false;
+          _velocitySamples.clear();
+          _addVelocitySample(event.position, _swipeLastTime!);
         }
       },
       onPointerMove: (event) {
@@ -347,37 +387,43 @@ class _QueuePanelState extends State<QueuePanel> {
 
         final dx = event.position.dx - _swipeStart!.dx;
         final dy = (event.position.dy - _swipeStart!.dy).abs();
+        final now = DateTime.now().millisecondsSinceEpoch;
 
-        // Check if this is a horizontal swipe (dx > dy * 1.5 for more tolerance)
-        final isHorizontal = dx.abs() > _swipeMinDistance && dx.abs() > dy * 1.5;
+        // Track all move events for velocity calculation
+        _addVelocitySample(event.position, now);
+        _swipeLast = event.position;
+        _swipeLastTime = now;
+
+        // Once direction is locked, maintain it (prevents accidental cancellation)
+        if (_swipeLocked && _isSwiping) {
+          widget.onSwipeUpdate?.call(dx.clamp(0.0, double.infinity));
+          return;
+        }
+
+        // Check if this is a horizontal swipe (reduced tolerance: dx > dy * 1.2)
+        final isHorizontal = dx.abs() > _swipeMinDistance && dx.abs() > dy * 1.2;
 
         if (isHorizontal && dx > 0) {
           // Horizontal swipe right - close gesture
           if (!_isSwiping) {
             _isSwiping = true;
+            _swipeLocked = true; // Lock direction once swipe starts
             widget.onSwipeStart?.call();
           }
-          // Track position for velocity calculation
-          _swipeLast = event.position;
-          _swipeLastTime = DateTime.now().millisecondsSinceEpoch;
           widget.onSwipeUpdate?.call(dx);
-        } else if (_isSwiping && !isHorizontal) {
-          // Was swiping but direction changed to vertical - cancel
-          widget.onSwipeEnd?.call(0); // Zero velocity = snap back
-          _isSwiping = false;
+        } else if (!_swipeLocked && dx.abs() > _swipeMinDistance) {
+          // Direction established as vertical - don't start swipe
+          _swipeLocked = true; // Lock as non-swipe
         }
       },
       onPointerUp: (event) {
-        if (_isSwiping && _swipeLast != null && _swipeLastTime != null) {
-          // Calculate instantaneous velocity from recent movement
-          final now = DateTime.now().millisecondsSinceEpoch;
-          final elapsed = now - _swipeLastTime!;
-          final dx = event.position.dx - _swipeLast!.dx;
-          // Use instantaneous velocity, fallback to reasonable default
-          final velocity = elapsed > 0 && elapsed < 100
-              ? (dx / elapsed) * 1000
-              : (event.position.dx - _swipeStart!.dx) > 100 ? 500.0 : 0.0;
-          widget.onSwipeEnd?.call(velocity);
+        if (_isSwiping) {
+          // Use averaged velocity for smoother behavior
+          final velocity = _calculateAverageVelocity();
+          // Also consider total displacement for slow swipes
+          final totalDx = event.position.dx - _swipeStart!.dx;
+          final effectiveVelocity = velocity > 50 ? velocity : (totalDx > 80 ? 300.0 : 0.0);
+          widget.onSwipeEnd?.call(effectiveVelocity);
         }
         _resetSwipeState();
       },
@@ -640,4 +686,12 @@ class _QueuePanelState extends State<QueuePanel> {
       ),
     );
   }
+}
+
+/// Helper class for velocity tracking samples
+class _VelocitySample {
+  final Offset position;
+  final int timeMs;
+
+  _VelocitySample(this.position, this.timeMs);
 }
