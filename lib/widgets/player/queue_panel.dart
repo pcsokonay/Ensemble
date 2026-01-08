@@ -73,9 +73,13 @@ class _QueuePanelState extends State<QueuePanel> {
   int? _swipeLastTime; // milliseconds since epoch
   bool _isSwiping = false;
   bool _swipeLocked = false; // Lock direction once established
-  bool _startedInEdgeZone = false; // Ignore swipes from edge (Android back gesture)
   static const _swipeMinDistance = 8.0; // Min distance to start tracking (reduced for responsiveness)
-  static const _edgeDeadZone = 40.0; // Dead zone for Android back gesture
+  static const _edgeDeadZone = 48.0; // Dead zone for Android back gesture (increased)
+
+  // Track last touch start position for edge detection in Dismissible
+  // Static so it persists across widget rebuilds
+  static double? _lastPointerDownX;
+  static double? _lastScreenWidth;
 
   // Velocity tracking with multiple samples for smoother calculation
   final List<_VelocitySample> _velocitySamples = [];
@@ -171,9 +175,20 @@ class _QueuePanelState extends State<QueuePanel> {
     _swipeLastTime = null;
     _isSwiping = false;
     _swipeLocked = false;
-    // NOTE: Don't reset _startedInEdgeZone here - it's needed by confirmDismiss
-    // which is called after pointer up. Reset on next pointer down instead.
     _velocitySamples.clear();
+    // NOTE: Don't reset _lastPointerDownX - it's needed by confirmDismiss
+    // which may be called after pointer up
+  }
+
+  /// Check if x position is in the edge dead zone (Android back gesture area)
+  static bool _isInEdgeZone(double x, double screenWidth) {
+    return x < _edgeDeadZone || x > screenWidth - _edgeDeadZone;
+  }
+
+  /// Check if last touch started in edge zone (for Dismissible to check)
+  static bool get lastTouchWasInEdgeZone {
+    if (_lastPointerDownX == null || _lastScreenWidth == null) return false;
+    return _isInEdgeZone(_lastPointerDownX!, _lastScreenWidth!);
   }
 
   void _addVelocitySample(Offset position, int timeMs) {
@@ -375,15 +390,16 @@ class _QueuePanelState extends State<QueuePanel> {
     // This allows swipe-to-close to work even over ListView/Dismissible
     return Listener(
       onPointerDown: (event) {
+        // Store touch position for edge detection (used by Dismissible confirmDismiss)
+        // Use static variables so they persist across rebuilds
+        _lastPointerDownX = event.position.dx;
+        _lastScreenWidth = MediaQuery.of(context).size.width;
+
         // Check if touch started in edge zone (Android back gesture area)
-        // Use GLOBAL X position (screen edge), not local position within queue panel
-        // Must check BEFORE other state to block edge gestures from Dismissible too
-        final screenWidth = MediaQuery.of(context).size.width;
-        _startedInEdgeZone = event.position.dx < _edgeDeadZone ||
-                             event.position.dx > screenWidth - _edgeDeadZone;
+        final startedInEdgeZone = _isInEdgeZone(event.position.dx, _lastScreenWidth!);
 
         // Don't track swipe while dragging a queue item
-        if (_dragIndex == null) {
+        if (_dragIndex == null && !startedInEdgeZone) {
           _swipeStart = event.position;
           _swipeLast = event.position;
           _swipeLastTime = DateTime.now().millisecondsSinceEpoch;
@@ -391,11 +407,14 @@ class _QueuePanelState extends State<QueuePanel> {
           _swipeLocked = false;
           _velocitySamples.clear();
           _addVelocitySample(event.position, _swipeLastTime!);
+        } else if (startedInEdgeZone) {
+          // Clear swipe state for edge touches
+          _swipeStart = null;
         }
       },
       onPointerMove: (event) {
         // Ignore swipes from edge zone (let Android back gesture handle it)
-        if (_swipeStart == null || _dragIndex != null || _startedInEdgeZone) return;
+        if (_swipeStart == null || _dragIndex != null) return;
 
         final dx = event.position.dx - _swipeStart!.dx;
         final dy = (event.position.dy - _swipeStart!.dy).abs();
@@ -567,7 +586,7 @@ class _QueuePanelState extends State<QueuePanel> {
       ),
       confirmDismiss: (direction) async {
         // Block dismissal if swipe started from screen edge (Android back gesture)
-        if (_startedInEdgeZone) return false;
+        if (lastTouchWasInEdgeZone) return false;
         // Don't allow dismissing the currently playing item
         return !isCurrentItem;
       },
