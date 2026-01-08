@@ -384,12 +384,11 @@ class _QueuePanelState extends State<QueuePanel> {
           _velocitySamples.clear();
           _addVelocitySample(event.position, _swipeLastTime!);
           // Check if touch started in edge zone (Android back gesture area)
-          // Use local X position within the widget
-          final RenderBox? box = context.findRenderObject() as RenderBox?;
-          if (box != null) {
-            final localPos = box.globalToLocal(event.position);
-            _startedInEdgeZone = localPos.dx < _edgeDeadZone;
-          }
+          // Use GLOBAL X position (screen edge), not local position within queue panel
+          // Queue panel slides in from right, so its local x=0 is not the screen edge
+          final screenWidth = MediaQuery.of(context).size.width;
+          _startedInEdgeZone = event.position.dx < _edgeDeadZone ||
+                               event.position.dx > screenWidth - _edgeDeadZone;
         }
       },
       onPointerMove: (event) {
