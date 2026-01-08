@@ -73,7 +73,9 @@ class _QueuePanelState extends State<QueuePanel> {
   int? _swipeLastTime; // milliseconds since epoch
   bool _isSwiping = false;
   bool _swipeLocked = false; // Lock direction once established
+  bool _startedInEdgeZone = false; // Ignore swipes from edge (Android back gesture)
   static const _swipeMinDistance = 8.0; // Min distance to start tracking (reduced for responsiveness)
+  static const _edgeDeadZone = 40.0; // Dead zone for Android back gesture
 
   // Velocity tracking with multiple samples for smoother calculation
   final List<_VelocitySample> _velocitySamples = [];
@@ -169,6 +171,7 @@ class _QueuePanelState extends State<QueuePanel> {
     _swipeLastTime = null;
     _isSwiping = false;
     _swipeLocked = false;
+    _startedInEdgeZone = false;
     _velocitySamples.clear();
   }
 
@@ -380,10 +383,18 @@ class _QueuePanelState extends State<QueuePanel> {
           _swipeLocked = false;
           _velocitySamples.clear();
           _addVelocitySample(event.position, _swipeLastTime!);
+          // Check if touch started in edge zone (Android back gesture area)
+          // Use local X position within the widget
+          final RenderBox? box = context.findRenderObject() as RenderBox?;
+          if (box != null) {
+            final localPos = box.globalToLocal(event.position);
+            _startedInEdgeZone = localPos.dx < _edgeDeadZone;
+          }
         }
       },
       onPointerMove: (event) {
-        if (_swipeStart == null || _dragIndex != null) return;
+        // Ignore swipes from edge zone (let Android back gesture handle it)
+        if (_swipeStart == null || _dragIndex != null || _startedInEdgeZone) return;
 
         final dx = event.position.dx - _swipeStart!.dx;
         final dy = (event.position.dy - _swipeStart!.dy).abs();
