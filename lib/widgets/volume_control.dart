@@ -50,6 +50,10 @@ class _VolumeControlState extends State<VolumeControl> {
   bool _showHints = true;
   bool _showPrecisionHint = false;
 
+  // Button tap indicator state
+  bool _showButtonIndicator = false;
+  Timer? _buttonIndicatorTimer;
+
   @override
   void initState() {
     super.initState();
@@ -124,11 +128,27 @@ class _VolumeControlState extends State<VolumeControl> {
   void dispose() {
     _volumeListener?.cancel();
     _precisionTimer?.cancel();
+    _buttonIndicatorTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _adjustVolume(MusicAssistantProvider maProvider, String playerId, double currentVolume, int delta) async {
     final newVolume = ((currentVolume * 100).round() + delta).clamp(0, 100);
+
+    // Show indicator briefly on button tap
+    _buttonIndicatorTimer?.cancel();
+    setState(() {
+      _showButtonIndicator = true;
+      _pendingVolume = newVolume / 100.0;
+    });
+    _buttonIndicatorTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() {
+          _showButtonIndicator = false;
+          _pendingVolume = null;
+        });
+      }
+    });
 
     if (_isLocalPlayer) {
       _logger.log('Volume: Setting system volume to $newVolume%');
@@ -328,8 +348,8 @@ class _VolumeControlState extends State<VolumeControl> {
                         ),
                       ),
                     ),
-                    // Floating teardrop indicator (only visible when dragging)
-                    if (_isDragging)
+                    // Floating teardrop indicator (visible when dragging or button tap)
+                    if (_isDragging || _showButtonIndicator)
                       Positioned(
                         left: clampedThumbPosition - 16,
                         top: -28,
