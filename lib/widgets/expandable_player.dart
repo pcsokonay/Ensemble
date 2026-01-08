@@ -177,18 +177,15 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Animation debugging - record every frame
     _controller.addListener(_recordAnimationFrame);
 
-    // Queue panel animation - spring physics for smoother motion
+    // Queue panel animation - uses spring physics directly (no CurvedAnimation)
+    // Spring simulation already provides natural physics-based easing
+    // CurvedAnimation would distort the spring output and cause jerky motion during swipe
     _queuePanelController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    _queuePanelAnimation = CurvedAnimation(
-      parent: _queuePanelController,
-      // Use fastOutSlowIn for smoother deceleration on open
-      curve: Curves.fastOutSlowIn,
-      // Use easeOutCubic for snappy close
-      reverseCurve: Curves.easeOutCubic,
-    );
+    // Use controller directly - spring physics provide the easing
+    _queuePanelAnimation = _queuePanelController;
 
     // Slide animation for device switching - used for snap/spring animations
     _slideController = AnimationController(
