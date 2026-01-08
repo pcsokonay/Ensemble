@@ -19,14 +19,6 @@ class _QueueScreenState extends State<QueueScreen> {
   bool _isLoading = true;
   String? _error;
 
-  String _formatDuration(Duration? duration) {
-    if (duration == null) return '';
-    final totalSeconds = duration.inSeconds;
-    final minutes = totalSeconds ~/ 60;
-    final seconds = totalSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
-  }
-
   @override
   void initState() {
     super.initState();
@@ -244,29 +236,41 @@ class _QueueScreenState extends State<QueueScreen> {
       child: Container(
         color: isCurrentItem ? Colors.blue.withOpacity(0.1) : null,
         child: ListTile(
-          leading: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: imageUrl != null
-                ? Image.network(
-                    imageUrl,
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle (visual only for now - reordering not implemented)
+              Icon(
+                Icons.drag_handle,
+                color: Colors.grey[600],
+              ),
+              const SizedBox(width: 8),
+              // Album art
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: imageUrl != null
+                    ? Image.network(
+                        imageUrl,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 48,
+                            height: 48,
+                            color: Colors.grey[800],
+                            child: const Icon(Icons.music_note, size: 24),
+                          );
+                        },
+                      )
+                    : Container(
                         width: 48,
                         height: 48,
                         color: Colors.grey[800],
                         child: const Icon(Icons.music_note, size: 24),
-                      );
-                    },
-                  )
-                : Container(
-                    width: 48,
-                    height: 48,
-                    color: Colors.grey[800],
-                    child: const Icon(Icons.music_note, size: 24),
-                  ),
+                      ),
+              ),
+            ],
           ),
           title: Text(
             item.track.name,
@@ -283,27 +287,9 @@ class _QueueScreenState extends State<QueueScreen> {
                   ),
                 )
               : null,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Duration
-              if (_formatDuration(item.track.duration).isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    _formatDuration(item.track.duration),
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              // Drag handle or play indicator
-              isCurrentItem
-                  ? Icon(Icons.play_arrow, color: Colors.blue[400], size: 20)
-                  : Icon(Icons.drag_handle, color: Colors.grey[600], size: 20),
-            ],
-          ),
+          trailing: isCurrentItem
+              ? Icon(Icons.play_arrow, color: Colors.blue[400])
+              : null,
         ),
       ),
     );
