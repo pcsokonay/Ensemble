@@ -646,9 +646,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   bool get isQueuePanelOpen => _queuePanelController.value > 0.5;
 
   /// Close queue panel if open (for external access via GlobalPlayerOverlay)
-  void closeQueuePanel() {
+  /// [withHaptic]: Set to false for Android back gesture (system provides haptic)
+  void closeQueuePanel({bool withHaptic = true}) {
     if (isQueuePanelOpen && !_queuePanelController.isAnimating) {
-      _closeQueuePanelWithSpring();
+      _closeQueuePanelWithSpring(withHaptic: withHaptic);
     }
   }
 

@@ -105,8 +105,9 @@ class GlobalPlayerOverlay extends StatefulWidget {
       globalPlayerKey.currentState?.isQueuePanelOpen ?? false;
 
   /// Close the queue panel if open
-  static void closeQueuePanel() {
-    globalPlayerKey.currentState?.closeQueuePanel();
+  /// [withHaptic]: Set to false for Android back gesture (system provides haptic)
+  static void closeQueuePanel({bool withHaptic = true}) {
+    globalPlayerKey.currentState?.closeQueuePanel(withHaptic: withHaptic);
   }
 
   /// Get the current expansion progress (0.0 to 1.0)
