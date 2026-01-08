@@ -73,6 +73,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   PlayerQueue? _queue;
   bool _isLoadingQueue = false;
   bool _isQueueDragging = false; // True while queue item is being dragged
+  bool _queuePanelTargetOpen = false; // Target state for queue panel (separate from animation value)
 
   // Progress tracking - uses PositionTracker stream as single source of truth
   StreamSubscription<Duration>? _positionSubscription;
@@ -319,6 +320,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Instantly hide queue panel when collapsing to avoid visual glitches
     // during Android's predictive back gesture (only reached if queue already closed)
     _queuePanelController.value = 0;
+    _queuePanelTargetOpen = false;
     _controller.duration = _collapseDuration;
     _controller.reverse().then((_) {
       AnimationDebugger.endSession();
@@ -380,6 +382,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       if (currentValue > 0.0) {
         AnimationDebugger.startSession('playerCollapse');
         _queuePanelController.value = 0;
+        _queuePanelTargetOpen = false;
         _controller.duration = _collapseDuration;
         _controller.reverse().then((_) {
           AnimationDebugger.endSession();
@@ -600,6 +603,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   /// Open queue panel with spring physics for natural feel
   void _openQueuePanelWithSpring() {
     HapticFeedback.lightImpact();
+    _queuePanelTargetOpen = true; // Set target state immediately
     // Use overdamped spring - settles cleanly without oscillation or snap
     final simulation = SpringSimulation(
       _queueSpring,
@@ -611,8 +615,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   }
 
   /// Close queue panel with spring physics
-  void _closeQueuePanelWithSpring({double velocity = 0.0}) {
-    HapticFeedback.lightImpact();
+  /// [withHaptic]: Set to false for Android back gesture (system provides haptic)
+  void _closeQueuePanelWithSpring({double velocity = 0.0, bool withHaptic = true}) {
+    _queuePanelTargetOpen = false; // Set target state immediately
+    if (withHaptic) {
+      HapticFeedback.lightImpact();
+    }
     // Use overdamped spring for snappy close without oscillation
     // Slightly stiffer than open spring for quicker settle
     const closeSpring = SpringDescription(
@@ -1160,18 +1168,20 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         }
 
         // Handle Android back button - close queue panel first, then collapse player
-        // Guard against re-entry during animations to prevent double-close
+        // Use _queuePanelTargetOpen (intent) instead of animation value for reliable back handling
+        // This prevents race conditions where animation value crosses threshold during gesture
         return PopScope(
-          canPop: !isQueuePanelOpen && !isExpanded,
+          canPop: !_queuePanelTargetOpen && !isExpanded,
           onPopInvokedWithResult: (didPop, result) {
             if (!didPop) {
-              if (isQueuePanelOpen) {
+              if (_queuePanelTargetOpen) {
                 // Always close queue panel on back, even if animating
                 // Stop any existing animation and start close
                 if (_queuePanelController.isAnimating) {
                   _queuePanelController.stop();
                 }
-                _closeQueuePanelWithSpring();
+                // No haptic - Android back gesture provides its own haptic feedback
+                _closeQueuePanelWithSpring(withHaptic: false);
               } else if (isExpanded) {
                 // Only collapse if not already animating
                 if (!_controller.isAnimating) {
