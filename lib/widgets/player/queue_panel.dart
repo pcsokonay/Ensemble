@@ -555,10 +555,13 @@ class _QueuePanelState extends State<QueuePanel> {
           ),
           child: ListTile(
             dense: true,
-            // Compensate for current item's 8px margin to align icons consistently
-            // Non-current: 8(list) + 0(margin) + 8(padding) + 14(center) = 30px from edge
-            // Current: 8(list) + 8(margin) + 0(padding) + 14(center) = 30px from edge
-            contentPadding: EdgeInsets.only(left: 16, right: isCurrentItem ? 0 : 8),
+            // Compensate for current item's 8px margin on both sides
+            // Left:  Non-current: 8+0+16=24px, Current: 8+8+8=24px
+            // Right: Non-current: 8+0+8+14=30px, Current: 8+8+0+14=30px
+            contentPadding: EdgeInsets.only(
+              left: isCurrentItem ? 8 : 16,
+              right: isCurrentItem ? 0 : 8,
+            ),
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(Radii.sm),
               child: SizedBox(
