@@ -1113,11 +1113,20 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
     final types = LibraryMediaType.values;
 
+    // Calculate flex values based on label length
+    // Longer labels get more space to avoid clipping
+    // Base flex of 10 for icon + padding, plus label length
+    int getFlexForType(LibraryMediaType type) {
+      final label = getMediaTypeLabel(type);
+      // Base space for icon/padding + proportional text space
+      return 10 + label.length;
+    }
+
     // Unified segmented bar with no gaps
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1128,7 +1137,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           final isFirst = index == 0;
           final isLast = index == types.length - 1;
 
-          return Expanded(
+          return Flexible(
+            flex: getFlexForType(type),
             child: GestureDetector(
               onTap: () => _changeMediaType(type),
               child: AnimatedContainer(
@@ -1138,8 +1148,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 decoration: BoxDecoration(
                   color: isSelected ? colorScheme.tertiaryContainer : Colors.transparent,
                   borderRadius: BorderRadius.horizontal(
-                    left: isFirst ? const Radius.circular(12) : Radius.zero,
-                    right: isLast ? const Radius.circular(12) : Radius.zero,
+                    left: isFirst ? const Radius.circular(8) : Radius.zero,
+                    right: isLast ? const Radius.circular(8) : Radius.zero,
                   ),
                 ),
                 child: Row(
