@@ -64,6 +64,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   // Media type selection (Music, Books, Podcasts)
   LibraryMediaType _selectedMediaType = LibraryMediaType.music;
 
+  // Track overscroll for switching between media types
+  double _horizontalOverscroll = 0;
+  static const double _overscrollThreshold = 80; // Pixels to trigger switch
+
   // View mode settings
   String _artistsViewMode = 'list'; // 'grid2', 'grid3', 'list'
   String _albumsViewMode = 'grid2'; // 'grid2', 'grid3', 'list'
@@ -521,6 +525,49 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     // No setState needed - ValueListenableBuilder will rebuild only the filter chips
     _selectedTabIndex.value = index;
     _tabIndexNotifier.value = index;
+  }
+
+  /// Handle horizontal overscroll to switch between media types
+  bool _handleHorizontalOverscroll(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.horizontal) {
+      return false;
+    }
+
+    if (notification is OverscrollNotification) {
+      _horizontalOverscroll += notification.overscroll;
+
+      // Check if we've overscrolled enough to switch
+      if (_horizontalOverscroll > _overscrollThreshold) {
+        // Overscrolled right at the end - go to previous media type
+        _horizontalOverscroll = 0;
+        _switchToPreviousMediaType();
+        return true;
+      } else if (_horizontalOverscroll < -_overscrollThreshold) {
+        // Overscrolled left at the end - go to next media type
+        _horizontalOverscroll = 0;
+        _switchToNextMediaType();
+        return true;
+      }
+    } else if (notification is ScrollEndNotification) {
+      // Reset overscroll accumulation when scroll ends
+      _horizontalOverscroll = 0;
+    }
+
+    return false;
+  }
+
+  void _switchToNextMediaType() {
+    final types = LibraryMediaType.values;
+    final currentIndex = types.indexOf(_selectedMediaType);
+    final nextIndex = (currentIndex + 1) % types.length;
+    _changeMediaType(types[nextIndex]);
+  }
+
+  void _switchToPreviousMediaType() {
+    final types = LibraryMediaType.values;
+    final currentIndex = types.indexOf(_selectedMediaType);
+    final prevIndex = (currentIndex - 1 + types.length) % types.length;
+    _changeMediaType(types[prevIndex]);
   }
 
   /// Handle scroll notifications to hide/show filter bars
@@ -992,13 +1039,17 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                       NotificationListener<ScrollNotification>(
                         onNotification: _handleScrollNotification,
                         // PERF: Use PageView.builder to only build visible tabs
-                        child: PageView.builder(
-                          controller: _pageController,
-                          onPageChanged: _onPageChanged,
-                          itemCount: _tabCount,
-                          // Faster settling so vertical scroll works sooner after swipe
-                          physics: const _FastPageScrollPhysics(),
-                          itemBuilder: (context, index) => _buildTabAtIndex(context, l10n, index),
+                        // Wrapped with horizontal overscroll detection for media type switching
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: _handleHorizontalOverscroll,
+                          child: PageView.builder(
+                            controller: _pageController,
+                            onPageChanged: _onPageChanged,
+                            itemCount: _tabCount,
+                            // Faster settling so vertical scroll works sooner after swipe
+                            physics: const _FastPageScrollPhysics(),
+                            itemBuilder: (context, index) => _buildTabAtIndex(context, l10n, index),
+                          ),
                         ),
                       ),
                       // Fade gradient at top - content fades as it scrolls under filter bar
