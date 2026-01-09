@@ -1396,39 +1396,86 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   Widget _buildCategoryChips(ColorScheme colorScheme, S l10n, int selectedIndex) {
     final categories = _getCategoryLabels(l10n);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: categories.asMap().entries.map((entry) {
-          final index = entry.key;
-          final label = entry.value;
-          final isSelected = selectedIndex == index;
+    // Calculate flex values based on label length (same approach as media type bar)
+    final flexValues = categories.map((label) => 10 + label.length).toList();
+    final totalFlex = flexValues.reduce((a, b) => a + b);
 
-          return Material(
-            color: isSelected
-                ? colorScheme.primaryContainer
-                : colorScheme.surfaceVariant.withOpacity(0.6),
-            child: InkWell(
-              onTap: () => _animateToCategory(index),
-              child: Container(
-                height: _filterRowHeight,
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected
-                        ? colorScheme.onPrimaryContainer
-                        : colorScheme.onSurfaceVariant.withOpacity(0.8),
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
+    // Estimate total width: base padding (28) + text width per label
+    final estimatedTotalWidth = categories.fold<double>(
+      0,
+      (sum, label) => sum + 28 + label.length * 8.5,
+    );
+
+    const double hInset = 2.0;
+
+    // Calculate left position for a given index
+    double getLeftPosition(int index) {
+      double left = 0;
+      for (int i = 0; i < index; i++) {
+        left += (flexValues[i] / totalFlex) * estimatedTotalWidth;
+      }
+      return left;
+    }
+
+    // Calculate width for a given index
+    double getTabWidth(int index) {
+      return (flexValues[index] / totalFlex) * estimatedTotalWidth;
+    }
+
+    return Container(
+      width: estimatedTotalWidth,
+      height: _filterRowHeight,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceVariant.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Stack(
+        children: [
+          // Animated sliding highlight
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            left: getLeftPosition(selectedIndex) + hInset,
+            width: getTabWidth(selectedIndex) - (hInset * 2),
+            top: 0,
+            bottom: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
-          );
-        }).toList(),
+          ),
+          // Labels row
+          Row(
+            children: categories.asMap().entries.map((entry) {
+              final index = entry.key;
+              final label = entry.value;
+              final isSelected = selectedIndex == index;
+
+              return Expanded(
+                flex: flexValues[index],
+                child: GestureDetector(
+                  onTap: () => _animateToCategory(index),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: isSelected
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onSurfaceVariant.withOpacity(0.8),
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
