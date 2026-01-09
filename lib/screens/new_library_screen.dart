@@ -1239,8 +1239,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final totalFlex = flexValues.reduce((a, b) => a + b);
     final selectedIndex = types.indexOf(_selectedMediaType);
 
-    // Inset for the pill highlight (creates padding inside the bar)
-    const double inset = 3.0;
+    // Horizontal inset for the pill highlight (small gap from edges)
+    const double hInset = 2.0;
 
     // Animated sliding highlight with pill shape
     return LayoutBuilder(
@@ -1272,16 +1272,16 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeOutCubic,
-                left: getLeftPosition(selectedIndex) + inset,
-                width: getTabWidth(selectedIndex) - (inset * 2),
-                top: inset,
-                bottom: inset,
+                left: getLeftPosition(selectedIndex) + hInset,
+                width: getTabWidth(selectedIndex) - (hInset * 2),
+                top: 0,
+                bottom: 0,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeOutCubic,
                   decoration: BoxDecoration(
                     color: getMediaTypeColor(_selectedMediaType),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
               ),
