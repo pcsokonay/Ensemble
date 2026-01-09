@@ -1111,6 +1111,20 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       }
     }
 
+    // Pastel colors for each media type
+    Color getMediaTypeColor(LibraryMediaType type) {
+      switch (type) {
+        case LibraryMediaType.music:
+          return const Color(0xFFB39DDB); // Soft purple
+        case LibraryMediaType.books:
+          return const Color(0xFFFFCC80); // Soft orange/amber
+        case LibraryMediaType.podcasts:
+          return const Color(0xFF80CBC4); // Soft teal
+        case LibraryMediaType.radio:
+          return const Color(0xFFF48FB1); // Soft pink
+      }
+    }
+
     final types = LibraryMediaType.values;
 
     // Calculate flex values based on label length
@@ -1146,7 +1160,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 curve: Curves.easeInOut,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? colorScheme.tertiaryContainer : Colors.transparent,
+                  color: isSelected ? getMediaTypeColor(type) : Colors.transparent,
                   borderRadius: BorderRadius.horizontal(
                     left: isFirst ? const Radius.circular(8) : Radius.zero,
                     right: isLast ? const Radius.circular(8) : Radius.zero,
@@ -1160,7 +1174,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                       getMediaTypeIcon(type),
                       size: 18,
                       color: isSelected
-                          ? colorScheme.onTertiaryContainer
+                          ? Colors.black87
                           : colorScheme.onSurface.withOpacity(0.6),
                     ),
                     const SizedBox(width: 6),
@@ -1169,7 +1183,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                         getMediaTypeLabel(type),
                         style: TextStyle(
                           color: isSelected
-                              ? colorScheme.onTertiaryContainer
+                              ? Colors.black87
                               : colorScheme.onSurface.withOpacity(0.7),
                           fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                           fontSize: 13,
