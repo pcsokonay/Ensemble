@@ -8,9 +8,9 @@ class MiniPlayerLayout {
   static const double textLeftOffset = 10.0; // Gap between art and text
   static const double textLeft = artSize + textLeftOffset; // 82px
   // 3-line layout: track, artist, player
-  static const double primaryTop = 8.0;
-  static const double secondaryTop = 27.0;
-  static const double tertiaryTop = 47.0;
+  static const double primaryTop = 9.0;
+  static const double secondaryTop = 26.0;
+  static const double tertiaryTop = 46.0;
   // 2-line layout (evenly spaced): player name, hint
   // Height 72 / 3 = 24px spacing. Line 1 center at 24, Line 2 center at 48
   static const double primaryTop2Line = 14.0; // 24 - (18/2) = 15, adjusted to 14
