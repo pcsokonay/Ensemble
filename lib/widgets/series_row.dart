@@ -299,44 +299,6 @@ class _SeriesCard extends StatelessWidget {
           // Use AspectRatio to guarantee square cover
           Hero(
             tag: heroTag,
-            // PERF: Use flightShuttleBuilder to avoid animating complex grid
-            // during hero flight. Show cached first cover image instead.
-            flightShuttleBuilder: (flightContext, animation, direction, fromContext, toContext) {
-              // Use first cover as simple placeholder during flight
-              final heroChild = toContext.widget as Hero;
-              return AnimatedBuilder(
-                animation: animation,
-                builder: (context, child) {
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(8 + 4 * animation.value),
-                    child: child,
-                  );
-                },
-                child: covers != null && covers!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: covers!.first,
-                        fit: BoxFit.cover,
-                        fadeInDuration: Duration.zero,
-                        fadeOutDuration: Duration.zero,
-                        placeholder: (_, __) => Container(
-                          color: colorScheme.surfaceContainerHighest,
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: colorScheme.surfaceContainerHighest,
-                        ),
-                      )
-                    : Container(
-                        color: colorScheme.surfaceContainerHighest,
-                        child: Center(
-                          child: Icon(
-                            Icons.collections_bookmark_rounded,
-                            size: 48,
-                            color: colorScheme.onSurfaceVariant.withOpacity(0.5),
-                          ),
-                        ),
-                      ),
-              );
-            },
             child: AspectRatio(
               aspectRatio: 1,
               child: ClipRRect(
