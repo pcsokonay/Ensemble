@@ -288,10 +288,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         final availableHeight = constraints.maxHeight - BottomSpacing.withMiniPlayer;
 
         // Account for margins between rows (2px each)
-        // For 3 rows to fit exactly, subtract margin space before dividing
+        // Only adjust for margins when ≤3 rows (so they fit exactly without scroll)
+        // For 4+ rows, use original calculation so 4th row stays hidden (scrollable)
         const marginSize = 2.0;
         final enabledRows = _countEnabledRows();
-        final marginsInView = enabledRows > 1 ? (enabledRows.clamp(1, 3) - 1) * marginSize : 0.0;
+        final marginsInView = enabledRows > 1 && enabledRows <= 3 ? (enabledRows - 1) * marginSize : 0.0;
         final rowHeight = (availableHeight - marginsInView) / 3;
 
         // Use Android 12+ stretch overscroll effect
