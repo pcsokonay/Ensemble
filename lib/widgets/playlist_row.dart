@@ -172,8 +172,12 @@ class _PlaylistRowState extends State<PlaylistRow> with AutomaticKeepAliveClient
                 ),
               ),
             ),
+            // DEBUG: Blue = content area
             Expanded(
-              child: _buildContent(contentHeight, colorScheme),
+              child: Container(
+                color: Colors.blue,
+                child: _buildContent(contentHeight, colorScheme),
+              ),
             ),
           ],
         ),

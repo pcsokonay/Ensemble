@@ -251,8 +251,12 @@ class _SeriesRowState extends State<SeriesRow> with AutomaticKeepAliveClientMixi
                 ),
               ),
             ),
+            // DEBUG: Blue = content area
             Expanded(
-              child: _buildContent(contentHeight, colorScheme, textTheme, maProvider),
+              child: Container(
+                color: Colors.blue,
+                child: _buildContent(contentHeight, colorScheme, textTheme, maProvider),
+              ),
             ),
           ],
         ),

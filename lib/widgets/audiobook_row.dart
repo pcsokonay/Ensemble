@@ -178,8 +178,12 @@ class _AudiobookRowState extends State<AudiobookRow> with AutomaticKeepAliveClie
                 ),
               ),
             ),
+            // DEBUG: Blue = content area
             Expanded(
-              child: _buildContent(contentHeight, colorScheme, maProvider),
+              child: Container(
+                color: Colors.blue,
+                child: _buildContent(contentHeight, colorScheme, maProvider),
+              ),
             ),
           ],
         ),

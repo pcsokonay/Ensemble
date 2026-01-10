@@ -180,8 +180,12 @@ class _PodcastRowState extends State<PodcastRow> with AutomaticKeepAliveClientMi
                 ),
               ),
             ),
+            // DEBUG: Blue = content area
             Expanded(
-              child: _buildContent(contentHeight, colorScheme),
+              child: Container(
+                color: Colors.blue,
+                child: _buildContent(contentHeight, colorScheme),
+              ),
             ),
           ],
         ),
