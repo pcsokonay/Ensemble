@@ -303,7 +303,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         // Add spacing between rows (not before first row)
         // DEBUG: Yellow = margin between rows
         if (rows.isNotEmpty) {
-          rows.add(Container(height: 1.0, color: Colors.yellow));
+          rows.add(Container(height: 2.0, color: Colors.yellow));
         }
         rows.add(widget);
       }
