@@ -250,6 +250,34 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   }
 
 
+  /// Count how many rows are currently enabled
+  int _countEnabledRows() {
+    int count = 0;
+    for (final rowId in _homeRowOrder) {
+      if (_isRowEnabled(rowId)) count++;
+    }
+    return count;
+  }
+
+  /// Check if a specific row is enabled
+  bool _isRowEnabled(String rowId) {
+    switch (rowId) {
+      case 'recent-albums': return _showRecentAlbums;
+      case 'discover-artists': return _showDiscoverArtists;
+      case 'discover-albums': return _showDiscoverAlbums;
+      case 'continue-listening': return _showContinueListeningAudiobooks;
+      case 'discover-audiobooks': return _showDiscoverAudiobooks;
+      case 'discover-series': return _showDiscoverSeries;
+      case 'favorite-albums': return _showFavoriteAlbums;
+      case 'favorite-artists': return _showFavoriteArtists;
+      case 'favorite-tracks': return _showFavoriteTracks;
+      case 'favorite-playlists': return _showFavoritePlaylists;
+      case 'favorite-radio-stations': return _showFavoriteRadioStations;
+      case 'favorite-podcasts': return _showFavoritePodcasts;
+      default: return false;
+    }
+  }
+
   Widget _buildConnectedView(
       BuildContext context, MusicAssistantProvider provider) {
     // Use LayoutBuilder to get available screen height
@@ -258,7 +286,13 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         // Each row is always 1/3 of screen height
         // 1 row = 1/3, 2 rows = 2/3, 3 rows = full screen, 4+ rows scroll
         final availableHeight = constraints.maxHeight - BottomSpacing.withMiniPlayer;
-        final rowHeight = availableHeight / 3;
+
+        // Account for margins between rows (2px each)
+        // For 3 rows to fit exactly, subtract margin space before dividing
+        const marginSize = 2.0;
+        final enabledRows = _countEnabledRows();
+        final marginsInView = enabledRows > 1 ? (enabledRows.clamp(1, 3) - 1) * marginSize : 0.0;
+        final rowHeight = (availableHeight - marginsInView) / 3;
 
         // Use Android 12+ stretch overscroll effect
         return NotificationListener<ScrollNotification>(
