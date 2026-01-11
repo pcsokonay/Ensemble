@@ -51,17 +51,87 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   @override
   bool get wantKeepAlive => true;
 
+  // Track if we had empty favorites on first load (to know when to refresh)
+  bool _hadEmptyFavoritesOnLoad = false;
+  SyncStatus? _lastSyncStatus;
+  int _lastArtistCount = 0;
+  MusicAssistantProvider? _providerListeningTo;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadSettings();
+    // Listen to sync completion to refresh favorite rows when data becomes available
+    SyncService.instance.addListener(_onSyncChanged);
+    _lastSyncStatus = SyncService.instance.status;
+    _checkInitialFavoriteState();
   }
 
   @override
   void dispose() {
+    SyncService.instance.removeListener(_onSyncChanged);
+    // Clean up provider listener if attached
+    _providerListeningTo?.removeListener(_onProviderChanged);
+    _providerListeningTo = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// Check if favorites are empty on initial load (so we know to refresh after sync)
+  void _checkInitialFavoriteState() {
+    // Schedule after first frame to ensure provider is accessible
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = context.read<MusicAssistantProvider>();
+      _lastArtistCount = provider.artists.length;
+      // Check if artists list is empty - favorites will also be empty
+      if (_lastArtistCount == 0) {
+        _hadEmptyFavoritesOnLoad = true;
+        _logger.log('📋 Home: favorites empty on load, will refresh after sync');
+        // Also listen to provider for when cache loads (before sync completes)
+        _providerListeningTo = provider;
+        provider.addListener(_onProviderChanged);
+      }
+    });
+  }
+
+  /// Called when MusicAssistantProvider changes (for cache load detection)
+  void _onProviderChanged() {
+    if (!mounted || !_hadEmptyFavoritesOnLoad || _providerListeningTo == null) return;
+    final currentCount = _providerListeningTo!.artists.length;
+    // If artists went from 0 to non-zero, refresh
+    if (_lastArtistCount == 0 && currentCount > 0) {
+      _logger.log('🔄 Home: artists loaded from cache ($currentCount), refreshing rows');
+      _hadEmptyFavoritesOnLoad = false;
+      _providerListeningTo!.removeListener(_onProviderChanged);
+      _providerListeningTo = null;
+      setState(() {
+        _refreshKey = UniqueKey();
+      });
+    }
+    _lastArtistCount = currentCount;
+  }
+
+  /// Called when SyncService status changes
+  void _onSyncChanged() {
+    final newStatus = SyncService.instance.status;
+    // When sync completes and we had empty favorites, refresh to show new data
+    if (_lastSyncStatus == SyncStatus.syncing &&
+        newStatus == SyncStatus.completed &&
+        _hadEmptyFavoritesOnLoad) {
+      _logger.log('🔄 Home: sync completed, refreshing favorite rows');
+      _hadEmptyFavoritesOnLoad = false;
+      // Clean up provider listener if still attached
+      _providerListeningTo?.removeListener(_onProviderChanged);
+      _providerListeningTo = null;
+      if (mounted) {
+        setState(() {
+          _refreshKey = UniqueKey();
+        });
+      }
+    }
+    _lastSyncStatus = newStatus;
   }
 
   @override
