@@ -137,6 +137,13 @@ class SearchScreenState extends State<SearchScreen> {
   double _lastVerticalScrollOffset = 0;
   static const double _scrollThreshold = 10.0;
 
+  // Filter chip position tracking for animated sliding highlight
+  final Map<String, GlobalKey> _filterKeys = {};
+  final Map<String, double> _filterWidths = {};
+  final Map<String, double> _filterPositions = {};
+  double _highlightLeft = 0;
+  double _highlightWidth = 80; // Default width until measured
+
   @override
   void initState() {
     super.initState();
@@ -185,6 +192,39 @@ class SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  /// Measure filter chip positions and update highlight
+  void _measureFilterPositions() {
+    final filters = _getAvailableFilters();
+    double left = 0;
+
+    for (final filter in filters) {
+      final key = _filterKeys[filter];
+      if (key?.currentContext != null) {
+        final box = key!.currentContext!.findRenderObject() as RenderBox?;
+        if (box != null && box.hasSize) {
+          _filterWidths[filter] = box.size.width;
+          _filterPositions[filter] = left;
+          left += box.size.width;
+        }
+      }
+    }
+  }
+
+  /// Update highlight position for the active filter
+  void _updateHighlightPosition(String activeFilter) {
+    _measureFilterPositions();
+
+    final position = _filterPositions[activeFilter];
+    final width = _filterWidths[activeFilter];
+
+    if (position != null && width != null) {
+      setState(() {
+        _highlightLeft = position;
+        _highlightWidth = width;
+      });
+    }
+  }
+
   /// Scroll filter bar to keep active filter visible
   /// Only scrolls when the filter would be obscured (off-screen)
   /// Uses post-frame callback to avoid interfering with PageView animation
@@ -200,30 +240,35 @@ class SearchScreenState extends State<SearchScreen> {
       // If all filters fit on screen, don't scroll at all
       if (maxScroll <= 0) return;
 
-      // Approximate width per filter chip (padding + text)
-      const chipWidth = 80.0;
-      const horizontalPadding = 16.0;
+      final filters = _getAvailableFilters();
+      if (filterIndex < 0 || filterIndex >= filters.length) return;
+
+      final filter = filters[filterIndex];
+
+      // Update highlight position
+      _updateHighlightPosition(filter);
+
+      // Use measured positions if available, fallback to estimate
+      final chipLeft = _filterPositions[filter] ?? (filterIndex * 80.0);
+      final chipWidth = _filterWidths[filter] ?? 80.0;
+      final chipRight = chipLeft + chipWidth;
 
       final currentScroll = _filterScrollController.offset;
       final viewportWidth = _filterScrollController.position.viewportDimension;
 
-      // Calculate the left and right edges of the active filter chip
-      final chipLeft = (filterIndex * chipWidth);
-      final chipRight = chipLeft + chipWidth;
-
       // Calculate what's currently visible in the viewport
       final visibleLeft = currentScroll;
-      final visibleRight = currentScroll + viewportWidth - (horizontalPadding * 2);
+      final visibleRight = currentScroll + viewportWidth;
 
       // Only scroll if the chip is actually obscured
       double? targetOffset;
 
       if (chipRight > visibleRight) {
-        // Chip is cut off on the right - scroll right just enough to show it
-        targetOffset = chipRight - viewportWidth + (horizontalPadding * 2);
+        // Chip is cut off on the right - scroll right to show it with padding
+        targetOffset = chipRight - viewportWidth + 8;
       } else if (chipLeft < visibleLeft) {
-        // Chip is cut off on the left - scroll left just enough to show it
-        targetOffset = chipLeft;
+        // Chip is cut off on the left - scroll left to show it with padding
+        targetOffset = chipLeft - 8;
       }
 
       // Only animate if we need to scroll
@@ -934,7 +979,7 @@ class SearchScreenState extends State<SearchScreen> {
     return items;
   }
 
-  /// Build joined segmented filter selector (like library media type selector)
+  /// Build joined segmented filter selector with animated sliding highlight
   Widget _buildFilterSelector(ColorScheme colorScheme) {
     final filters = _getAvailableFilters();
     final l10n = S.of(context)!;
@@ -953,42 +998,93 @@ class SearchScreenState extends State<SearchScreen> {
       }
     }
 
-    // No ClipRRect here - parent container handles clipping with rounded corners
+    // Ensure GlobalKeys exist for all filters
+    for (final filter in filters) {
+      _filterKeys.putIfAbsent(filter, () => GlobalKey());
+    }
+
     // Wrap in ValueListenableBuilder for efficient rebuilds on filter change
     return ValueListenableBuilder<String>(
       valueListenable: _activeFilterNotifier,
       builder: (context, activeFilter, _) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: filters.map((filter) {
-            final isSelected = activeFilter == filter;
-            return Material(
-              // Use theme-aware colors for light/dark mode support
-              color: isSelected
-                  ? colorScheme.primaryContainer
-                  : colorScheme.surfaceVariant.withOpacity(0.6),
-              child: InkWell(
-                onTap: () {
-                  // Only update ValueNotifier - no setState needed
-                  _activeFilterNotifier.value = filter;
-                  _animateToFilter(filter);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  child: Text(
-                    getLabel(filter),
-                    style: TextStyle(
-                      color: isSelected
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSurfaceVariant.withOpacity(0.8),
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+        // Measure positions after build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _measureFilterPositions();
+            // Update highlight on first build or when filters change
+            final position = _filterPositions[activeFilter];
+            final width = _filterWidths[activeFilter];
+            if (position != null && width != null &&
+                (_highlightLeft != position || _highlightWidth != width)) {
+              setState(() {
+                _highlightLeft = position;
+                _highlightWidth = width;
+              });
+            }
+          }
+        });
+
+        final selectedIndex = filters.indexOf(activeFilter);
+        final isFirstTab = selectedIndex == 0;
+        final isLastTab = selectedIndex == filters.length - 1;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: IntrinsicHeight(
+            child: Stack(
+              children: [
+                // Animated sliding highlight
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                  left: _highlightLeft + (isFirstTab ? 0 : 2),
+                  width: _highlightWidth - (isFirstTab ? 0 : 2) - (isLastTab ? 0 : 2),
+                  top: 0,
+                  bottom: 0,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
-              ),
-            );
-          }).toList(),
+                // Filter buttons row (transparent, on top of highlight)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: filters.map((filter) {
+                    final isSelected = activeFilter == filter;
+                    return GestureDetector(
+                      key: _filterKeys[filter],
+                      onTap: () {
+                        _activeFilterNotifier.value = filter;
+                        _animateToFilter(filter);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        child: Text(
+                          getLabel(filter),
+                          style: TextStyle(
+                            color: isSelected
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onSurfaceVariant.withOpacity(0.8),
+                            fontSize: 14,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
