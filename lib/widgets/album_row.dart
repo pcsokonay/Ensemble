@@ -166,9 +166,7 @@ class _AlbumRowState extends State<AlbumRow> with AutomaticKeepAliveClientMixin 
         child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // DEBUG: Green = top/bottom padding
-          Container(
-            color: Colors.green,
+          Padding(
             padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 8.0),
             child: Text(
               widget.title,
@@ -178,12 +176,8 @@ class _AlbumRowState extends State<AlbumRow> with AutomaticKeepAliveClientMixin 
               ),
             ),
           ),
-          // DEBUG: Blue = content area
           Expanded(
-            child: Container(
-              color: Colors.blue,
-              child: _buildContent(contentHeight, colorScheme),
-            ),
+            child: _buildContent(contentHeight, colorScheme),
           ),
           ],
         ),
