@@ -146,8 +146,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   final ScrollController _podcastsScrollController = ScrollController();
   final ScrollController _radioScrollController = ScrollController();
 
-  int get _tabCount {
-    switch (_selectedMediaType) {
+  int get _tabCount => _getTabCountForType(_selectedMediaType);
+
+  int _getTabCountForType(LibraryMediaType type) {
+    switch (type) {
       case LibraryMediaType.music:
         return 4; // Artists, Albums, Tracks, Playlists (always 4)
       case LibraryMediaType.books:
@@ -562,8 +564,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     return baseHsl.withHue((baseHsl.hue + hueShift) % 360).toColor();
   }
 
-  void _changeMediaType(LibraryMediaType type) {
-    _logger.log('📚 _changeMediaType called: $type (current: $_selectedMediaType)');
+  void _changeMediaType(LibraryMediaType type, {bool goToLastTab = false}) {
+    _logger.log('📚 _changeMediaType called: $type (current: $_selectedMediaType, goToLastTab: $goToLastTab)');
     if (_selectedMediaType == type) {
       _logger.log('📚 Same type, skipping');
       return;
@@ -571,8 +573,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     setState(() {
       _selectedMediaType = type;
     });
-    _selectedTabIndex.value = 0; // Reset to first category
-    _tabIndexNotifier.value = 0;
+
+    // Calculate the target tab index based on direction
+    final targetIndex = goToLastTab ? _getTabCountForType(type) - 1 : 0;
+    _selectedTabIndex.value = targetIndex;
+    _tabIndexNotifier.value = targetIndex;
     _resetCategoryIndex();
     // Load audiobooks when switching to books tab
     if (type == LibraryMediaType.books) {
@@ -641,14 +646,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final types = LibraryMediaType.values;
     final currentIndex = types.indexOf(_selectedMediaType);
     final nextIndex = (currentIndex + 1) % types.length;
-    _changeMediaType(types[nextIndex]);
+    _changeMediaType(types[nextIndex], goToLastTab: false);
   }
 
   void _switchToPreviousMediaType() {
     final types = LibraryMediaType.values;
     final currentIndex = types.indexOf(_selectedMediaType);
     final prevIndex = (currentIndex - 1 + types.length) % types.length;
-    _changeMediaType(types[prevIndex]);
+    _changeMediaType(types[prevIndex], goToLastTab: true);
   }
 
   // Drag handlers for single-category types
