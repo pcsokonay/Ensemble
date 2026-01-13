@@ -3659,8 +3659,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             break;
           case 'artist':
             sortedAlbums.sort((a, b) {
-              final artistA = a.artists.isNotEmpty ? a.artists.first.name ?? '' : '';
-              final artistB = b.artists.isNotEmpty ? b.artists.first.name ?? '' : '';
+              final artistA = (a.artists?.isNotEmpty ?? false) ? a.artists!.first.name ?? '' : '';
+              final artistB = (b.artists?.isNotEmpty ?? false) ? b.artists!.first.name ?? '' : '';
               final artistCompare = artistA.toLowerCase().compareTo(artistB.toLowerCase());
               if (artistCompare != 0) return artistCompare;
               return (a.name ?? '').compareTo(b.name ?? '');
