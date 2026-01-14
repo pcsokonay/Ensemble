@@ -17,6 +17,59 @@ class SettingsService {
     return _prefsCache ??= await SharedPreferences.getInstance();
   }
 
+  // ============ GENERIC HELPERS ============
+  // These reduce boilerplate for repetitive getter/setter patterns
+
+  /// Get a string value, with optional default
+  static Future<String?> _getString(String key, {String? defaultValue}) async {
+    final prefs = await _getPrefs();
+    return prefs.getString(key) ?? defaultValue;
+  }
+
+  /// Set a string value, removing if null/empty when removeIfEmpty is true
+  static Future<void> _setString(String key, String? value, {bool removeIfEmpty = false}) async {
+    final prefs = await _getPrefs();
+    if (removeIfEmpty && (value == null || value.isEmpty)) {
+      await prefs.remove(key);
+    } else if (value != null) {
+      await prefs.setString(key, value);
+    }
+  }
+
+  /// Get a bool value with default
+  static Future<bool> _getBool(String key, {bool defaultValue = false}) async {
+    final prefs = await _getPrefs();
+    return prefs.getBool(key) ?? defaultValue;
+  }
+
+  /// Set a bool value
+  static Future<void> _setBool(String key, bool value) async {
+    final prefs = await _getPrefs();
+    await prefs.setBool(key, value);
+  }
+
+  /// Get an int value, with optional default
+  static Future<int?> _getInt(String key, {int? defaultValue}) async {
+    final prefs = await _getPrefs();
+    return prefs.getInt(key) ?? defaultValue;
+  }
+
+  /// Set an int value, removing if null
+  static Future<void> _setInt(String key, int? value) async {
+    final prefs = await _getPrefs();
+    if (value == null) {
+      await prefs.remove(key);
+    } else {
+      await prefs.setInt(key, value);
+    }
+  }
+
+  /// Remove a key
+  static Future<void> _remove(String key) async {
+    final prefs = await _getPrefs();
+    await prefs.remove(key);
+  }
+
   static const String _keyServerUrl = 'server_url';
   static const String _keyAuthServerUrl = 'auth_server_url';
   static const String _keyWebSocketPort = 'websocket_port';
@@ -245,100 +298,32 @@ class SettingsService {
   }
 
   // Theme settings
-  static Future<String?> getThemeMode() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyThemeMode) ?? 'system';
-  }
+  static Future<String?> getThemeMode() => _getString(_keyThemeMode, defaultValue: 'system');
+  static Future<void> saveThemeMode(String mode) => _setString(_keyThemeMode, mode);
 
-  static Future<void> saveThemeMode(String mode) async {
-    final prefs = await _getPrefs();
-    await prefs.setString(_keyThemeMode, mode);
-  }
+  static Future<bool> getUseMaterialTheme() => _getBool(_keyUseMaterialTheme, defaultValue: false);
+  static Future<void> saveUseMaterialTheme(bool enabled) => _setBool(_keyUseMaterialTheme, enabled);
 
-  static Future<bool> getUseMaterialTheme() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyUseMaterialTheme) ?? false;
-  }
+  static Future<bool> getAdaptiveTheme() => _getBool(_keyAdaptiveTheme, defaultValue: true);
+  static Future<void> saveAdaptiveTheme(bool enabled) => _setBool(_keyAdaptiveTheme, enabled);
 
-  static Future<void> saveUseMaterialTheme(bool enabled) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyUseMaterialTheme, enabled);
-  }
-
-  static Future<bool> getAdaptiveTheme() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyAdaptiveTheme) ?? true; // Default to true
-  }
-
-  static Future<void> saveAdaptiveTheme(bool enabled) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyAdaptiveTheme, enabled);
-  }
-
-  static Future<String?> getCustomColor() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyCustomColor);
-  }
-
-  static Future<void> saveCustomColor(String color) async {
-    final prefs = await _getPrefs();
-    await prefs.setString(_keyCustomColor, color);
-  }
+  static Future<String?> getCustomColor() => _getString(_keyCustomColor);
+  static Future<void> saveCustomColor(String color) => _setString(_keyCustomColor, color);
 
   // Locale (null = system default)
-  static Future<String?> getLocale() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyLocale);
-  }
-
-  static Future<void> saveLocale(String? locale) async {
-    final prefs = await _getPrefs();
-    if (locale == null) {
-      await prefs.remove(_keyLocale);
-    } else {
-      await prefs.setString(_keyLocale, locale);
-    }
-  }
+  static Future<String?> getLocale() => _getString(_keyLocale);
+  static Future<void> saveLocale(String? locale) => _setString(_keyLocale, locale, removeIfEmpty: true);
 
   // Metadata API Keys
-  static Future<String?> getLastFmApiKey() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyLastFmApiKey);
-  }
+  static Future<String?> getLastFmApiKey() => _getString(_keyLastFmApiKey);
+  static Future<void> setLastFmApiKey(String? key) => _setString(_keyLastFmApiKey, key, removeIfEmpty: true);
 
-  static Future<void> setLastFmApiKey(String? key) async {
-    final prefs = await _getPrefs();
-    if (key == null || key.isEmpty) {
-      await prefs.remove(_keyLastFmApiKey);
-    } else {
-      await prefs.setString(_keyLastFmApiKey, key);
-    }
-  }
-
-  static Future<String?> getTheAudioDbApiKey() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyTheAudioDbApiKey);
-  }
-
-  static Future<void> setTheAudioDbApiKey(String? key) async {
-    final prefs = await _getPrefs();
-    if (key == null || key.isEmpty) {
-      await prefs.remove(_keyTheAudioDbApiKey);
-    } else {
-      await prefs.setString(_keyTheAudioDbApiKey, key);
-    }
-  }
+  static Future<String?> getTheAudioDbApiKey() => _getString(_keyTheAudioDbApiKey);
+  static Future<void> setTheAudioDbApiKey(String? key) => _setString(_keyTheAudioDbApiKey, key, removeIfEmpty: true);
 
   // Local Playback Settings
-  static Future<bool> getEnableLocalPlayback() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyEnableLocalPlayback) ?? true;
-  }
-
-  static Future<void> setEnableLocalPlayback(bool enabled) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyEnableLocalPlayback, enabled);
-  }
+  static Future<bool> getEnableLocalPlayback() => _getBool(_keyEnableLocalPlayback, defaultValue: true);
+  static Future<void> setEnableLocalPlayback(bool enabled) => _setBool(_keyEnableLocalPlayback, enabled);
 
   static Future<String> getLocalPlayerName() async {
     // Derive player name from owner name
@@ -352,58 +337,24 @@ class SettingsService {
     return prefs.getString(_keyLocalPlayerName) ?? 'Ensemble';
   }
 
-  static Future<void> setLocalPlayerName(String name) async {
-    final prefs = await _getPrefs();
-    await prefs.setString(_keyLocalPlayerName, name);
-  }
+  static Future<void> setLocalPlayerName(String name) => _setString(_keyLocalPlayerName, name);
 
   // Owner Name - used to derive player name
-  static Future<String?> getOwnerName() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyOwnerName);
-  }
-
-  static Future<void> setOwnerName(String name) async {
-    final prefs = await _getPrefs();
-    await prefs.setString(_keyOwnerName, name.trim());
-  }
+  static Future<String?> getOwnerName() => _getString(_keyOwnerName);
+  static Future<void> setOwnerName(String name) => _setString(_keyOwnerName, name.trim());
 
   // Last selected player ID - persists user's player selection across sessions
-  static Future<String?> getLastSelectedPlayerId() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyLastSelectedPlayerId);
-  }
-
-  static Future<void> setLastSelectedPlayerId(String? playerId) async {
-    final prefs = await _getPrefs();
-    if (playerId == null || playerId.isEmpty) {
-      await prefs.remove(_keyLastSelectedPlayerId);
-    } else {
-      await prefs.setString(_keyLastSelectedPlayerId, playerId);
-    }
-  }
+  static Future<String?> getLastSelectedPlayerId() => _getString(_keyLastSelectedPlayerId);
+  static Future<void> setLastSelectedPlayerId(String? playerId) =>
+      _setString(_keyLastSelectedPlayerId, playerId, removeIfEmpty: true);
 
   // Prefer Local Player - always select local player first when available
-  static Future<bool> getPreferLocalPlayer() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyPreferLocalPlayer) ?? false;
-  }
-
-  static Future<void> setPreferLocalPlayer(bool prefer) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyPreferLocalPlayer, prefer);
-  }
+  static Future<bool> getPreferLocalPlayer() => _getBool(_keyPreferLocalPlayer, defaultValue: false);
+  static Future<void> setPreferLocalPlayer(bool prefer) => _setBool(_keyPreferLocalPlayer, prefer);
 
   // Smart Sort Players - sort by status (playing > on > off) instead of alphabetically
-  static Future<bool> getSmartSortPlayers() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keySmartSortPlayers) ?? false;
-  }
-
-  static Future<void> setSmartSortPlayers(bool smartSort) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keySmartSortPlayers, smartSort);
-  }
+  static Future<bool> getSmartSortPlayers() => _getBool(_keySmartSortPlayers, defaultValue: false);
+  static Future<void> setSmartSortPlayers(bool smartSort) => _setBool(_keySmartSortPlayers, smartSort);
 
   // Helper to create player name with possessive apostrophe
   // Automatically detects Phone vs Tablet based on screen size
@@ -430,138 +381,47 @@ class SettingsService {
   }
 
   // Home Screen Row Settings (Main rows - default on)
-  static Future<bool> getShowRecentAlbums() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowRecentAlbums) ?? true;
-  }
+  static Future<bool> getShowRecentAlbums() => _getBool(_keyShowRecentAlbums, defaultValue: true);
+  static Future<void> setShowRecentAlbums(bool show) => _setBool(_keyShowRecentAlbums, show);
 
-  static Future<void> setShowRecentAlbums(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowRecentAlbums, show);
-  }
+  static Future<bool> getShowDiscoverArtists() => _getBool(_keyShowDiscoverArtists, defaultValue: true);
+  static Future<void> setShowDiscoverArtists(bool show) => _setBool(_keyShowDiscoverArtists, show);
 
-  static Future<bool> getShowDiscoverArtists() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowDiscoverArtists) ?? true;
-  }
-
-  static Future<void> setShowDiscoverArtists(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowDiscoverArtists, show);
-  }
-
-  static Future<bool> getShowDiscoverAlbums() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowDiscoverAlbums) ?? true;
-  }
-
-  static Future<void> setShowDiscoverAlbums(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowDiscoverAlbums, show);
-  }
+  static Future<bool> getShowDiscoverAlbums() => _getBool(_keyShowDiscoverAlbums, defaultValue: true);
+  static Future<void> setShowDiscoverAlbums(bool show) => _setBool(_keyShowDiscoverAlbums, show);
 
   // Home Screen Audiobook Rows (default off - optional)
-  static Future<bool> getShowContinueListeningAudiobooks() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowContinueListeningAudiobooks) ?? false;
-  }
+  static Future<bool> getShowContinueListeningAudiobooks() => _getBool(_keyShowContinueListeningAudiobooks, defaultValue: false);
+  static Future<void> setShowContinueListeningAudiobooks(bool show) => _setBool(_keyShowContinueListeningAudiobooks, show);
 
-  static Future<void> setShowContinueListeningAudiobooks(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowContinueListeningAudiobooks, show);
-  }
+  static Future<bool> getShowDiscoverAudiobooks() => _getBool(_keyShowDiscoverAudiobooks, defaultValue: false);
+  static Future<void> setShowDiscoverAudiobooks(bool show) => _setBool(_keyShowDiscoverAudiobooks, show);
 
-  static Future<bool> getShowDiscoverAudiobooks() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowDiscoverAudiobooks) ?? false;
-  }
-
-  static Future<void> setShowDiscoverAudiobooks(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowDiscoverAudiobooks, show);
-  }
-
-  static Future<bool> getShowDiscoverSeries() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowDiscoverSeries) ?? false;
-  }
-
-  static Future<void> setShowDiscoverSeries(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowDiscoverSeries, show);
-  }
+  static Future<bool> getShowDiscoverSeries() => _getBool(_keyShowDiscoverSeries, defaultValue: false);
+  static Future<void> setShowDiscoverSeries(bool show) => _setBool(_keyShowDiscoverSeries, show);
 
   // Home Screen Favorites Settings (default off)
-  static Future<bool> getShowFavoriteAlbums() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowFavoriteAlbums) ?? false;
-  }
+  static Future<bool> getShowFavoriteAlbums() => _getBool(_keyShowFavoriteAlbums, defaultValue: false);
+  static Future<void> setShowFavoriteAlbums(bool show) => _setBool(_keyShowFavoriteAlbums, show);
 
-  static Future<void> setShowFavoriteAlbums(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowFavoriteAlbums, show);
-  }
+  static Future<bool> getShowFavoriteArtists() => _getBool(_keyShowFavoriteArtists, defaultValue: false);
+  static Future<void> setShowFavoriteArtists(bool show) => _setBool(_keyShowFavoriteArtists, show);
 
-  static Future<bool> getShowFavoriteArtists() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowFavoriteArtists) ?? false;
-  }
+  static Future<bool> getShowFavoriteTracks() => _getBool(_keyShowFavoriteTracks, defaultValue: false);
+  static Future<void> setShowFavoriteTracks(bool show) => _setBool(_keyShowFavoriteTracks, show);
 
-  static Future<void> setShowFavoriteArtists(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowFavoriteArtists, show);
-  }
+  static Future<bool> getShowFavoritePlaylists() => _getBool(_keyShowFavoritePlaylists, defaultValue: false);
+  static Future<void> setShowFavoritePlaylists(bool show) => _setBool(_keyShowFavoritePlaylists, show);
 
-  static Future<bool> getShowFavoriteTracks() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowFavoriteTracks) ?? false;
-  }
+  static Future<bool> getShowFavoriteRadioStations() => _getBool(_keyShowFavoriteRadioStations, defaultValue: false);
+  static Future<void> setShowFavoriteRadioStations(bool show) => _setBool(_keyShowFavoriteRadioStations, show);
 
-  static Future<void> setShowFavoriteTracks(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowFavoriteTracks, show);
-  }
-
-  static Future<bool> getShowFavoritePlaylists() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowFavoritePlaylists) ?? false;
-  }
-
-  static Future<void> setShowFavoritePlaylists(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowFavoritePlaylists, show);
-  }
-
-  static Future<bool> getShowFavoriteRadioStations() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowFavoriteRadioStations) ?? false;
-  }
-
-  static Future<void> setShowFavoriteRadioStations(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowFavoriteRadioStations, show);
-  }
-
-  static Future<bool> getShowFavoritePodcasts() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowFavoritePodcasts) ?? false;
-  }
-
-  static Future<void> setShowFavoritePodcasts(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowFavoritePodcasts, show);
-  }
+  static Future<bool> getShowFavoritePodcasts() => _getBool(_keyShowFavoritePodcasts, defaultValue: false);
+  static Future<void> setShowFavoritePodcasts(bool show) => _setBool(_keyShowFavoritePodcasts, show);
 
   // Library Artists Filter - show only artists that have albums in library
-  static Future<bool> getShowOnlyArtistsWithAlbums() async {
-    final prefs = await _getPrefs();
-    return prefs.getBool(_keyShowOnlyArtistsWithAlbums) ?? false;
-  }
-
-  static Future<void> setShowOnlyArtistsWithAlbums(bool show) async {
-    final prefs = await _getPrefs();
-    await prefs.setBool(_keyShowOnlyArtistsWithAlbums, show);
-  }
+  static Future<bool> getShowOnlyArtistsWithAlbums() => _getBool(_keyShowOnlyArtistsWithAlbums, defaultValue: false);
+  static Future<void> setShowOnlyArtistsWithAlbums(bool show) => _setBool(_keyShowOnlyArtistsWithAlbums, show);
 
   // Home Row Order
   static Future<List<String>> getHomeRowOrder() async {
@@ -594,31 +454,14 @@ class SettingsService {
   }
 
   // View Mode Settings - Artist Albums
-  static Future<String> getArtistAlbumsSortOrder() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyArtistAlbumsSortOrder) ?? 'alpha';
-  }
+  static Future<String?> getArtistAlbumsSortOrder() => _getString(_keyArtistAlbumsSortOrder, defaultValue: 'alpha');
+  static Future<void> setArtistAlbumsSortOrder(String order) => _setString(_keyArtistAlbumsSortOrder, order);
 
-  static Future<void> setArtistAlbumsSortOrder(String order) async {
-    final prefs = await _getPrefs();
-    await prefs.setString(_keyArtistAlbumsSortOrder, order);
-  }
-
-  static Future<String> getArtistAlbumsViewMode() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyArtistAlbumsViewMode) ?? 'grid2';
-  }
-
-  static Future<void> setArtistAlbumsViewMode(String mode) async {
-    final prefs = await _getPrefs();
-    await prefs.setString(_keyArtistAlbumsViewMode, mode);
-  }
+  static Future<String?> getArtistAlbumsViewMode() => _getString(_keyArtistAlbumsViewMode, defaultValue: 'grid2');
+  static Future<void> setArtistAlbumsViewMode(String mode) => _setString(_keyArtistAlbumsViewMode, mode);
 
   // View Mode Settings - Library Artists
-  static Future<String> getLibraryArtistsViewMode() async {
-    final prefs = await _getPrefs();
-    return prefs.getString(_keyLibraryArtistsViewMode) ?? 'list';
-  }
+  static Future<String?> getLibraryArtistsViewMode() => _getString(_keyLibraryArtistsViewMode, defaultValue: 'list');
 
   static Future<void> setLibraryArtistsViewMode(String mode) async {
     final prefs = await _getPrefs();
