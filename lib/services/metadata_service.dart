@@ -326,120 +326,171 @@ class MetadataService {
     return null;
   }
 
-  /// Fetches author image URL from multiple sources
-  /// Priority: 1. Audnexus, 2. Open Library, 3. Wikipedia
-  /// Returns the image URL if found, null otherwise
-  static Future<String?> getAuthorImageUrl(String authorName) async {
-    // Check cache first
-    final cacheKey = 'authorImage:$authorName';
-    if (_authorImageCache.containsKey(cacheKey)) {
-      return _authorImageCache[cacheKey];
+  /// Generate name variations for fuzzy matching
+  /// Returns a list of name variations to try, in priority order
+  static List<String> _generateNameVariations(String authorName) {
+    final variations = <String>[];
+    final original = authorName.trim();
+
+    // Always try original first
+    variations.add(original);
+
+    // Handle "Lastname, Firstname" format
+    if (original.contains(',')) {
+      final parts = original.split(',').map((p) => p.trim()).toList();
+      if (parts.length == 2) {
+        variations.add('${parts[1]} ${parts[0]}'); // "Firstname Lastname"
+      }
     }
 
-    // Try Audnexus (specifically for audiobook authors, uses Audible data)
+    // Remove common titles
+    final titles = ['Dr.', 'Dr', 'Mr.', 'Mr', 'Mrs.', 'Mrs', 'Ms.', 'Ms',
+                    'Prof.', 'Prof', 'Professor', 'Sir', 'Dame', 'Lord', 'Lady'];
+    String withoutTitle = original;
+    for (final title in titles) {
+      if (withoutTitle.toLowerCase().startsWith(title.toLowerCase() + ' ')) {
+        withoutTitle = withoutTitle.substring(title.length).trim();
+        if (withoutTitle != original) {
+          variations.add(withoutTitle);
+        }
+        break;
+      }
+    }
+
+    // Remove suffixes
+    final suffixes = [', Jr.', ', Jr', ' Jr.', ' Jr', ', Sr.', ', Sr', ' Sr.', ' Sr',
+                      ', III', ' III', ', II', ' II', ', IV', ' IV', ', PhD', ', Ph.D.'];
+    String withoutSuffix = withoutTitle;
+    for (final suffix in suffixes) {
+      if (withoutSuffix.toLowerCase().endsWith(suffix.toLowerCase())) {
+        withoutSuffix = withoutSuffix.substring(0, withoutSuffix.length - suffix.length).trim();
+        if (withoutSuffix != withoutTitle && !variations.contains(withoutSuffix)) {
+          variations.add(withoutSuffix);
+        }
+        break;
+      }
+    }
+
+    // Split into parts for further variations
+    final parts = withoutSuffix.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+
+    if (parts.length >= 2) {
+      // Try first + last only (skip middle names/initials)
+      final firstLast = '${parts.first} ${parts.last}';
+      if (!variations.contains(firstLast)) {
+        variations.add(firstLast);
+      }
+
+      // If first part is an initial (like "J." or "J"), try expanding common patterns
+      if (parts.first.length <= 2 || (parts.first.length == 2 && parts.first.endsWith('.'))) {
+        // Try just last name
+        if (!variations.contains(parts.last)) {
+          variations.add(parts.last);
+        }
+      }
+
+      // Handle double-barreled first names like "J.K." or "J. K."
+      if (parts.length >= 3) {
+        final first = parts.first;
+        final second = parts[1];
+        // Check if first two parts are initials
+        if ((first.length <= 2 || first.endsWith('.')) &&
+            (second.length <= 2 || second.endsWith('.'))) {
+          // Try third part onwards as the name
+          final restOfName = parts.sublist(2).join(' ');
+          if (restOfName.isNotEmpty && !variations.contains(restOfName)) {
+            variations.add(restOfName);
+          }
+        }
+      }
+    }
+
+    // Remove duplicates while preserving order
+    return variations.toSet().toList();
+  }
+
+  /// Try to fetch author image from Audnexus
+  static Future<String?> _tryAudnexus(String name) async {
     try {
-      final audnexusUri = Uri.https(
-        'api.audnex.us',
-        '/authors',
-        {'name': authorName},
-      );
+      final uri = Uri.https('api.audnex.us', '/authors', {'name': name});
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
 
-      final audnexusResponse = await http.get(audnexusUri).timeout(const Duration(seconds: 5));
-
-      if (audnexusResponse.statusCode == 200) {
-        final data = json.decode(audnexusResponse.body);
-        // Audnexus returns an array of authors
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
         if (data is List && data.isNotEmpty) {
-          final author = data[0];
-          final imageUrl = author['image'] as String?;
+          final imageUrl = data[0]['image'] as String?;
           if (imageUrl != null && imageUrl.isNotEmpty) {
-            _authorImageCache[cacheKey] = imageUrl;
             return imageUrl;
           }
         }
       }
     } catch (e) {
-      _logger.warning('Audnexus author image error: $e', context: 'Metadata');
+      _logger.warning('Audnexus author image error for "$name": $e', context: 'Metadata');
     }
+    return null;
+  }
 
-    // Fall back to Open Library API
+  /// Try to fetch author image from Open Library
+  static Future<String?> _tryOpenLibrary(String name) async {
     try {
-      final uri = Uri.https(
-        'openlibrary.org',
-        '/search/authors.json',
-        {
-          'q': authorName,
-          'limit': '1',
-        },
-      );
-
+      final uri = Uri.https('openlibrary.org', '/search/authors.json', {
+        'q': name,
+        'limit': '1',
+      });
       final response = await http.get(uri).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final authors = data['docs'] as List?;
         if (authors != null && authors.isNotEmpty) {
-          final author = authors[0];
-          final authorKey = author['key'] as String?;
+          final authorKey = authors[0]['key'] as String?;
           if (authorKey != null) {
-            // Open Library author images are available at:
-            // https://covers.openlibrary.org/a/olid/{OLID}-L.jpg
             final olid = authorKey.replaceAll('/authors/', '');
             final imageUrl = 'https://covers.openlibrary.org/a/olid/$olid-L.jpg';
 
-            // Verify the image actually exists (Open Library returns 404 for missing images)
+            // Verify image exists
             try {
-              final imageCheck = await http.head(Uri.parse(imageUrl)).timeout(const Duration(seconds: 3));
-              if (imageCheck.statusCode == 200) {
-                _authorImageCache[cacheKey] = imageUrl;
+              final check = await http.head(Uri.parse(imageUrl)).timeout(const Duration(seconds: 3));
+              if (check.statusCode == 200) {
                 return imageUrl;
               }
-            } catch (_) {
-              // Image doesn't exist, continue to cache null
-            }
+            } catch (_) {}
           }
         }
       }
     } catch (e) {
-      _logger.warning('Open Library author image error: $e', context: 'Metadata');
+      _logger.warning('Open Library author image error for "$name": $e', context: 'Metadata');
     }
+    return null;
+  }
 
-    // Fall back to Wikipedia API
+  /// Try to fetch author image from Wikipedia
+  static Future<String?> _tryWikipedia(String name) async {
     try {
-      // Search for author on Wikipedia
-      final searchUri = Uri.https(
-        'en.wikipedia.org',
-        '/w/api.php',
-        {
-          'action': 'query',
-          'list': 'search',
-          'srsearch': '$authorName writer',
-          'srlimit': '1',
-          'format': 'json',
-        },
-      );
-
+      // Search for author
+      final searchUri = Uri.https('en.wikipedia.org', '/w/api.php', {
+        'action': 'query',
+        'list': 'search',
+        'srsearch': '$name writer author',
+        'srlimit': '1',
+        'format': 'json',
+      });
       final searchResponse = await http.get(searchUri).timeout(const Duration(seconds: 5));
 
       if (searchResponse.statusCode == 200) {
         final searchData = json.decode(searchResponse.body);
-        final searchResults = searchData['query']?['search'] as List?;
-        if (searchResults != null && searchResults.isNotEmpty) {
-          final pageTitle = searchResults[0]['title'] as String?;
+        final results = searchData['query']?['search'] as List?;
+        if (results != null && results.isNotEmpty) {
+          final pageTitle = results[0]['title'] as String?;
           if (pageTitle != null) {
             // Get page image
-            final imageUri = Uri.https(
-              'en.wikipedia.org',
-              '/w/api.php',
-              {
-                'action': 'query',
-                'titles': pageTitle,
-                'prop': 'pageimages',
-                'pithumbsize': '500',
-                'format': 'json',
-              },
-            );
-
+            final imageUri = Uri.https('en.wikipedia.org', '/w/api.php', {
+              'action': 'query',
+              'titles': pageTitle,
+              'prop': 'pageimages',
+              'pithumbsize': '500',
+              'format': 'json',
+            });
             final imageResponse = await http.get(imageUri).timeout(const Duration(seconds: 5));
 
             if (imageResponse.statusCode == 200) {
@@ -450,7 +501,6 @@ class MetadataService {
                 final thumbnail = page?['thumbnail'] as Map<String, dynamic>?;
                 final imageUrl = thumbnail?['source'] as String?;
                 if (imageUrl != null && imageUrl.isNotEmpty) {
-                  _authorImageCache[cacheKey] = imageUrl;
                   return imageUrl;
                 }
               }
@@ -459,7 +509,50 @@ class MetadataService {
         }
       }
     } catch (e) {
-      _logger.warning('Wikipedia author image error: $e', context: 'Metadata');
+      _logger.warning('Wikipedia author image error for "$name": $e', context: 'Metadata');
+    }
+    return null;
+  }
+
+  /// Fetches author image URL from multiple sources with fuzzy name matching
+  /// Priority: 1. Audnexus, 2. Open Library, 3. Wikipedia
+  /// Tries name variations if exact match fails
+  static Future<String?> getAuthorImageUrl(String authorName) async {
+    // Check cache first
+    final cacheKey = 'authorImage:$authorName';
+    if (_authorImageCache.containsKey(cacheKey)) {
+      return _authorImageCache[cacheKey];
+    }
+
+    // Generate name variations for fuzzy matching
+    final variations = _generateNameVariations(authorName);
+
+    // Try each source with all variations before moving to next source
+    // This prioritizes source quality over name variation
+
+    // 1. Try Audnexus (best for audiobook authors)
+    for (final name in variations) {
+      final result = await _tryAudnexus(name);
+      if (result != null) {
+        _authorImageCache[cacheKey] = result;
+        return result;
+      }
+    }
+
+    // 2. Try Open Library
+    for (final name in variations) {
+      final result = await _tryOpenLibrary(name);
+      if (result != null) {
+        _authorImageCache[cacheKey] = result;
+        return result;
+      }
+    }
+
+    // 3. Try Wikipedia (only first variation to avoid too many requests)
+    final wikiResult = await _tryWikipedia(variations.first);
+    if (wikiResult != null) {
+      _authorImageCache[cacheKey] = wikiResult;
+      return wikiResult;
     }
 
     // Cache the null result to avoid repeated failed lookups
