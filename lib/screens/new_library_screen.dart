@@ -2096,13 +2096,24 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final authorImageUrl = _authorImages[authorName];
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
 
+    // Fallback widget for when no image is available
+    Widget authorFallback = Icon(
+      Icons.person_rounded,
+      color: colorScheme.onPrimaryContainer,
+      size: 28,
+    );
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       leading: Hero(
         tag: HeroTags.authorImage + authorName + '_library$heroSuffix',
-        child: CircleAvatar(
-          backgroundColor: colorScheme.primaryContainer,
-          radius: 24,
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            shape: BoxShape.circle,
+          ),
           child: authorImageUrl != null
               ? ClipOval(
                   child: CachedNetworkImage(
@@ -2114,32 +2125,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     memCacheHeight: 128,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
-                    placeholder: (_, __) => Text(
-                      authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        color: colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                    errorWidget: (_, __, ___) => Text(
-                      authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        color: colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
+                    placeholder: (_, __) => Center(child: authorFallback),
+                    errorWidget: (_, __, ___) => Center(child: authorFallback),
                   ),
                 )
-              : Text(
-                  authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                  style: TextStyle(
-                    color: colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
+              : Center(child: authorFallback),
         ),
       ),
       title: Text(
@@ -2165,6 +2155,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final textTheme = Theme.of(context).textTheme;
     final authorImageUrl = _authorImages[authorName];
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
+    final iconSize = _authorsViewMode == 'grid3' ? 36.0 : 48.0;
+
+    // Fallback widget for when no image is available
+    Widget authorFallback = Icon(
+      Icons.person_rounded,
+      color: colorScheme.onPrimaryContainer,
+      size: iconSize,
+    );
 
     // Match music artist card layout
     return GestureDetector(
@@ -2190,9 +2188,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                         color: colorScheme.primaryContainer,
                         shape: BoxShape.circle,
                       ),
-                      child: ClipOval(
-                        child: authorImageUrl != null
-                            ? CachedNetworkImage(
+                      child: authorImageUrl != null
+                          ? ClipOval(
+                              child: CachedNetworkImage(
                                 imageUrl: authorImageUrl,
                                 fit: BoxFit.cover,
                                 width: size,
@@ -2201,38 +2199,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                                 memCacheHeight: 256,
                                 fadeInDuration: Duration.zero,
                                 fadeOutDuration: Duration.zero,
-                                placeholder: (_, __) => Center(
-                                  child: Text(
-                                    authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                                    style: TextStyle(
-                                      color: colorScheme.onPrimaryContainer,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: _authorsViewMode == 'grid3' ? 28 : 36,
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: (_, __, ___) => Center(
-                                  child: Text(
-                                    authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                                    style: TextStyle(
-                                      color: colorScheme.onPrimaryContainer,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: _authorsViewMode == 'grid3' ? 28 : 36,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                                  style: TextStyle(
-                                    color: colorScheme.onPrimaryContainer,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: _authorsViewMode == 'grid3' ? 28 : 36,
-                                  ),
-                                ),
+                                placeholder: (_, __) => Center(child: authorFallback),
+                                errorWidget: (_, __, ___) => Center(child: authorFallback),
                               ),
-                      ),
+                            )
+                          : Center(child: authorFallback),
                     ),
                   ),
                 );
