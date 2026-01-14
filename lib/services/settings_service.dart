@@ -454,14 +454,14 @@ class SettingsService {
   }
 
   // View Mode Settings - Artist Albums
-  static Future<String?> getArtistAlbumsSortOrder() => _getString(_keyArtistAlbumsSortOrder, defaultValue: 'alpha');
+  static Future<String> getArtistAlbumsSortOrder() async => (await _getString(_keyArtistAlbumsSortOrder)) ?? 'alpha';
   static Future<void> setArtistAlbumsSortOrder(String order) => _setString(_keyArtistAlbumsSortOrder, order);
 
-  static Future<String?> getArtistAlbumsViewMode() => _getString(_keyArtistAlbumsViewMode, defaultValue: 'grid2');
+  static Future<String> getArtistAlbumsViewMode() async => (await _getString(_keyArtistAlbumsViewMode)) ?? 'grid2';
   static Future<void> setArtistAlbumsViewMode(String mode) => _setString(_keyArtistAlbumsViewMode, mode);
 
   // View Mode Settings - Library Artists
-  static Future<String?> getLibraryArtistsViewMode() => _getString(_keyLibraryArtistsViewMode, defaultValue: 'list');
+  static Future<String> getLibraryArtistsViewMode() async => (await _getString(_keyLibraryArtistsViewMode)) ?? 'list';
 
   static Future<void> setLibraryArtistsViewMode(String mode) async {
     final prefs = await _getPrefs();
