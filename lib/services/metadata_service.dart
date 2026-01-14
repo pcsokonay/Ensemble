@@ -571,12 +571,32 @@ class MetadataService {
 
     // Handle comma-separated author names (e.g., "Neil Gaiman, Dirk Maggs")
     // Try to get image for the first/primary author
-    if (authorName.contains(',') && !RegExp(r'^[A-Z]\.\s*,').hasMatch(authorName)) {
-      // Split on comma but not if it looks like "Lastname, Firstname" format
-      // (which would have a single letter before the comma like "Tolkien, J.R.R.")
+    if (authorName.contains(',')) {
       final authors = authorName.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-      if (authors.length >= 2 && authors[0].split(' ').length > 1) {
-        // First part has multiple words, so this is likely "Author1, Author2" not "Lastname, First"
+
+      // Skip if this looks like "Lastname, Firstname" format or has suffixes
+      // - Second part is initials (J.R.R., J.K., etc.)
+      // - Second part is a suffix (Jr., Sr., III, PhD, etc.)
+      final suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'phd', 'ph.d.', 'md', 'm.d.'];
+      if (authors.length == 2) {
+        final secondPart = authors[1].toLowerCase();
+        // Check if second part is a suffix or looks like initials
+        if (suffixes.contains(secondPart) ||
+            RegExp(r'^[a-z]\.?\s*[a-z]?\.?\s*[a-z]?\.?$').hasMatch(secondPart)) {
+          // This is "Lastname, First" or "Name, Jr." - don't split
+        } else if (authors[0].split(' ').length > 1 && authors[1].split(' ').length > 1) {
+          // Both parts have multiple words - likely "Author1, Author2"
+          for (final author in authors) {
+            final result = await getAuthorImageUrl(author);
+            if (result != null) {
+              _authorImageCache[cacheKey] = result;
+              return result;
+            }
+          }
+          // Don't cache null here - fall through to try the full name
+        }
+      } else if (authors.length > 2) {
+        // Multiple commas = definitely multiple authors
         for (final author in authors) {
           final result = await getAuthorImageUrl(author);
           if (result != null) {
@@ -584,8 +604,7 @@ class MetadataService {
             return result;
           }
         }
-        _authorImageCache[cacheKey] = null;
-        return null;
+        // Don't cache null - fall through to try full name
       }
     }
 
