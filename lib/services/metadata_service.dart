@@ -509,6 +509,60 @@ class MetadataService {
     return null;
   }
 
+  /// Try to fetch author image from Wikidata (structured Wikipedia data)
+  static Future<String?> _tryWikidata(String name) async {
+    try {
+      // Search for entity by name
+      final searchUri = Uri.https('www.wikidata.org', '/w/api.php', {
+        'action': 'wbsearchentities',
+        'search': name,
+        'language': 'en',
+        'type': 'item',
+        'limit': '3',
+        'format': 'json',
+      });
+      final searchResponse = await http.get(searchUri).timeout(const Duration(seconds: 5));
+
+      if (searchResponse.statusCode == 200) {
+        final searchData = json.decode(searchResponse.body);
+        final results = searchData['search'] as List?;
+
+        // Try each result to find one with an image
+        for (final result in results ?? []) {
+          final entityId = result['id'] as String?;
+          if (entityId == null) continue;
+
+          // Get the image property (P18)
+          final claimsUri = Uri.https('www.wikidata.org', '/w/api.php', {
+            'action': 'wbgetclaims',
+            'entity': entityId,
+            'property': 'P18', // P18 is the "image" property
+            'format': 'json',
+          });
+          final claimsResponse = await http.get(claimsUri).timeout(const Duration(seconds: 5));
+
+          if (claimsResponse.statusCode == 200) {
+            final claimsData = json.decode(claimsResponse.body);
+            final claims = claimsData['claims'] as Map<String, dynamic>?;
+            final imageProperty = claims?['P18'] as List?;
+
+            if (imageProperty != null && imageProperty.isNotEmpty) {
+              final imageName = imageProperty[0]['mainsnak']?['datavalue']?['value'] as String?;
+              if (imageName != null && imageName.isNotEmpty) {
+                // Convert filename to Wikimedia Commons URL
+                final encodedName = Uri.encodeComponent(imageName.replaceAll(' ', '_'));
+                return 'https://commons.wikimedia.org/wiki/Special:FilePath/$encodedName?width=500';
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      _logger.warning('Wikidata author image error for "$name": $e', context: 'Metadata');
+    }
+    return null;
+  }
+
   /// Try to fetch author image from Wikipedia
   static Future<String?> _tryWikipedia(String name) async {
     try {
@@ -632,7 +686,16 @@ class MetadataService {
       }
     }
 
-    // 3. Try Wikipedia (try top 3 variations - best source for famous authors)
+    // 3. Try Wikidata (structured data, good for finding exact person)
+    for (final name in variations.take(2)) {
+      final wikidataResult = await _tryWikidata(name);
+      if (wikidataResult != null) {
+        _authorImageCache[cacheKey] = wikidataResult;
+        return wikidataResult;
+      }
+    }
+
+    // 4. Try Wikipedia (search-based, good fallback)
     for (final name in variations.take(3)) {
       final wikiResult = await _tryWikipedia(name);
       if (wikiResult != null) {

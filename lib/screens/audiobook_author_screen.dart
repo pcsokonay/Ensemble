@@ -184,33 +184,35 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
                           color: colorScheme.primaryContainer,
                           shape: BoxShape.circle,
                         ),
-                        child: ClipOval(
-                          child: _authorImageUrl != null
-                              ? CachedNetworkImage(
-                                  imageUrl: _authorImageUrl!,
-                                  fit: BoxFit.cover,
-                                  width: coverSize,
-                                  height: coverSize,
-                                  // Only set width - height scales proportionally to preserve aspect ratio
-                                  memCacheWidth: 256,
-                                  fadeInDuration: Duration.zero,
-                                  fadeOutDuration: Duration.zero,
-                                  placeholder: (_, __) => Icon(
-                                    MdiIcons.accountOutline,
-                                    size: coverSize * 0.5,
-                                    color: colorScheme.onPrimaryContainer,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Icon always present underneath
+                            Icon(
+                              MdiIcons.accountOutline,
+                              size: coverSize * 0.5,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                            // Image covers icon when loaded
+                            if (_authorImageUrl != null)
+                              SizedBox(
+                                width: coverSize,
+                                height: coverSize,
+                                child: ClipOval(
+                                  child: CachedNetworkImage(
+                                    imageUrl: _authorImageUrl!,
+                                    fit: BoxFit.cover,
+                                    width: coverSize,
+                                    height: coverSize,
+                                    memCacheWidth: 256,
+                                    fadeInDuration: Duration.zero,
+                                    fadeOutDuration: Duration.zero,
+                                    placeholder: (_, __) => const SizedBox.shrink(),
+                                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
                                   ),
-                                  errorWidget: (_, __, ___) => Icon(
-                                    MdiIcons.accountOutline,
-                                    size: coverSize * 0.5,
-                                    color: colorScheme.onPrimaryContainer,
-                                  ),
-                                )
-                              : Icon(
-                                  MdiIcons.accountOutline,
-                                  size: coverSize * 0.5,
-                                  color: colorScheme.onPrimaryContainer,
                                 ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
