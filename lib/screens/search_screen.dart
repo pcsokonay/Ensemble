@@ -487,81 +487,97 @@ class SearchScreenState extends State<SearchScreen> {
               decoration: const BoxDecoration(),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceVariant.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      // Search field
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: TextField(
-                            controller: _searchController,
-                            focusNode: _focusNode,
-                            style: TextStyle(color: colorScheme.onSurface),
-                            cursorColor: colorScheme.primary,
-                            textInputAction: TextInputAction.search,
-                            textAlignVertical: TextAlignVertical.center,
-                            decoration: InputDecoration(
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                              hintText: S.of(context)!.searchMusic,
-                              hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
-                              border: InputBorder.none,
-                              suffixIcon: _hasSearchText
-                                  ? IconButton(
-                                      icon: Icon(Icons.clear_rounded, color: colorScheme.onSurface.withOpacity(0.5)),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        setState(() {
-                                          _hasSearchText = false;
-                                          _searchResults = {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': [], 'podcasts': []};
-                                          _hasSearched = false;
-                                          _searchError = null;
-                                          _cachedListItems.clear();
-                                          _cachedAvailableFilters = null;
-                                        });
-                                      },
-                                    )
-                                  : null,
+                child: Row(
+                  children: [
+                    // Search field container
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceVariant.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _focusNode,
+                          style: TextStyle(color: colorScheme.onSurface),
+                          cursorColor: colorScheme.primary,
+                          textInputAction: TextInputAction.search,
+                          textAlignVertical: TextAlignVertical.center,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                            hintText: S.of(context)!.searchMusic,
+                            hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
+                            border: InputBorder.none,
+                            prefixIcon: Icon(
+                              Icons.search_rounded,
+                              color: colorScheme.onSurface.withOpacity(0.5),
                             ),
-                            onChanged: (value) {
-                              // PERF: Only rebuild when clear button visibility changes
-                              final hasText = value.isNotEmpty;
-                              if (hasText != _hasSearchText) {
-                                setState(() {
-                                  _hasSearchText = hasText;
-                                });
-                              }
-                              _onSearchChanged(value);
-                            },
-                            onSubmitted: (query) => _performSearch(query),
+                            suffixIcon: _hasSearchText
+                                ? IconButton(
+                                    icon: Icon(Icons.clear_rounded, color: colorScheme.onSurface.withOpacity(0.5)),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _hasSearchText = false;
+                                        _searchResults = {'artists': [], 'albums': [], 'tracks': [], 'playlists': [], 'audiobooks': [], 'podcasts': []};
+                                        _hasSearched = false;
+                                        _searchError = null;
+                                        _cachedListItems.clear();
+                                        _cachedAvailableFilters = null;
+                                      });
+                                    },
+                                  )
+                                : null,
                           ),
-                        ),
-                      ),
-                      // Library-only toggle
-                      Tooltip(
-                        message: S.of(context)!.libraryOnly,
-                        child: IconButton(
-                          icon: Icon(
-                            _libraryOnly ? Icons.library_music : Icons.library_music_outlined,
-                            color: _libraryOnly ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.5),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _libraryOnly = !_libraryOnly;
-                            });
-                            if (_searchController.text.isNotEmpty) {
-                              _performSearch(_searchController.text);
+                          onChanged: (value) {
+                            // PERF: Only rebuild when clear button visibility changes
+                            final hasText = value.isNotEmpty;
+                            if (hasText != _hasSearchText) {
+                              setState(() {
+                                _hasSearchText = hasText;
+                              });
                             }
+                            _onSearchChanged(value);
                           },
+                          onSubmitted: (query) => _performSearch(query),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Library-only toggle with circle background
+                    Tooltip(
+                      message: S.of(context)!.libraryOnly,
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Material(
+                          color: _libraryOnly
+                              ? colorScheme.primary
+                              : colorScheme.surfaceVariant.withOpacity(0.6),
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _libraryOnly = !_libraryOnly;
+                              });
+                              if (_searchController.text.isNotEmpty) {
+                                _performSearch(_searchController.text);
+                              }
+                            },
+                            customBorder: const CircleBorder(),
+                            child: Icon(
+                              _libraryOnly ? Icons.library_music : Icons.library_music_outlined,
+                              size: 22,
+                              color: _libraryOnly
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
