@@ -1348,7 +1348,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   // ============ FILTER ROWS ============
   // Consistent height for filter rows
-  static const double _filterRowHeight = 48.0;
+  static const double _filterRowHeight = 36.0;
 
   Widget _buildFilterRows(ColorScheme colorScheme, S l10n, {required bool showLibraryTypeRow}) {
     return Column(
@@ -1795,10 +1795,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final sortIcon = _getSortIcon(currentSort);
     final fadedCircleColor = colorScheme.surfaceVariant.withOpacity(0.6);
 
-    // Material Design minimum touch target: 48x48
-    // Using 44x44 (acceptable for icon buttons) with 20px icons
-    const double buttonSize = 44.0;
-    const double iconSize = 20.0;
+    // Compact touch targets for filter row buttons
+    const double buttonSize = 36.0;
+    const double iconSize = 18.0;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
