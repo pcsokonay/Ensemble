@@ -511,50 +511,59 @@ class MetadataService {
 
   /// Try to fetch author image from Wikipedia
   static Future<String?> _tryWikipedia(String name) async {
-    try {
-      // Search for author
-      final searchUri = Uri.https('en.wikipedia.org', '/w/api.php', {
-        'action': 'query',
-        'list': 'search',
-        'srsearch': '$name writer author',
-        'srlimit': '1',
-        'format': 'json',
-      });
-      final searchResponse = await http.get(searchUri).timeout(const Duration(seconds: 5));
+    // Try different search queries - sometimes "writer author" suffix helps, sometimes it hurts
+    final searchQueries = [
+      name,                        // Try exact name first
+      '$name author',              // Then with author
+      '$name writer',              // Then with writer
+      '$name novelist',            // Then with novelist
+    ];
 
-      if (searchResponse.statusCode == 200) {
-        final searchData = json.decode(searchResponse.body);
-        final results = searchData['query']?['search'] as List?;
-        if (results != null && results.isNotEmpty) {
-          final pageTitle = results[0]['title'] as String?;
-          if (pageTitle != null) {
-            // Get page image
-            final imageUri = Uri.https('en.wikipedia.org', '/w/api.php', {
-              'action': 'query',
-              'titles': pageTitle,
-              'prop': 'pageimages',
-              'pithumbsize': '500',
-              'format': 'json',
-            });
-            final imageResponse = await http.get(imageUri).timeout(const Duration(seconds: 5));
+    for (final query in searchQueries) {
+      try {
+        final searchUri = Uri.https('en.wikipedia.org', '/w/api.php', {
+          'action': 'query',
+          'list': 'search',
+          'srsearch': query,
+          'srlimit': '1',
+          'format': 'json',
+        });
+        final searchResponse = await http.get(searchUri).timeout(const Duration(seconds: 5));
 
-            if (imageResponse.statusCode == 200) {
-              final imageData = json.decode(imageResponse.body);
-              final pages = imageData['query']?['pages'] as Map<String, dynamic>?;
-              if (pages != null && pages.isNotEmpty) {
-                final page = pages.values.first as Map<String, dynamic>?;
-                final thumbnail = page?['thumbnail'] as Map<String, dynamic>?;
-                final imageUrl = thumbnail?['source'] as String?;
-                if (imageUrl != null && imageUrl.isNotEmpty) {
-                  return imageUrl;
+        if (searchResponse.statusCode == 200) {
+          final searchData = json.decode(searchResponse.body);
+          final results = searchData['query']?['search'] as List?;
+          if (results != null && results.isNotEmpty) {
+            final pageTitle = results[0]['title'] as String?;
+            if (pageTitle != null) {
+              // Get page image
+              final imageUri = Uri.https('en.wikipedia.org', '/w/api.php', {
+                'action': 'query',
+                'titles': pageTitle,
+                'prop': 'pageimages',
+                'pithumbsize': '500',
+                'format': 'json',
+              });
+              final imageResponse = await http.get(imageUri).timeout(const Duration(seconds: 5));
+
+              if (imageResponse.statusCode == 200) {
+                final imageData = json.decode(imageResponse.body);
+                final pages = imageData['query']?['pages'] as Map<String, dynamic>?;
+                if (pages != null && pages.isNotEmpty) {
+                  final page = pages.values.first as Map<String, dynamic>?;
+                  final thumbnail = page?['thumbnail'] as Map<String, dynamic>?;
+                  final imageUrl = thumbnail?['source'] as String?;
+                  if (imageUrl != null && imageUrl.isNotEmpty) {
+                    return imageUrl;
+                  }
                 }
               }
             }
           }
         }
+      } catch (e) {
+        _logger.warning('Wikipedia author image error for "$query": $e', context: 'Metadata');
       }
-    } catch (e) {
-      _logger.warning('Wikipedia author image error for "$name": $e', context: 'Metadata');
     }
     return null;
   }
@@ -567,6 +576,26 @@ class MetadataService {
     final cacheKey = 'authorImage:$authorName';
     if (_authorImageCache.containsKey(cacheKey)) {
       return _authorImageCache[cacheKey];
+    }
+
+    // Handle comma-separated author names (e.g., "Neil Gaiman, Dirk Maggs")
+    // Try to get image for the first/primary author
+    if (authorName.contains(',') && !RegExp(r'^[A-Z]\.\s*,').hasMatch(authorName)) {
+      // Split on comma but not if it looks like "Lastname, Firstname" format
+      // (which would have a single letter before the comma like "Tolkien, J.R.R.")
+      final authors = authorName.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      if (authors.length >= 2 && authors[0].split(' ').length > 1) {
+        // First part has multiple words, so this is likely "Author1, Author2" not "Lastname, First"
+        for (final author in authors) {
+          final result = await getAuthorImageUrl(author);
+          if (result != null) {
+            _authorImageCache[cacheKey] = result;
+            return result;
+          }
+        }
+        _authorImageCache[cacheKey] = null;
+        return null;
+      }
     }
 
     // Generate name variations for fuzzy matching
