@@ -34,6 +34,10 @@ final _logger = DebugLogger();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize SharedPreferences cache early for performance
+  await SettingsService.initialize();
+  _logger.log('⚡ SharedPreferences cached');
+
   // Initialize local database
   await DatabaseService.instance.initialize();
   _logger.log('💾 Database initialized');

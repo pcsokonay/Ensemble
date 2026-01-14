@@ -98,11 +98,20 @@ class SecureStorageService {
     await _storage.deleteAll();
   }
 
+  // Migration completed flag key
+  static const String _keyMigrationCompleted = 'secure_storage_migration_completed';
+
   /// Migrate credentials from SharedPreferences to secure storage.
   /// Call this once during app upgrade to migrate existing users.
+  /// Uses a flag to skip migration on subsequent runs for performance.
   static Future<void> migrateFromSharedPreferences() async {
     // Import SharedPreferences for migration
     final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // Skip if migration already completed
+    if (prefs.getBool(_keyMigrationCompleted) == true) {
+      return;
+    }
 
     // Migrate auth token
     final authToken = prefs.getString('auth_token');
@@ -144,5 +153,8 @@ class SecureStorageService {
       await setAbsApiToken(absApiToken);
       await prefs.remove('abs_api_token');
     }
+
+    // Mark migration as completed to skip on future runs
+    await prefs.setBool(_keyMigrationCompleted, true);
   }
 }
