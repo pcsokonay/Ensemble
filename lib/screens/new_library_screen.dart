@@ -2241,6 +2241,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   void _navigateToAuthor(String authorName, List<Audiobook> books, {String? heroTagSuffix, String? initialAuthorImageUrl}) {
+    updateAdaptiveColorsFromImage(context, initialAuthorImageUrl);
     Navigator.push(
       context,
       FadeSlidePageRoute(
@@ -2328,6 +2329,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   void _navigateToAudiobook(Audiobook book, {String? heroTagSuffix, String? initialImageUrl}) {
+    updateAdaptiveColorsFromImage(context, initialImageUrl);
     Navigator.push(
       context,
       FadeSlidePageRoute(
@@ -2705,6 +2707,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       ),
       onTap: () {
         _logger.log('📚 Tapped series: ${series.name}, path: ${series.id}');
+        updateAdaptiveColorsFromImage(context, firstCover);
         Navigator.push(
           context,
           FadeSlidePageRoute(
@@ -2737,6 +2740,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     return GestureDetector(
       onTap: () {
         _logger.log('📚 Tapped series: ${series.name}, path: ${series.id}');
+        updateAdaptiveColorsFromImage(context, cachedCovers?.firstOrNull);
         Navigator.push(
           context,
           FadeSlidePageRoute(
@@ -3544,6 +3548,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         ),
       ),
         onTap: () {
+          updateAdaptiveColorsFromImage(context, imageUrl);
           Navigator.push(
             context,
             FadeSlidePageRoute(
@@ -3567,6 +3572,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
     return GestureDetector(
       onTap: () {
+        updateAdaptiveColorsFromImage(context, imageUrl);
         Navigator.push(
           context,
           FadeSlidePageRoute(
