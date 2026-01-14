@@ -187,11 +187,11 @@ audioHandler = await AudioService.init(...);
 - Replace all magic numbers
 
 ### Phase 4: Architecture (2-3 weeks)
-- Split MusicAssistantProvider into focused managers
-- Split new_library_screen into tab widgets
-- Extract generic helpers for SettingsService
-- Remove/integrate unused providers
-- Split music_assistant_api.dart by domain
+- ~~Split MusicAssistantProvider into focused managers~~ **DEFERRED** - MusicAssistantProvider has evolved with Sendspin, Cast-Sendspin ID mapping, position tracker integration. Splitting would require ~1600 lines of sync work. Code is working and tested.
+- ~~Split new_library_screen into tab widgets~~ **DEFERRED** - Tabs have tight state coupling (15+ view modes, 15+ sort orders, 10 scroll controllers). Extraction would require InheritedWidget/callbacks for all shared state. Risk outweighs benefit.
+- ✅ Extract generic helpers for SettingsService - Reduced from 1,031 to 874 lines (~15%)
+- ✅ Remove/integrate unused providers - Deleted PlayerProvider (964 lines), LibraryProvider, ConnectionProvider (651 lines total)
+- ~~Split music_assistant_api.dart by domain~~ **DEFERRED** - All methods share WebSocket connection and auth state. Clean extraction would require connection manager abstraction.
 
 ---
 
