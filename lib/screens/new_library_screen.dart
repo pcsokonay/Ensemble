@@ -3481,7 +3481,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                         addAutomaticKeepAlives: false,
                         addRepaintBoundaries: false,
                         itemCount: sortedArtists.length,
-                        padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.navBarOnly),
+                        padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                         itemBuilder: (context, index) {
                           final artist = sortedArtists[index];
                           return _buildArtistTile(
@@ -3497,7 +3497,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                         cacheExtent: 1000,
                         addAutomaticKeepAlives: false,
                         addRepaintBoundaries: false,
-                        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.navBarOnly),
+                        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: _artistsViewMode == 'grid3' ? 3 : 2,
                           childAspectRatio: _artistsViewMode == 'grid3' ? 0.75 : 0.80,
@@ -3710,7 +3710,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     cacheExtent: 1000,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: false,
-                    padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.navBarOnly),
+                    padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                     itemCount: sortedAlbums.length,
                     itemBuilder: (context, index) {
                       final album = sortedAlbums[index];
@@ -3723,7 +3723,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     cacheExtent: 1000,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: false,
-                    padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.navBarOnly),
+                    padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: _albumsViewMode == 'grid3' ? 3 : 2,
                       childAspectRatio: _albumsViewMode == 'grid3' ? 0.70 : 0.75,
@@ -3850,7 +3850,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
                 itemCount: _sortedPlaylists.length,
-                padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.navBarOnly),
+                padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                 itemBuilder: (context, index) {
                   final playlist = _sortedPlaylists[index];
                   return _buildPlaylistTile(context, playlist, l10n);
@@ -3862,7 +3862,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 cacheExtent: 1000,
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
-                padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.navBarOnly),
+                padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: _playlistsViewMode == 'grid3' ? 3 : 2,
                   childAspectRatio: _playlistsViewMode == 'grid3' ? 0.75 : 0.80,
@@ -4070,8 +4070,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     // Get the appropriate track list based on favorites mode
     final List<Track> displayTracks;
     if (_showFavoritesOnly) {
-      // Filter to favorites from already loaded tracks
-      displayTracks = _sortedAllTracks.where((t) => t.favorite == true).toList();
+      // Use the dedicated favorites list that was loaded by _loadFavoriteTracks()
+      displayTracks = _sortedFavoriteTracks;
     } else {
       displayTracks = _sortedAllTracks;
     }
@@ -4108,7 +4108,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           cacheExtent: 1000,
           addAutomaticKeepAlives: false,
           addRepaintBoundaries: false,
-          padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.navBarOnly),
+          padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
           itemCount: displayTracks.length + (_hasMoreTracks && !_showFavoritesOnly ? 1 : 0),
           itemBuilder: (context, index) {
             // Show loading indicator at the end when loading more
@@ -4161,9 +4161,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       ),
       title: Text(
         track.artistsString,
-        style: textTheme.bodyMedium?.copyWith(
+        style: textTheme.titleMedium?.copyWith(
           color: colorScheme.onSurface,
-          fontWeight: FontWeight.w500,
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
