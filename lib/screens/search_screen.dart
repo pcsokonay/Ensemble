@@ -603,7 +603,7 @@ class SearchScreenState extends State<SearchScreen> {
               size: 80,
               color: colorScheme.onBackground.withOpacity(0.3),
             ),
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             Text(
               S.of(context)!.searchForContent,
               style: TextStyle(
@@ -656,7 +656,7 @@ class SearchScreenState extends State<SearchScreen> {
               size: 64,
               color: colorScheme.error.withOpacity(0.7),
             ),
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             Text(
               _searchError!,
               style: TextStyle(
@@ -665,7 +665,7 @@ class SearchScreenState extends State<SearchScreen> {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             FilledButton.tonal(
               onPressed: () => _performSearch(_searchController.text),
               child: Text(S.of(context)!.retry),

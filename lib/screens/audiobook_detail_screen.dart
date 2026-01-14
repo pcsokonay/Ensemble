@@ -567,7 +567,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    Spacing.vGap8,
 
                     // Author
                     Text(
@@ -589,7 +589,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                     ],
 
                     // Duration & Progress
-                    const SizedBox(height: 16),
+                    Spacing.vGap16,
                     Row(
                       children: [
                         if (book.duration != null) ...[
@@ -737,7 +737,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      Spacing.vGap8,
                       InkWell(
                         onTap: () {
                           setState(() {
@@ -768,7 +768,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    Spacing.vGap8,
                   ],
                 ),
               ),

@@ -530,12 +530,12 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             Text(
               S.of(context)!.addAlbumToQueueOn,
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             if (players.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -610,12 +610,12 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             Text(
               S.of(context)!.addToQueueOn,
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             if (players.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -903,7 +903,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  Spacing.vGap8,
                   Hero(
                     tag: HeroTags.artistName + (widget.album.uri ?? widget.album.itemId) + _heroTagSuffix,
                     child: Material(
@@ -923,7 +923,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  Spacing.vGap16,
                   // Album Description
                   if (_albumDescription != null && _albumDescription!.isNotEmpty) ...[
                     InkWell(
@@ -945,7 +945,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    Spacing.vGap8,
                   ],
                   Row(
                     children: [

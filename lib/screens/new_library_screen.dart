@@ -2220,7 +2220,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               },
             ),
           ),
-          const SizedBox(height: 8),
+          Spacing.vGap8,
           Text(
             authorName,
             style: textTheme.bodyMedium?.copyWith(
@@ -2482,7 +2482,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          Spacing.vGap8,
           Hero(
             tag: HeroTags.audiobookTitle + (book.uri ?? book.itemId) + '_library$heroSuffix',
             child: Material(
@@ -2565,7 +2565,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      Spacing.vGap8,
                       Text(
                         _seriesLoaded
                             ? l10n.noSeriesAvailable
@@ -2764,7 +2764,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          Spacing.vGap8,
           Text(
             series.name,
             style: textTheme.bodyMedium?.copyWith(
@@ -3146,7 +3146,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          Spacing.vGap8,
           Text(
             podcast.name,
             maxLines: 2,
@@ -3383,7 +3383,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          Spacing.vGap8,
           Text(
             station.name,
             maxLines: 2,
@@ -3598,7 +3598,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               },
             ),
           ),
-          const SizedBox(height: 8),
+          Spacing.vGap8,
           Text(
             artist.name,
             style: textTheme.bodyMedium?.copyWith(
@@ -4014,7 +4014,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            Spacing.vGap8,
             Hero(
               tag: HeroTags.playlistTitle + (playlist.uri ?? playlist.itemId) + heroSuffix,
               child: Material(

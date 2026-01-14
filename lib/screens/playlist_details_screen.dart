@@ -411,12 +411,12 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             Text(
               S.of(context)!.addToQueueOn,
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             if (players.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -489,12 +489,12 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             Text(
               S.of(context)!.addToQueueOn,
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             if (players.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -759,7 +759,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        Spacing.vGap8,
                         // Owner info
                         if (widget.playlist.owner != null)
                           Text(
@@ -776,7 +776,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                             color: colorScheme.onSurface.withOpacity(0.5),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        Spacing.vGap16,
                         // Action buttons row
                         Row(
                           children: [

@@ -418,12 +418,12 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             Text(
               S.of(context)!.startRadioOn(widget.artist.name),
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             if (players.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -498,12 +498,12 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             Text(
               S.of(context)!.addToQueueOn,
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 16),
+            Spacing.vGap16,
             if (players.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -787,7 +787,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  Spacing.vGap16,
                   if (_artistDescription != null && _artistDescription!.isNotEmpty) ...[
                     InkWell(
                       onTap: () {
@@ -808,7 +808,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    Spacing.vGap8,
                   ],
                   // Action Buttons Row
                   Row(
@@ -898,7 +898,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  Spacing.vGap16,
                 ],
               ),
             ),
@@ -1105,7 +1105,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          Spacing.vGap8,
           Hero(
             tag: HeroTags.albumTitle + (album.uri ?? album.itemId) + '_$heroSuffix',
             child: Material(
