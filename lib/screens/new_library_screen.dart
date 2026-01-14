@@ -3730,13 +3730,12 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     itemCount: sortedAlbums.length,
                     itemBuilder: (context, index) {
                       final album = sortedAlbums[index];
-                      // PERF: Use appropriate cache size based on grid columns
-                      final cacheSize = _albumsViewMode == 'grid3' ? 200 : 300;
                       return AlbumCard(
                         key: ValueKey(album.uri ?? album.itemId),
                         album: album,
                         heroTagSuffix: 'library_grid',
-                        imageCacheSize: cacheSize,
+                        // Use 256 to match detail screen for smooth Hero animation
+                        imageCacheSize: 256,
                       );
                     },
                   ),
