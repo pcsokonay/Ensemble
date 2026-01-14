@@ -2096,12 +2096,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final authorImageUrl = _authorImages[authorName];
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
 
-    Widget buildAuthorIcon() => Icon(
-      Icons.person_rounded,
-      color: colorScheme.onPrimaryContainer,
-      size: 28,
-    );
-
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       leading: Hero(
@@ -2113,8 +2107,18 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             color: colorScheme.primaryContainer,
             shape: BoxShape.circle,
           ),
-          child: authorImageUrl != null
-              ? ClipOval(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Icon always present underneath
+              Icon(
+                Icons.person_rounded,
+                color: colorScheme.onPrimaryContainer,
+                size: 28,
+              ),
+              // Image covers icon when loaded
+              if (authorImageUrl != null)
+                ClipOval(
                   child: CachedNetworkImage(
                     imageUrl: authorImageUrl,
                     fit: BoxFit.cover,
@@ -2124,21 +2128,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     memCacheHeight: 128,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
-                    placeholder: (_, __) => Container(
-                      width: 48,
-                      height: 48,
-                      color: colorScheme.primaryContainer,
-                      child: Center(child: buildAuthorIcon()),
-                    ),
-                    errorWidget: (_, __, ___) => Container(
-                      width: 48,
-                      height: 48,
-                      color: colorScheme.primaryContainer,
-                      child: Center(child: buildAuthorIcon()),
-                    ),
+                    // Transparent placeholder - icon shows through
+                    placeholder: (_, __) => const SizedBox.shrink(),
+                    // On error, shrink to show icon underneath
+                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
                   ),
-                )
-              : Center(child: buildAuthorIcon()),
+                ),
+            ],
+          ),
         ),
       ),
       title: Text(
@@ -2166,12 +2163,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
     final iconSize = _authorsViewMode == 'grid3' ? 36.0 : 48.0;
 
-    Widget buildAuthorIcon() => Icon(
-      Icons.person_rounded,
-      color: colorScheme.onPrimaryContainer,
-      size: iconSize,
-    );
-
     // Match music artist card layout
     return GestureDetector(
       onTap: () => _navigateToAuthor(authorName, books, heroTagSuffix: 'library$heroSuffix', initialAuthorImageUrl: authorImageUrl),
@@ -2196,8 +2187,18 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                         color: colorScheme.primaryContainer,
                         shape: BoxShape.circle,
                       ),
-                      child: authorImageUrl != null
-                          ? ClipOval(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Icon always present underneath
+                          Icon(
+                            Icons.person_rounded,
+                            color: colorScheme.onPrimaryContainer,
+                            size: iconSize,
+                          ),
+                          // Image covers icon when loaded
+                          if (authorImageUrl != null)
+                            ClipOval(
                               child: CachedNetworkImage(
                                 imageUrl: authorImageUrl,
                                 fit: BoxFit.cover,
@@ -2207,21 +2208,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                                 memCacheHeight: 256,
                                 fadeInDuration: Duration.zero,
                                 fadeOutDuration: Duration.zero,
-                                placeholder: (_, __) => Container(
-                                  width: size,
-                                  height: size,
-                                  color: colorScheme.primaryContainer,
-                                  child: Center(child: buildAuthorIcon()),
-                                ),
-                                errorWidget: (_, __, ___) => Container(
-                                  width: size,
-                                  height: size,
-                                  color: colorScheme.primaryContainer,
-                                  child: Center(child: buildAuthorIcon()),
-                                ),
+                                // Transparent placeholder - icon shows through
+                                placeholder: (_, __) => const SizedBox.shrink(),
+                                // On error, shrink to show icon underneath
+                                errorWidget: (_, __, ___) => const SizedBox.shrink(),
                               ),
-                            )
-                          : Center(child: buildAuthorIcon()),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 );
