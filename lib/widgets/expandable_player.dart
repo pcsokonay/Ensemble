@@ -1231,6 +1231,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   Widget build(BuildContext context) {
     // PERF: Use select() to only rebuild when adaptive theme setting changes
     final adaptiveTheme = context.select<ThemeProvider, bool>((p) => p.adaptiveTheme);
+    // Get full themeProvider for methods that need adaptive color schemes
+    final themeProvider = context.read<ThemeProvider>();
 
     return Consumer<MusicAssistantProvider>(
       builder: (context, maProvider, child) {

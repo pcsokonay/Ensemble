@@ -482,7 +482,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
         // Hide when: not connected, no player selected, OR showing welcome screen
         // For first-time users, selectedPlayer becomes non-null at the same time
         // as shouldShowWelcomeBackdrop becomes true, preventing any gap.
-        if (provider.isConnected && provider.selectedPlayer != null && !shouldShowWelcomeBackdrop)
+        if (isConnected && hasSelectedPlayer && !shouldShowWelcomeBackdrop)
           Positioned(
             left: 0,
             right: 0,
