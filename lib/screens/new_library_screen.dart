@@ -2096,8 +2096,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final authorImageUrl = _authorImages[authorName];
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
 
-    // Fallback widget for when no image is available
-    Widget authorFallback = Icon(
+    Widget buildAuthorIcon() => Icon(
       Icons.person_rounded,
       color: colorScheme.onPrimaryContainer,
       size: 28,
@@ -2125,11 +2124,21 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     memCacheHeight: 128,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
-                    placeholder: (_, __) => Center(child: authorFallback),
-                    errorWidget: (_, __, ___) => Center(child: authorFallback),
+                    placeholder: (_, __) => Container(
+                      width: 48,
+                      height: 48,
+                      color: colorScheme.primaryContainer,
+                      child: Center(child: buildAuthorIcon()),
+                    ),
+                    errorWidget: (_, __, ___) => Container(
+                      width: 48,
+                      height: 48,
+                      color: colorScheme.primaryContainer,
+                      child: Center(child: buildAuthorIcon()),
+                    ),
                   ),
                 )
-              : Center(child: authorFallback),
+              : Center(child: buildAuthorIcon()),
         ),
       ),
       title: Text(
@@ -2157,8 +2166,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
     final iconSize = _authorsViewMode == 'grid3' ? 36.0 : 48.0;
 
-    // Fallback widget for when no image is available
-    Widget authorFallback = Icon(
+    Widget buildAuthorIcon() => Icon(
       Icons.person_rounded,
       color: colorScheme.onPrimaryContainer,
       size: iconSize,
@@ -2199,11 +2207,21 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                                 memCacheHeight: 256,
                                 fadeInDuration: Duration.zero,
                                 fadeOutDuration: Duration.zero,
-                                placeholder: (_, __) => Center(child: authorFallback),
-                                errorWidget: (_, __, ___) => Center(child: authorFallback),
+                                placeholder: (_, __) => Container(
+                                  width: size,
+                                  height: size,
+                                  color: colorScheme.primaryContainer,
+                                  child: Center(child: buildAuthorIcon()),
+                                ),
+                                errorWidget: (_, __, ___) => Container(
+                                  width: size,
+                                  height: size,
+                                  color: colorScheme.primaryContainer,
+                                  child: Center(child: buildAuthorIcon()),
+                                ),
                               ),
                             )
-                          : Center(child: authorFallback),
+                          : Center(child: buildAuthorIcon()),
                     ),
                   ),
                 );
