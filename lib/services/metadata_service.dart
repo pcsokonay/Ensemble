@@ -455,17 +455,46 @@ class MetadataService {
   }
 
   /// Try to fetch author image from Audnexus
+  /// Audnexus requires a two-step process:
+  /// 1. Search by name to get the ASIN
+  /// 2. Fetch full author details by ASIN to get the image
   static Future<String?> _tryAudnexus(String name) async {
     try {
-      final uri = Uri.https('api.audnex.us', '/authors', {'name': name});
-      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+      // Step 1: Search for author to get ASIN
+      final searchUri = Uri.https('api.audnex.us', '/authors', {'name': name});
+      final searchResponse = await http.get(searchUri).timeout(const Duration(seconds: 5));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is List && data.isNotEmpty) {
-          final imageUrl = data[0]['image'] as String?;
-          if (imageUrl != null && imageUrl.isNotEmpty) {
-            return imageUrl;
+      if (searchResponse.statusCode == 200) {
+        final searchData = json.decode(searchResponse.body);
+        if (searchData is List && searchData.isNotEmpty) {
+          // Find the best match - prefer exact name matches
+          String? bestAsin;
+          final nameLower = name.toLowerCase().replaceAll(RegExp(r'[.\s]+'), '');
+
+          for (final result in searchData) {
+            final resultName = (result['name'] as String?)?.toLowerCase().replaceAll(RegExp(r'[.\s]+'), '');
+            final asin = result['asin'] as String?;
+            if (asin != null) {
+              if (resultName == nameLower) {
+                bestAsin = asin;
+                break; // Exact match found
+              }
+              bestAsin ??= asin; // Keep first result as fallback
+            }
+          }
+
+          if (bestAsin != null) {
+            // Step 2: Fetch full author details by ASIN
+            final detailsUri = Uri.https('api.audnex.us', '/authors/$bestAsin');
+            final detailsResponse = await http.get(detailsUri).timeout(const Duration(seconds: 5));
+
+            if (detailsResponse.statusCode == 200) {
+              final detailsData = json.decode(detailsResponse.body);
+              final imageUrl = detailsData['image'] as String?;
+              if (imageUrl != null && imageUrl.isNotEmpty) {
+                return imageUrl;
+              }
+            }
           }
         }
       }
@@ -493,10 +522,12 @@ class MetadataService {
             final olid = authorKey.replaceAll('/authors/', '');
             final imageUrl = 'https://covers.openlibrary.org/a/olid/$olid-L.jpg';
 
-            // Verify image exists
+            // Verify image exists - Open Library returns 302 redirects for valid images
             try {
               final check = await http.head(Uri.parse(imageUrl)).timeout(const Duration(seconds: 3));
-              if (check.statusCode == 200) {
+              // Accept 200 (direct), 301/302 (redirect to archive.org), or 307/308 (temporary redirect)
+              if (check.statusCode == 200 || check.statusCode == 301 ||
+                  check.statusCode == 302 || check.statusCode == 307 || check.statusCode == 308) {
                 return imageUrl;
               }
             } catch (_) {}
