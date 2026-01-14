@@ -1826,6 +1826,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             ),
           ),
         ),
+        const SizedBox(width: 6),
         // Favorites toggle (all media types support favorites)
         SizedBox(
           width: buttonSize,
@@ -1844,6 +1845,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             ),
           ),
         ),
+        const SizedBox(width: 6),
         // View mode toggle
         SizedBox(
           width: buttonSize,
