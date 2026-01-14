@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,8 +6,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../constants/hero_tags.dart';
+import '../constants/timings.dart';
 
-class RadioStationCard extends StatelessWidget {
+class RadioStationCard extends StatefulWidget {
   final MediaItem radioStation;
   final VoidCallback? onTap;
   final String? heroTagSuffix;
@@ -21,24 +23,40 @@ class RadioStationCard extends StatelessWidget {
   });
 
   @override
+  State<RadioStationCard> createState() => _RadioStationCardState();
+}
+
+class _RadioStationCardState extends State<RadioStationCard> {
+  bool _isTapping = false;
+
+  @override
   Widget build(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.api?.getImageUrl(radioStation, size: 256);
+    final imageUrl = maProvider.api?.getImageUrl(widget.radioStation, size: 256);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final suffix = heroTagSuffix != null ? '_$heroTagSuffix' : '';
-    final cacheSize = imageCacheSize ?? 256;
+    final suffix = widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
+    final cacheSize = widget.imageCacheSize ?? 256;
 
     return RepaintBoundary(
       child: GestureDetector(
-        onTap: onTap ?? () {
+        onTap: widget.onTap ?? () {
+          // Prevent double-tap actions
+          if (_isTapping) return;
+          _isTapping = true;
+
           HapticFeedback.mediumImpact();
           // Play the radio station on selected player
           final selectedPlayer = maProvider.selectedPlayer;
           if (selectedPlayer != null) {
-            maProvider.api?.playRadioStation(selectedPlayer.playerId, radioStation);
+            maProvider.api?.playRadioStation(selectedPlayer.playerId, widget.radioStation);
           }
+
+          // Reset after debounce delay
+          Future.delayed(Timings.navigationDebounce, () {
+            if (mounted) _isTapping = false;
+          });
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,7 +65,7 @@ class RadioStationCard extends StatelessWidget {
             AspectRatio(
               aspectRatio: 1.0,
               child: Hero(
-                tag: HeroTags.radioCover + (radioStation.uri ?? radioStation.itemId) + suffix,
+                tag: HeroTags.radioCover + (widget.radioStation.uri ?? widget.radioStation.itemId) + suffix,
                 child: ClipOval(
                   child: Container(
                     color: colorScheme.surfaceContainerHighest,
@@ -84,11 +102,11 @@ class RadioStationCard extends StatelessWidget {
             SizedBox(
               height: 36, // Fixed height for 2 lines of text
               child: Hero(
-                tag: HeroTags.radioTitle + (radioStation.uri ?? radioStation.itemId) + suffix,
+                tag: HeroTags.radioTitle + (widget.radioStation.uri ?? widget.radioStation.itemId) + suffix,
                 child: Material(
                   color: Colors.transparent,
                   child: Text(
-                    radioStation.name,
+                    widget.radioStation.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,

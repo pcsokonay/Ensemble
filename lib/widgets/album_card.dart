@@ -6,6 +6,7 @@ import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../screens/album_details_screen.dart';
 import '../constants/hero_tags.dart';
+import '../constants/timings.dart';
 import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
 import '../services/metadata_service.dart';
@@ -36,6 +37,7 @@ class _AlbumCardState extends State<AlbumCard> {
   bool _maImageFailed = false;
   String? _cachedMaImageUrl;
   Timer? _fallbackTimer;
+  bool _isNavigating = false;
 
   /// Delay before fetching fallback images to avoid requests during fast scroll
   static const _fallbackDelay = Duration(milliseconds: 200);
@@ -117,6 +119,10 @@ class _AlbumCardState extends State<AlbumCard> {
     return RepaintBoundary(
       child: GestureDetector(
         onTap: widget.onTap ?? () {
+          // Prevent double-tap navigation
+          if (_isNavigating) return;
+          _isNavigating = true;
+
           // Update adaptive colors immediately on tap
           updateAdaptiveColorsFromImage(context, imageUrl);
           Navigator.push(
@@ -128,7 +134,12 @@ class _AlbumCardState extends State<AlbumCard> {
                 initialImageUrl: imageUrl,
               ),
             ),
-          );
+          ).then((_) {
+            // Reset after navigation debounce delay
+            Future.delayed(Timings.navigationDebounce, () {
+              if (mounted) _isNavigating = false;
+            });
+          });
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

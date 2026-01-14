@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -6,10 +7,11 @@ import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../screens/podcast_detail_screen.dart';
 import '../constants/hero_tags.dart';
+import '../constants/timings.dart';
 import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
 
-class PodcastCard extends StatelessWidget {
+class PodcastCard extends StatefulWidget {
   final MediaItem podcast;
   final VoidCallback? onTap;
   final String? heroTagSuffix;
@@ -26,33 +28,49 @@ class PodcastCard extends StatelessWidget {
   });
 
   @override
+  State<PodcastCard> createState() => _PodcastCardState();
+}
+
+class _PodcastCardState extends State<PodcastCard> {
+  bool _isNavigating = false;
+
+  @override
   Widget build(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
     // Use provider's getPodcastImageUrl which includes iTunes cache
-    final imageUrl = maProvider.getPodcastImageUrl(podcast, size: 256);
+    final imageUrl = maProvider.getPodcastImageUrl(widget.podcast, size: 256);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final suffix = heroTagSuffix != null ? '_$heroTagSuffix' : '';
+    final suffix = widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
 
     // PERF: Use appropriate cache size based on display size
-    final cacheSize = imageCacheSize ?? 256;
+    final cacheSize = widget.imageCacheSize ?? 256;
 
     return RepaintBoundary(
       child: GestureDetector(
-        onTap: onTap ?? () {
+        onTap: widget.onTap ?? () {
+          // Prevent double-tap navigation
+          if (_isNavigating) return;
+          _isNavigating = true;
+
           // Update adaptive colors immediately on tap
           updateAdaptiveColorsFromImage(context, imageUrl);
           Navigator.push(
             context,
             FadeSlidePageRoute(
               child: PodcastDetailScreen(
-                podcast: podcast,
-                heroTagSuffix: heroTagSuffix,
+                podcast: widget.podcast,
+                heroTagSuffix: widget.heroTagSuffix,
                 initialImageUrl: imageUrl,
               ),
             ),
-          );
+          ).then((_) {
+            // Reset after navigation debounce delay
+            Future.delayed(Timings.navigationDebounce, () {
+              if (mounted) _isNavigating = false;
+            });
+          });
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,7 +79,7 @@ class PodcastCard extends StatelessWidget {
             AspectRatio(
               aspectRatio: 1.0,
               child: Hero(
-                tag: HeroTags.podcastCover + (podcast.uri ?? podcast.itemId) + suffix,
+                tag: HeroTags.podcastCover + (widget.podcast.uri ?? widget.podcast.itemId) + suffix,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12.0),
                   child: Container(
@@ -97,11 +115,11 @@ class PodcastCard extends StatelessWidget {
             const SizedBox(height: 8),
             // Podcast title
             Hero(
-              tag: HeroTags.podcastTitle + (podcast.uri ?? podcast.itemId) + suffix,
+              tag: HeroTags.podcastTitle + (widget.podcast.uri ?? widget.podcast.itemId) + suffix,
               child: Material(
                 color: Colors.transparent,
                 child: Text(
-                  podcast.name,
+                  widget.podcast.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.titleSmall?.copyWith(
@@ -113,7 +131,7 @@ class PodcastCard extends StatelessWidget {
             ),
             // Podcast author (if available)
             Text(
-              _getAuthor(podcast),
+              _getAuthor(widget.podcast),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textTheme.bodySmall?.copyWith(

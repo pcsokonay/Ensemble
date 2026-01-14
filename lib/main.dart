@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -84,7 +85,29 @@ Future<void> main() async {
     ),
   );
 
-  runApp(const MusicAssistantApp());
+  // Set up Flutter error boundary to catch and log widget build errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    _logger.error('Flutter error: ${details.exceptionAsString()}', context: 'FlutterError');
+    _logger.error('Stack trace:\n${details.stack}', context: 'FlutterError');
+    // Still report to Flutter's default handler in debug mode
+    FlutterError.presentError(details);
+  };
+
+  // Catch errors from the platform dispatcher (platform channel errors)
+  PlatformDispatcher.instance.onError = (error, stack) {
+    _logger.error('Platform error: $error', context: 'PlatformDispatcher');
+    _logger.error('Stack trace:\n$stack', context: 'PlatformDispatcher');
+    return true; // Handled
+  };
+
+  // Wrap app in zone to catch async errors
+  runZonedGuarded(
+    () => runApp(const MusicAssistantApp()),
+    (error, stackTrace) {
+      _logger.error('Uncaught async error: $error', context: 'ZoneError');
+      _logger.error('Stack trace:\n$stackTrace', context: 'ZoneError');
+    },
+  );
 }
 
 class MusicAssistantApp extends StatefulWidget {

@@ -31,6 +31,9 @@ class Timings {
   /// Search debounce delay
   static const Duration searchDebounce = Duration(milliseconds: 500);
 
+  /// Navigation debounce to prevent double-tap navigation
+  static const Duration navigationDebounce = Duration(milliseconds: 500);
+
   /// Delay after track change before updating state
   static const Duration trackChangeDelay = Duration(milliseconds: 500);
 }

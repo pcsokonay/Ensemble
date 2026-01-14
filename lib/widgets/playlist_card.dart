@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -5,10 +6,11 @@ import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../screens/playlist_details_screen.dart';
 import '../constants/hero_tags.dart';
+import '../constants/timings.dart';
 import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
 
-class PlaylistCard extends StatelessWidget {
+class PlaylistCard extends StatefulWidget {
   final Playlist playlist;
   final VoidCallback? onTap;
   final String? heroTagSuffix;
@@ -23,30 +25,46 @@ class PlaylistCard extends StatelessWidget {
   });
 
   @override
+  State<PlaylistCard> createState() => _PlaylistCardState();
+}
+
+class _PlaylistCardState extends State<PlaylistCard> {
+  bool _isNavigating = false;
+
+  @override
   Widget build(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.api?.getImageUrl(playlist, size: 256);
+    final imageUrl = maProvider.api?.getImageUrl(widget.playlist, size: 256);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final suffix = heroTagSuffix != null ? '_$heroTagSuffix' : '';
-    final cacheSize = imageCacheSize ?? 256;
+    final suffix = widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
+    final cacheSize = widget.imageCacheSize ?? 256;
 
     return RepaintBoundary(
       child: GestureDetector(
-        onTap: onTap ?? () {
+        onTap: widget.onTap ?? () {
+          // Prevent double-tap navigation
+          if (_isNavigating) return;
+          _isNavigating = true;
+
           // Update adaptive colors immediately on tap
           updateAdaptiveColorsFromImage(context, imageUrl);
           Navigator.push(
             context,
             FadeSlidePageRoute(
               child: PlaylistDetailsScreen(
-                playlist: playlist,
-                heroTagSuffix: heroTagSuffix,
+                playlist: widget.playlist,
+                heroTagSuffix: widget.heroTagSuffix,
                 initialImageUrl: imageUrl,
               ),
             ),
-          );
+          ).then((_) {
+            // Reset after navigation debounce delay
+            Future.delayed(Timings.navigationDebounce, () {
+              if (mounted) _isNavigating = false;
+            });
+          });
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,7 +73,7 @@ class PlaylistCard extends StatelessWidget {
             AspectRatio(
               aspectRatio: 1.0,
               child: Hero(
-                tag: HeroTags.playlistCover + (playlist.uri ?? playlist.itemId) + suffix,
+                tag: HeroTags.playlistCover + (widget.playlist.uri ?? widget.playlist.itemId) + suffix,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12.0),
                   child: Container(
@@ -91,11 +109,11 @@ class PlaylistCard extends StatelessWidget {
             const SizedBox(height: 8),
             // Playlist title
             Hero(
-              tag: HeroTags.playlistTitle + (playlist.uri ?? playlist.itemId) + suffix,
+              tag: HeroTags.playlistTitle + (widget.playlist.uri ?? widget.playlist.itemId) + suffix,
               child: Material(
                 color: Colors.transparent,
                 child: Text(
-                  playlist.name,
+                  widget.playlist.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.titleSmall?.copyWith(
@@ -107,7 +125,7 @@ class PlaylistCard extends StatelessWidget {
             ),
             // Owner/track count
             Text(
-              playlist.owner ?? (playlist.trackCount != null ? '${playlist.trackCount} tracks' : ''),
+              widget.playlist.owner ?? (widget.playlist.trackCount != null ? '${widget.playlist.trackCount} tracks' : ''),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textTheme.bodySmall?.copyWith(
