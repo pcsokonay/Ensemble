@@ -1132,7 +1132,8 @@ class MusicAssistantAPI {
           final name = ((itemMap['name'] as String?) ?? (itemMap['label'] as String?) ?? '').toLowerCase();
           final path = itemMap['path'] as String? ?? '';
 
-          if (name.contains('series') || path.contains('series')) {
+          // Check for "series" in name/path, or abbreviated path ending with "/s"
+          if (name.contains('series') || path.contains('series') || path.endsWith('/s')) {
             _logger.log('📚 Found series folder: $path');
 
             // Browse the series folder
@@ -1141,13 +1142,15 @@ class MusicAssistantAPI {
 
             for (final seriesItem in seriesItems) {
               final seriesMap = seriesItem as Map<String, dynamic>;
+              final seriesName = (seriesMap['name'] as String?) ?? (seriesMap['label'] as String?) ?? '';
+              final seriesPath = seriesMap['path'] as String? ?? '';
               // Skip parent navigation
-              if (seriesMap['path'] == 'root' || seriesMap['name'] == '..') continue;
+              if (seriesPath == 'root' || seriesName == '..' || seriesPath.endsWith('://')) continue;
               // Skip actual audiobook items (we only want series folders)
               final mediaType = seriesMap['media_type'] as String?;
               if (mediaType == 'audiobook' || mediaType == 'track') continue;
 
-              _logger.log('📚 Series: name=${seriesMap['name']}, path=${seriesMap['path']}, media_type=$mediaType');
+              _logger.log('📚 Series: name=$seriesName, path=$seriesPath, media_type=$mediaType');
               allSeries.add(AudiobookSeries.fromJson(seriesMap));
             }
             break; // Found series in this library, move to next library
