@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 /// A scrollbar that shows a letter popup when dragging, for fast navigation
 /// through alphabetically sorted lists.
+///
+/// Scrolls PROPORTIONALLY (like a normal scrollbar) and shows which letter
+/// section you're currently in via a popup indicator.
 class LetterScrollbar extends StatefulWidget {
   /// The scrollable child widget (ListView, GridView, etc.)
   final Widget child;
@@ -9,15 +12,33 @@ class LetterScrollbar extends StatefulWidget {
   /// The scroll controller for the child
   final ScrollController controller;
 
-  /// List of items to extract letters from (must be sorted alphabetically)
-  /// Each item's first character is used to determine the letter
+  /// List of strings to extract letters from (should match visual sort order).
+  /// Each item's first character is used to determine the letter shown in the popup.
   final List<String> items;
 
-  /// Callback when user taps/drags to a specific index
+  /// Callback when user taps/drags to a specific index.
   final void Function(int index)? onScrollToIndex;
 
   /// Callback when drag state changes (for disabling scroll-to-hide)
   final void Function(bool isDragging)? onDragStateChanged;
+
+  /// Fixed item height for lists. Enables precise scroll calculation.
+  final double? itemExtent;
+
+  /// Number of columns for grid layouts.
+  final int? crossAxisCount;
+
+  /// Aspect ratio of grid children (width / height).
+  final double? childAspectRatio;
+
+  /// Spacing between grid rows (mainAxisSpacing)
+  final double? mainAxisSpacing;
+
+  /// Horizontal padding of the scrollable area
+  final double? horizontalPadding;
+
+  /// Bottom padding to prevent scrollbar from going behind bottom nav/mini player
+  final double bottomPadding;
 
   const LetterScrollbar({
     super.key,
@@ -26,6 +47,12 @@ class LetterScrollbar extends StatefulWidget {
     required this.items,
     this.onScrollToIndex,
     this.onDragStateChanged,
+    this.itemExtent,
+    this.crossAxisCount,
+    this.childAspectRatio,
+    this.mainAxisSpacing,
+    this.horizontalPadding,
+    this.bottomPadding = 0,
   });
 
   @override
@@ -55,71 +82,38 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
       final position = widget.controller.position;
       if (position.maxScrollExtent > 0) {
         final newFraction = (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0);
-        // PERF: Only rebuild if fraction changed by more than 1% to reduce rebuilds
         if ((newFraction - _scrollFraction).abs() > 0.01) {
           setState(() {
             _scrollFraction = newFraction;
+            _currentLetter = _getLetterAtFraction(newFraction);
           });
         }
       }
     }
   }
 
-  // Build a map of letter -> first index for that letter
-  Map<String, int> get _letterIndexMap {
-    final map = <String, int>{};
-    for (int i = 0; i < widget.items.length; i++) {
-      final item = widget.items[i];
-      if (item.isNotEmpty) {
-        final letter = item[0].toUpperCase();
-        if (!map.containsKey(letter)) {
-          map[letter] = i;
-        }
-      }
+  /// Normalizes a character to a letter for the scrollbar.
+  String _normalizeToLetter(String char) {
+    if (char.isEmpty) return '';
+    final upper = char[0].toUpperCase();
+    if (upper.codeUnitAt(0) >= 65 && upper.codeUnitAt(0) <= 90) {
+      return upper;
     }
-    return map;
+    return '#';
   }
 
-  String _getLetterAtPosition(double position, double maxHeight) {
-    if (widget.items.isEmpty || maxHeight <= 0) return '';
+  /// Get the letter at a given scroll fraction (0.0 to 1.0)
+  String _getLetterAtFraction(double fraction) {
+    if (widget.items.isEmpty) return '';
 
-    // Calculate which item index corresponds to this position
-    final fraction = (position / maxHeight).clamp(0.0, 1.0);
-    final index = (fraction * (widget.items.length - 1)).round();
-
-    if (index >= 0 && index < widget.items.length) {
+    final index = (fraction * (widget.items.length - 1)).round().clamp(0, widget.items.length - 1);
+    if (index < widget.items.length) {
       final item = widget.items[index];
       if (item.isNotEmpty) {
-        return item[0].toUpperCase();
+        return _normalizeToLetter(item[0]);
       }
     }
     return '';
-  }
-
-  void _scrollToLetter(String letter) {
-    final letterMap = _letterIndexMap;
-    if (letterMap.containsKey(letter)) {
-      final index = letterMap[letter]!;
-      if (widget.onScrollToIndex != null) {
-        widget.onScrollToIndex!(index);
-      } else {
-        // Estimate scroll position based on index
-        // This is approximate - works better with fixed height items
-        final scrollController = widget.controller;
-        if (scrollController.hasClients) {
-          final maxScroll = scrollController.position.maxScrollExtent;
-          final fraction = index / widget.items.length;
-          final targetScroll = (fraction * maxScroll).clamp(0.0, maxScroll);
-
-          // Update scroll fraction immediately for smooth thumb tracking
-          setState(() {
-            _scrollFraction = fraction;
-          });
-
-          scrollController.jumpTo(targetScroll);
-        }
-      }
-    }
   }
 
   void _handleDragStart(DragStartDetails details) {
@@ -128,14 +122,14 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
       _dragPosition = details.localPosition.dy;
     });
     widget.onDragStateChanged?.call(true);
-    _updateLetterAndScroll(details.localPosition.dy);
+    _scrollToPosition(details.localPosition.dy);
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
     setState(() {
       _dragPosition = details.localPosition.dy;
     });
-    _updateLetterAndScroll(details.localPosition.dy);
+    _scrollToPosition(details.localPosition.dy);
   }
 
   void _handleDragEnd(DragEndDetails details) {
@@ -145,18 +139,35 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
     widget.onDragStateChanged?.call(false);
   }
 
-  void _updateLetterAndScroll(double position) {
+  /// Scroll proportionally based on drag position
+  void _scrollToPosition(double position) {
     final renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox != null) {
-      final height = renderBox.size.height;
-      final letter = _getLetterAtPosition(position, height);
-      if (letter.isNotEmpty && letter != _currentLetter) {
-        setState(() {
-          _currentLetter = letter;
-        });
-        _scrollToLetter(letter);
+    if (renderBox == null || !widget.controller.hasClients) return;
+
+    // Account for bottom padding in the effective track height
+    final totalHeight = renderBox.size.height;
+    final effectiveHeight = totalHeight - widget.bottomPadding;
+    if (effectiveHeight <= 0) return;
+
+    // Calculate scroll fraction from position (clamped to effective area)
+    final clampedPosition = position.clamp(0.0, effectiveHeight);
+    final fraction = clampedPosition / effectiveHeight;
+
+    // Get letter for display
+    final letter = _getLetterAtFraction(fraction);
+
+    // Scroll proportionally
+    final maxScroll = widget.controller.position.maxScrollExtent;
+    final targetScroll = (fraction * maxScroll).clamp(0.0, maxScroll);
+
+    setState(() {
+      _scrollFraction = fraction;
+      if (letter.isNotEmpty) {
+        _currentLetter = letter;
       }
-    }
+    });
+
+    widget.controller.jumpTo(targetScroll);
   }
 
   @override
@@ -168,12 +179,12 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
         // The scrollable content
         widget.child,
 
-        // The draggable scrollbar area (right edge) - wider grab area
+        // The draggable scrollbar area (right edge)
         Positioned(
           right: 0,
           top: 0,
-          bottom: 0,
-          width: 32, // Wider grab area
+          bottom: widget.bottomPadding,
+          width: 32,
           child: GestureDetector(
             onVerticalDragStart: _handleDragStart,
             onVerticalDragUpdate: _handleDragUpdate,
@@ -196,11 +207,11 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
                 final trackHeight = constraints.maxHeight;
                 final thumbHeight = _isDragging ? 60.0 : 40.0;
                 final availableTrack = trackHeight - thumbHeight;
-                final thumbTop = availableTrack * _scrollFraction;
+                final thumbTop = (availableTrack * _scrollFraction).clamp(0.0, availableTrack);
 
                 return Stack(
                   children: [
-                    // Thumb that tracks scroll position - use AnimatedPositioned for smooth motion
+                    // Thumb that tracks scroll position
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 50),
                       curve: Curves.linear,
@@ -229,7 +240,10 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
         if (_isDragging && _currentLetter.isNotEmpty)
           Positioned(
             right: 48,
-            top: _dragPosition - 28,
+            top: (_dragPosition - 28).clamp(
+              0.0,
+              (context.findRenderObject() as RenderBox?)?.size.height ?? 500 - 56 - widget.bottomPadding,
+            ),
             child: Material(
               elevation: 4,
               color: colorScheme.primaryContainer,

@@ -20,7 +20,17 @@ class SecureStorageService {
 
   // Auth Token (for stream requests)
   static Future<String?> getAuthToken() async {
-    return await _storage.read(key: _keyAuthToken);
+    try {
+      return await _storage.read(key: _keyAuthToken);
+    } catch (e) {
+      // Handle decryption errors (e.g., after keystore/signature change)
+      if (e.toString().contains('BadPaddingException') ||
+          e.toString().contains('BAD_DECRYPT')) {
+        await _storage.delete(key: _keyAuthToken);
+        return null;
+      }
+      rethrow;
+    }
   }
 
   static Future<void> setAuthToken(String? token) async {
@@ -33,7 +43,17 @@ class SecureStorageService {
 
   // Music Assistant Native Auth Token (long-lived token)
   static Future<String?> getMaAuthToken() async {
-    return await _storage.read(key: _keyMaAuthToken);
+    try {
+      return await _storage.read(key: _keyMaAuthToken);
+    } catch (e) {
+      // Handle decryption errors (e.g., after keystore/signature change)
+      if (e.toString().contains('BadPaddingException') ||
+          e.toString().contains('BAD_DECRYPT')) {
+        await _storage.delete(key: _keyMaAuthToken);
+        return null;
+      }
+      rethrow;
+    }
   }
 
   static Future<void> setMaAuthToken(String? token) async {
@@ -50,7 +70,18 @@ class SecureStorageService {
 
   // Auth Credentials (serialized auth strategy credentials)
   static Future<Map<String, dynamic>?> getAuthCredentials() async {
-    final json = await _storage.read(key: _keyAuthCredentials);
+    String? json;
+    try {
+      json = await _storage.read(key: _keyAuthCredentials);
+    } catch (e) {
+      // Handle decryption errors (e.g., after keystore/signature change)
+      if (e.toString().contains('BadPaddingException') ||
+          e.toString().contains('BAD_DECRYPT')) {
+        await _storage.delete(key: _keyAuthCredentials);
+        return null;
+      }
+      rethrow;
+    }
     if (json == null) return null;
     try {
       return jsonDecode(json) as Map<String, dynamic>;
@@ -69,7 +100,17 @@ class SecureStorageService {
 
   // Password
   static Future<String?> getPassword() async {
-    return await _storage.read(key: _keyPassword);
+    try {
+      return await _storage.read(key: _keyPassword);
+    } catch (e) {
+      // Handle decryption errors (e.g., after keystore/signature change)
+      if (e.toString().contains('BadPaddingException') ||
+          e.toString().contains('BAD_DECRYPT')) {
+        await _storage.delete(key: _keyPassword);
+        return null;
+      }
+      rethrow;
+    }
   }
 
   static Future<void> setPassword(String? password) async {
@@ -82,7 +123,17 @@ class SecureStorageService {
 
   // Audiobookshelf API Token
   static Future<String?> getAbsApiToken() async {
-    return await _storage.read(key: _keyAbsApiToken);
+    try {
+      return await _storage.read(key: _keyAbsApiToken);
+    } catch (e) {
+      // Handle decryption errors (e.g., after keystore/signature change)
+      if (e.toString().contains('BadPaddingException') ||
+          e.toString().contains('BAD_DECRYPT')) {
+        await _storage.delete(key: _keyAbsApiToken);
+        return null;
+      }
+      rethrow;
+    }
   }
 
   static Future<void> setAbsApiToken(String? token) async {

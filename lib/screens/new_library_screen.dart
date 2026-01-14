@@ -2051,6 +2051,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         controller: _authorsScrollController,
         items: _sortedAuthorNames,
         onDragStateChanged: _onLetterScrollbarDragChanged,
+        bottomPadding: BottomSpacing.withMiniPlayer,
         child: _authorsViewMode == 'list'
             ? ListView.builder(
                 controller: _authorsScrollController,
@@ -2383,6 +2384,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         controller: _audiobooksScrollController,
         items: _audiobookNames,
         onDragStateChanged: _onLetterScrollbarDragChanged,
+        bottomPadding: BottomSpacing.withMiniPlayer,
         child: _audiobooksViewMode == 'list'
             ? ListView.builder(
                 controller: _audiobooksScrollController,
@@ -2605,6 +2607,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         controller: _seriesScrollController,
         items: _seriesNames,
         onDragStateChanged: _onLetterScrollbarDragChanged,
+        bottomPadding: BottomSpacing.withMiniPlayer,
         child: _seriesViewMode == 'list'
             ? ListView.builder(
                 controller: _seriesScrollController,
@@ -3015,6 +3018,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         controller: _podcastsScrollController,
         items: podcastNames,
         onDragStateChanged: _onLetterScrollbarDragChanged,
+        bottomPadding: BottomSpacing.withMiniPlayer,
         child: _podcastsViewMode == 'list'
           ? ListView.builder(
               controller: _podcastsScrollController,
@@ -3260,6 +3264,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         controller: _radioScrollController,
         items: radioNames,
         onDragStateChanged: _onLetterScrollbarDragChanged,
+        bottomPadding: BottomSpacing.withMiniPlayer,
         child: _radioViewMode == 'list'
           ? ListView.builder(
               controller: _radioScrollController,
@@ -3468,6 +3473,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 controller: _artistsScrollController,
                 items: artistNames,
                 onDragStateChanged: _onLetterScrollbarDragChanged,
+                bottomPadding: BottomSpacing.withMiniPlayer,
                 child: _artistsViewMode == 'list'
                     ? ListView.builder(
                         controller: _artistsScrollController,
@@ -3700,6 +3706,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             controller: _albumsScrollController,
             items: albumNames,
             onDragStateChanged: _onLetterScrollbarDragChanged,
+            bottomPadding: BottomSpacing.withMiniPlayer,
             child: _albumsViewMode == 'list'
                 ? ListView.builder(
                     controller: _albumsScrollController,
@@ -3838,6 +3845,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         controller: _playlistsScrollController,
         items: _playlistNames,
         onDragStateChanged: _onLetterScrollbarDragChanged,
+        bottomPadding: BottomSpacing.withMiniPlayer,
         child: _playlistsViewMode == 'list'
             ? ListView.builder(
                 controller: _playlistsScrollController,
@@ -4090,14 +4098,29 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       );
     }
 
+    // Build items list based on current sort order for accurate letter display
+    final List<String> trackSortKeys;
+    switch (_tracksSortOrder) {
+      case 'artist':
+        trackSortKeys = displayTracks.map((t) => t.artistsString).toList();
+        break;
+      case 'album':
+        trackSortKeys = displayTracks.map((t) => t.album?.name ?? t.name).toList();
+        break;
+      default:
+        trackSortKeys = displayTracks.map((t) => t.name).toList();
+        break;
+    }
+
     return RefreshIndicator(
       color: colorScheme.primary,
       backgroundColor: colorScheme.background,
       onRefresh: _loadAllTracks,
       child: LetterScrollbar(
         controller: _tracksScrollController,
-        items: displayTracks.map((t) => t.name).toList(),
+        items: trackSortKeys,
         onDragStateChanged: _onLetterScrollbarDragChanged,
+        bottomPadding: BottomSpacing.withMiniPlayer,
         child: ListView.builder(
           controller: _tracksScrollController,
           key: PageStorageKey<String>('library_tracks_list_${_showFavoritesOnly ? 'fav' : 'all'}'),
