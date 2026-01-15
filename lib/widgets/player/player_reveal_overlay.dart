@@ -40,8 +40,10 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
   Timer? _refreshTimer;
 
   // Track vertical drag for dismissal
-  double _dragOffset = 0;
   bool _isDragging = false;
+
+  // Threshold for drag-to-dismiss (in animation value, 0.0-1.0)
+  static const double _dismissThreshold = 0.7;
 
   // Scroll controller for when player list overflows
   final ScrollController _scrollController = ScrollController();
@@ -153,11 +155,22 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
     // Trigger single bounce on mini player when cards are ~70% collapsed
     // This creates the effect of cards "landing" on the mini player
     bool bounceFired = false;
-    void checkBounce() {
-      if (!bounceFired && _revealController.value < 0.3) {
+    void fireBounce() {
+      if (!bounceFired) {
         bounceFired = true;
         GlobalPlayerOverlay.triggerBounce();
       }
+    }
+
+    void checkBounce() {
+      if (_revealController.value < 0.3) {
+        fireBounce();
+      }
+    }
+
+    // If user already dragged past bounce threshold, fire immediately
+    if (_revealController.value < 0.3) {
+      fireBounce();
     }
 
     _revealController.duration = const Duration(milliseconds: 150);
@@ -200,11 +213,17 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
     // Ignore swipe up when not scrollable - cards should stay fixed
     if (delta <= 0) return;
 
-    // Swiping down = dismiss gesture
-    setState(() {
-      _isDragging = true;
-      _dragOffset += delta;
-    });
+    // Swiping down = dismiss gesture - directly control animation controller
+    _isDragging = true;
+
+    // Convert drag delta to animation value change
+    // Use average card travel distance (~150px) as reference
+    const dragSensitivity = 150.0;
+    final valueDelta = delta / dragSensitivity;
+
+    // Decrease animation value (cards move down)
+    final newValue = (_revealController.value - valueDelta).clamp(0.0, 1.0);
+    _revealController.value = newValue;
   }
 
   void _handleVerticalDragEnd(DragEndDetails details) {
@@ -212,22 +231,16 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
 
     // If not dragging (was scrolling), don't dismiss
     if (!_isDragging) return;
+    _isDragging = false;
 
-    // Dismiss if dragged down enough or with enough velocity
-    if (_dragOffset > 100 || velocity > 500) {
+    // Dismiss if dragged past threshold or with enough velocity
+    if (_revealController.value < _dismissThreshold || velocity > 500) {
       HapticFeedback.lightImpact();
-      // Reset drag offset before dismiss so animation starts from correct position
-      setState(() {
-        _isDragging = false;
-        _dragOffset = 0;
-      });
       dismiss();
     } else {
-      // Spring back
-      setState(() {
-        _isDragging = false;
-        _dragOffset = 0;
-      });
+      // Spring back to fully revealed
+      _revealController.duration = const Duration(milliseconds: 150);
+      _revealController.forward();
     }
   }
 
@@ -320,7 +333,7 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                 Positioned(
                   left: 12,
                   right: 12,
-                  bottom: widget.miniPlayerBottom + widget.miniPlayerHeight + 8 - _dragOffset,
+                  bottom: widget.miniPlayerBottom + widget.miniPlayerHeight + 8,
                   child: GestureDetector(
                     onVerticalDragUpdate: _handleVerticalDragUpdate,
                     onVerticalDragEnd: _handleVerticalDragEnd,
