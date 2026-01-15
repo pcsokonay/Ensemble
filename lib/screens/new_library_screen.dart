@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -52,6 +51,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   bool _isLoadingAudiobooks = false;
   bool _showFavoritesOnly = false;
   bool _isChangingMediaType = false; // Flag to ignore onPageChanged during media type transitions
+  bool _showOnlyArtistsWithAlbums = false; // Filter artists tab to only show those with albums
+  bool _isSyncingArtists = false; // Show progress while re-syncing artists
 
   // All tracks with lazy loading
   List<Track> _allTracks = [];
@@ -223,6 +224,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final radioSort = await SettingsService.getLibraryRadioSortOrder();
     final podcastsSort = await SettingsService.getLibraryPodcastsSortOrder();
 
+    // Artists filter setting
+    final showOnlyArtistsWithAlbums = await SettingsService.getShowOnlyArtistsWithAlbums();
+
     if (mounted) {
       setState(() {
         // View modes
@@ -245,95 +249,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         _seriesSortOrder = seriesSort;
         _radioSortOrder = radioSort;
         _podcastsSortOrder = podcastsSort;
+
+        // Artists filter
+        _showOnlyArtistsWithAlbums = showOnlyArtistsWithAlbums;
       });
     }
-  }
-
-  void _cycleArtistsViewMode() {
-    String newMode;
-    switch (_artistsViewMode) {
-      case 'list':
-        newMode = 'grid2';
-        break;
-      case 'grid2':
-        newMode = 'grid3';
-        break;
-      default:
-        newMode = 'list';
-    }
-    setState(() => _artistsViewMode = newMode);
-    SettingsService.setLibraryArtistsViewMode(newMode);
-  }
-
-  void _cycleAlbumsViewMode() {
-    String newMode;
-    switch (_albumsViewMode) {
-      case 'grid2':
-        newMode = 'grid3';
-        break;
-      case 'grid3':
-        newMode = 'list';
-        break;
-      default:
-        newMode = 'grid2';
-    }
-    setState(() => _albumsViewMode = newMode);
-    SettingsService.setLibraryAlbumsViewMode(newMode);
-  }
-
-  void _cyclePlaylistsViewMode() {
-    String newMode;
-    switch (_playlistsViewMode) {
-      case 'list':
-        newMode = 'grid2';
-        break;
-      case 'grid2':
-        newMode = 'grid3';
-        break;
-      default:
-        newMode = 'list';
-    }
-    setState(() => _playlistsViewMode = newMode);
-    SettingsService.setLibraryPlaylistsViewMode(newMode);
-  }
-
-  void _cycleAuthorsViewMode() {
-    String newMode;
-    switch (_authorsViewMode) {
-      case 'list':
-        newMode = 'grid2';
-        break;
-      case 'grid2':
-        newMode = 'grid3';
-        break;
-      default:
-        newMode = 'list';
-    }
-    setState(() => _authorsViewMode = newMode);
-    SettingsService.setLibraryAuthorsViewMode(newMode);
-  }
-
-  void _cycleAudiobooksViewMode() {
-    String newMode;
-    switch (_audiobooksViewMode) {
-      case 'grid2':
-        newMode = 'grid3';
-        break;
-      case 'grid3':
-        newMode = 'list';
-        break;
-      default:
-        newMode = 'grid2';
-    }
-    setState(() => _audiobooksViewMode = newMode);
-    SettingsService.setLibraryAudiobooksViewMode(newMode);
-  }
-
-  void _toggleAudiobooksSortOrder() {
-    final newOrder = _audiobooksSortOrder == 'alpha' ? 'year' : 'alpha';
-    _audiobooksSortOrder = newOrder;
-    _sortAudiobooks();
-    SettingsService.setLibraryAudiobooksSortOrder(newOrder);
   }
 
   /// Sort audiobooks based on current sort order
@@ -351,66 +271,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
     _sortedAudiobooks = sorted;
     _audiobookNames = sorted.map((a) => a.name).toList();
-  }
-
-  void _cycleSeriesViewMode() {
-    // Series now has grid2, grid3, and list view
-    String newMode;
-    switch (_seriesViewMode) {
-      case 'grid2':
-        newMode = 'grid3';
-        break;
-      case 'grid3':
-        newMode = 'list';
-        break;
-      default:
-        newMode = 'grid2';
-    }
-    setState(() => _seriesViewMode = newMode);
-    SettingsService.setLibrarySeriesViewMode(newMode);
-  }
-
-  void _cycleRadioViewMode() {
-    String newMode;
-    switch (_radioViewMode) {
-      case 'list':
-        newMode = 'grid2';
-        break;
-      case 'grid2':
-        newMode = 'grid3';
-        break;
-      default:
-        newMode = 'list';
-    }
-    setState(() => _radioViewMode = newMode);
-    SettingsService.setLibraryRadioViewMode(newMode);
-  }
-
-  void _cyclePodcastsViewMode() {
-    String newMode;
-    switch (_podcastsViewMode) {
-      case 'grid2':
-        newMode = 'grid3';
-        break;
-      case 'grid3':
-        newMode = 'list';
-        break;
-      default:
-        newMode = 'grid2';
-    }
-    setState(() => _podcastsViewMode = newMode);
-    SettingsService.setLibraryPodcastsViewMode(newMode);
-  }
-
-  IconData _getViewModeIcon(String mode) {
-    switch (mode) {
-      case 'list':
-        return Icons.view_list;
-      case 'grid3':
-        return Icons.grid_view;
-      default:
-        return Icons.grid_on;
-    }
   }
 
   String _getCurrentViewMode() {
@@ -467,68 +327,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           return _playlistsViewMode;
         default:
           return 'list';
-      }
-    }
-  }
-
-  void _cycleCurrentViewMode() {
-    final tabIndex = _selectedTabIndex.value;
-
-    // Handle books media type
-    if (_selectedMediaType == LibraryMediaType.books) {
-      switch (tabIndex) {
-        case 0:
-          _cycleAuthorsViewMode();
-          break;
-        case 1:
-          _cycleAudiobooksViewMode();
-          break;
-        case 2:
-          _cycleSeriesViewMode();
-          break;
-      }
-      return;
-    }
-
-    // Handle radio media type
-    if (_selectedMediaType == LibraryMediaType.radio) {
-      _cycleRadioViewMode();
-      return;
-    }
-
-    // Handle podcasts media type
-    if (_selectedMediaType == LibraryMediaType.podcasts) {
-      _cyclePodcastsViewMode();
-      return;
-    }
-
-    // Handle music media type
-    if (_showFavoritesOnly) {
-      switch (tabIndex) {
-        case 0:
-          _cycleArtistsViewMode();
-          break;
-        case 1:
-          _cycleAlbumsViewMode();
-          break;
-        case 2:
-          // Tracks - no view toggle
-          break;
-        case 3:
-          _cyclePlaylistsViewMode();
-          break;
-      }
-    } else {
-      switch (tabIndex) {
-        case 0:
-          _cycleArtistsViewMode();
-          break;
-        case 1:
-          _cycleAlbumsViewMode();
-          break;
-        case 2:
-          _cyclePlaylistsViewMode();
-          break;
       }
     }
   }
@@ -1329,7 +1127,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   colorScheme.background,
-                                  colorScheme.surface.withOpacity(0),
+                                  colorScheme.background.withOpacity(0),
                                 ],
                               ),
                             ),
@@ -1388,8 +1186,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     ),
                   ),
                 ),
-                // Right: action buttons
-                _buildInlineActionButtons(colorScheme),
+                // Right: options menu
+                _buildLibraryOptionsMenu(colorScheme),
               ],
             ),
           ),
@@ -1580,35 +1378,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
   }
 
-  /// Get sort icon based on current sort order
-  IconData _getSortIcon(String sortOrder) {
-    switch (sortOrder) {
-      case 'alpha':
-        return Icons.sort_by_alpha;
-      case 'alpha_desc':
-        return Icons.sort_by_alpha; // Same icon, rotation handled in widget
-      case 'year':
-      case 'year_desc':
-        return Icons.calendar_today;
-      case 'artist':
-        return Icons.person;
-      case 'album':
-        return Icons.album;
-      case 'duration':
-        return Icons.timer;
-      case 'tracks':
-      case 'books':
-        return Icons.format_list_numbered;
-      default:
-        return Icons.sort;
-    }
-  }
-
-  /// Check if sort order is descending
-  bool _isSortDescending(String sortOrder) {
-    return sortOrder.endsWith('_desc');
-  }
-
   /// Set sort order and persist to settings
   Future<void> _setSortOrder(String order) async {
     final tabIndex = _selectedTabIndex.value;
@@ -1687,39 +1456,314 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
   }
 
-  /// Get sort options for current tab
-  List<PopupMenuEntry<String>> _getSortOptions() {
+  // Single options menu combining sort, view mode, and favorites filter
+  Widget _buildLibraryOptionsMenu(ColorScheme colorScheme) {
+    final fadedCircleColor = colorScheme.surfaceVariant.withOpacity(0.6);
+
+    // Touch target meets Material Design 48x48 minimum
+    const double buttonSize = ButtonSizes.xl;
+    const double iconSize = ButtonSizes.iconXl;
+
+    return SizedBox(
+      width: buttonSize,
+      height: buttonSize,
+      child: Material(
+        color: _showFavoritesOnly ? StatusColors.favorite : fadedCircleColor,
+        shape: const CircleBorder(),
+        child: PopupMenuButton<String>(
+          onSelected: _handleMenuSelection,
+          itemBuilder: (context) => _buildMenuItems(context),
+          position: PopupMenuPosition.under,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // Show spinner on button while syncing artists filter
+          child: _isSyncingArtists
+              ? Center(
+                  child: SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _showFavoritesOnly ? Colors.white : colorScheme.onSurface,
+                    ),
+                  ),
+                )
+              : Icon(
+                  Icons.more_vert,
+                  size: iconSize,
+                  color: _showFavoritesOnly ? Colors.white : colorScheme.onSurface,
+                ),
+        ),
+      ),
+    );
+  }
+
+  /// Handle selection from the unified options menu
+  void _handleMenuSelection(String value) {
+    if (value.startsWith('sort:')) {
+      _setSortOrder(value.substring(5));
+    } else if (value.startsWith('view:')) {
+      _setViewMode(value.substring(5));
+    } else if (value == 'toggle:favorites') {
+      _toggleFavoritesMode(!_showFavoritesOnly);
+    } else if (value == 'toggle:artistsWithAlbums') {
+      _toggleArtistsWithAlbumsFilter(!_showOnlyArtistsWithAlbums);
+    }
+  }
+
+  /// Toggle the "show only artists with albums" filter
+  Future<void> _toggleArtistsWithAlbumsFilter(bool value) async {
+    setState(() {
+      _showOnlyArtistsWithAlbums = value;
+      _isSyncingArtists = true;
+    });
+
+    await SettingsService.setShowOnlyArtistsWithAlbums(value);
+
+    // Force sync library to apply the new filter at API level
+    if (mounted) {
+      await context.read<MusicAssistantProvider>().forceLibrarySync();
+      if (mounted) {
+        setState(() => _isSyncingArtists = false);
+      }
+    }
+  }
+
+  /// Set view mode directly (instead of cycling)
+  Future<void> _setViewMode(String mode) async {
     final tabIndex = _selectedTabIndex.value;
+
+    setState(() {
+      switch (_selectedMediaType) {
+        case LibraryMediaType.music:
+          switch (tabIndex) {
+            case 0:
+              _artistsViewMode = mode;
+              break;
+            case 1:
+              _albumsViewMode = mode;
+              break;
+            case 2:
+              // Tracks - no view mode
+              break;
+            case 3:
+              _playlistsViewMode = mode;
+              break;
+          }
+          break;
+        case LibraryMediaType.books:
+          switch (tabIndex) {
+            case 0:
+              _authorsViewMode = mode;
+              break;
+            case 1:
+              _audiobooksViewMode = mode;
+              break;
+            case 2:
+              _seriesViewMode = mode;
+              break;
+          }
+          break;
+        case LibraryMediaType.radio:
+          _radioViewMode = mode;
+          break;
+        case LibraryMediaType.podcasts:
+          _podcastsViewMode = mode;
+          break;
+      }
+    });
+
+    // Persist to settings
+    switch (_selectedMediaType) {
+      case LibraryMediaType.music:
+        switch (tabIndex) {
+          case 0: await SettingsService.setLibraryArtistsViewMode(mode); break;
+          case 1: await SettingsService.setLibraryAlbumsViewMode(mode); break;
+          case 2: break; // Tracks - no view mode
+          case 3: await SettingsService.setLibraryPlaylistsViewMode(mode); break;
+        }
+        break;
+      case LibraryMediaType.books:
+        switch (tabIndex) {
+          case 0: await SettingsService.setLibraryAuthorsViewMode(mode); break;
+          case 1: await SettingsService.setLibraryAudiobooksViewMode(mode); break;
+          case 2: await SettingsService.setLibrarySeriesViewMode(mode); break;
+        }
+        break;
+      case LibraryMediaType.radio:
+        await SettingsService.setLibraryRadioViewMode(mode);
+        break;
+      case LibraryMediaType.podcasts:
+        await SettingsService.setLibraryPodcastsViewMode(mode);
+        break;
+    }
+  }
+
+  /// Build all menu items for the unified options menu
+  List<PopupMenuEntry<String>> _buildMenuItems(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final currentSort = _getCurrentSortOrder();
+    final currentViewMode = _getCurrentViewMode();
+    final hasViewModes = _currentTabHasViewModes();
+
+    return [
+      // Sort section header
+      PopupMenuItem<String>(
+        enabled: false,
+        height: 32,
+        child: Text(
+          'Sort',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurface.withOpacity(0.5),
+          ),
+        ),
+      ),
+      // Sort options
+      ..._buildSortMenuItems(currentSort, colorScheme),
+
+      // View section (if tab supports multiple views)
+      if (hasViewModes) ...[
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          enabled: false,
+          height: 32,
+          child: Text(
+            'View',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface.withOpacity(0.5),
+            ),
+          ),
+        ),
+        ..._buildViewModeMenuItems(currentViewMode, colorScheme),
+      ],
+
+      // Filter section
+      const PopupMenuDivider(),
+      PopupMenuItem<String>(
+        enabled: false,
+        height: 32,
+        child: Text(
+          'Filter',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurface.withOpacity(0.5),
+          ),
+        ),
+      ),
+      // Favorites toggle
+      PopupMenuItem<String>(
+        value: 'toggle:favorites',
+        child: Row(
+          children: [
+            Icon(
+              _showFavoritesOnly ? Icons.favorite : Icons.favorite_border,
+              size: 18,
+              color: _showFavoritesOnly ? StatusColors.favorite : null,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Favorites Only',
+              style: TextStyle(
+                color: _showFavoritesOnly ? StatusColors.favorite : null,
+                fontWeight: _showFavoritesOnly ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+            const Spacer(),
+            if (_showFavoritesOnly)
+              Icon(
+                Icons.check,
+                size: 18,
+                color: StatusColors.favorite,
+              ),
+          ],
+        ),
+      ),
+      // "Artists with albums only" filter (only on Artists tab)
+      if (_selectedMediaType == LibraryMediaType.music && _selectedTabIndex.value == 0)
+        PopupMenuItem<String>(
+          value: 'toggle:artistsWithAlbums',
+          child: Row(
+            children: [
+              Icon(
+                _showOnlyArtistsWithAlbums ? Icons.album : Icons.album_outlined,
+                size: 18,
+                color: _showOnlyArtistsWithAlbums ? colorScheme.primary : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'With Albums Only',
+                  style: TextStyle(
+                    color: _showOnlyArtistsWithAlbums ? colorScheme.primary : null,
+                    fontWeight: _showOnlyArtistsWithAlbums ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+              if (_isSyncingArtists)
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.primary,
+                  ),
+                )
+              else if (_showOnlyArtistsWithAlbums)
+                Icon(
+                  Icons.check,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+            ],
+          ),
+        ),
+    ];
+  }
+
+  /// Check if current tab supports multiple view modes
+  bool _currentTabHasViewModes() {
+    // Tracks tab (Music index 2) only has list view
+    if (_selectedMediaType == LibraryMediaType.music && _selectedTabIndex.value == 2) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Build sort menu items with prefixed values
+  List<PopupMenuItem<String>> _buildSortMenuItems(String currentSort, ColorScheme colorScheme) {
+    final tabIndex = _selectedTabIndex.value;
 
     switch (_selectedMediaType) {
       case LibraryMediaType.music:
         switch (tabIndex) {
           case 0: // Artists
             return [
-              _buildSortOption('alpha', 'A-Z', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort),
+              _buildMenuItem('sort:alpha', 'A-Z', Icons.sort_by_alpha, currentSort == 'alpha', colorScheme),
+              _buildMenuItem('sort:alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort == 'alpha_desc', colorScheme),
             ];
           case 1: // Albums
             return [
-              _buildSortOption('alpha', 'A-Z', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('year', 'Year (Newest)', Icons.calendar_today, currentSort),
-              _buildSortOption('year_desc', 'Year (Oldest)', Icons.calendar_today, currentSort),
-              _buildSortOption('artist', 'By Artist', Icons.person, currentSort),
+              _buildMenuItem('sort:alpha', 'A-Z', Icons.sort_by_alpha, currentSort == 'alpha', colorScheme),
+              _buildMenuItem('sort:alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort == 'alpha_desc', colorScheme),
+              _buildMenuItem('sort:year', 'Year (Newest)', Icons.calendar_today, currentSort == 'year', colorScheme),
+              _buildMenuItem('sort:year_desc', 'Year (Oldest)', Icons.calendar_today, currentSort == 'year_desc', colorScheme),
+              _buildMenuItem('sort:artist', 'By Artist', Icons.person, currentSort == 'artist', colorScheme),
             ];
           case 2: // Tracks
             return [
-              _buildSortOption('alpha', 'A-Z', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('artist', 'By Artist', Icons.person, currentSort),
-              _buildSortOption('album', 'By Album', Icons.album, currentSort),
-              _buildSortOption('duration', 'Duration', Icons.timer, currentSort),
+              _buildMenuItem('sort:alpha', 'A-Z', Icons.sort_by_alpha, currentSort == 'alpha', colorScheme),
+              _buildMenuItem('sort:artist', 'By Artist', Icons.person, currentSort == 'artist', colorScheme),
+              _buildMenuItem('sort:album', 'By Album', Icons.album, currentSort == 'album', colorScheme),
+              _buildMenuItem('sort:duration', 'Duration', Icons.timer, currentSort == 'duration', colorScheme),
             ];
           case 3: // Playlists
             return [
-              _buildSortOption('alpha', 'A-Z', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('tracks', 'Track Count', Icons.format_list_numbered, currentSort),
+              _buildMenuItem('sort:alpha', 'A-Z', Icons.sort_by_alpha, currentSort == 'alpha', colorScheme),
+              _buildMenuItem('sort:alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort == 'alpha_desc', colorScheme),
+              _buildMenuItem('sort:tracks', 'Track Count', Icons.format_list_numbered, currentSort == 'tracks', colorScheme),
             ];
           default:
             return [];
@@ -1728,39 +1772,48 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         switch (tabIndex) {
           case 0: // Authors
             return [
-              _buildSortOption('alpha', 'A-Z', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('books', 'Book Count', Icons.format_list_numbered, currentSort),
+              _buildMenuItem('sort:alpha', 'A-Z', Icons.sort_by_alpha, currentSort == 'alpha', colorScheme),
+              _buildMenuItem('sort:alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort == 'alpha_desc', colorScheme),
+              _buildMenuItem('sort:books', 'Book Count', Icons.format_list_numbered, currentSort == 'books', colorScheme),
             ];
           case 1: // All Books
             return [
-              _buildSortOption('alpha', 'A-Z', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('year', 'Year', Icons.calendar_today, currentSort),
+              _buildMenuItem('sort:alpha', 'A-Z', Icons.sort_by_alpha, currentSort == 'alpha', colorScheme),
+              _buildMenuItem('sort:year', 'Year', Icons.calendar_today, currentSort == 'year', colorScheme),
             ];
           case 2: // Series
             return [
-              _buildSortOption('alpha', 'A-Z', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort),
-              _buildSortOption('books', 'Book Count', Icons.format_list_numbered, currentSort),
+              _buildMenuItem('sort:alpha', 'A-Z', Icons.sort_by_alpha, currentSort == 'alpha', colorScheme),
+              _buildMenuItem('sort:alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort == 'alpha_desc', colorScheme),
+              _buildMenuItem('sort:books', 'Book Count', Icons.format_list_numbered, currentSort == 'books', colorScheme),
             ];
           default:
             return [];
         }
       case LibraryMediaType.radio:
         return [
-          _buildSortOption('alpha', 'A-Z', Icons.sort_by_alpha, currentSort),
-          _buildSortOption('alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort),
+          _buildMenuItem('sort:alpha', 'A-Z', Icons.sort_by_alpha, currentSort == 'alpha', colorScheme),
+          _buildMenuItem('sort:alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort == 'alpha_desc', colorScheme),
         ];
       case LibraryMediaType.podcasts:
         return [
-          _buildSortOption('alpha', 'A-Z', Icons.sort_by_alpha, currentSort),
-          _buildSortOption('alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort),
+          _buildMenuItem('sort:alpha', 'A-Z', Icons.sort_by_alpha, currentSort == 'alpha', colorScheme),
+          _buildMenuItem('sort:alpha_desc', 'Z-A', Icons.sort_by_alpha, currentSort == 'alpha_desc', colorScheme),
         ];
     }
   }
 
-  PopupMenuItem<String> _buildSortOption(String value, String label, IconData icon, String currentSort) {
-    final isSelected = currentSort == value;
+  /// Build view mode menu items with prefixed values
+  List<PopupMenuItem<String>> _buildViewModeMenuItems(String currentMode, ColorScheme colorScheme) {
+    return [
+      _buildMenuItem('view:list', 'List', Icons.view_list, currentMode == 'list', colorScheme),
+      _buildMenuItem('view:grid2', '2-Column Grid', Icons.grid_on, currentMode == 'grid2', colorScheme),
+      _buildMenuItem('view:grid3', '3-Column Grid', Icons.grid_view, currentMode == 'grid3', colorScheme),
+    ];
+  }
+
+  /// Build a single menu item with icon and checkmark
+  PopupMenuItem<String> _buildMenuItem(String value, String label, IconData icon, bool isSelected, ColorScheme colorScheme) {
     return PopupMenuItem<String>(
       value: value,
       child: Row(
@@ -1768,13 +1821,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           Icon(
             icon,
             size: 18,
-            color: isSelected ? Theme.of(context).colorScheme.primary : null,
+            color: isSelected ? colorScheme.primary : null,
           ),
           const SizedBox(width: 12),
           Text(
             label,
             style: TextStyle(
-              color: isSelected ? Theme.of(context).colorScheme.primary : null,
+              color: isSelected ? colorScheme.primary : null,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
@@ -1783,89 +1836,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
             Icon(
               Icons.check,
               size: 18,
-              color: Theme.of(context).colorScheme.primary,
+              color: colorScheme.primary,
             ),
         ],
       ),
-    );
-  }
-
-  // Inline action buttons for sort, favorites and view mode (right side of row 2)
-  Widget _buildInlineActionButtons(ColorScheme colorScheme) {
-    final currentSort = _getCurrentSortOrder();
-    final sortIcon = _getSortIcon(currentSort);
-    final fadedCircleColor = colorScheme.surfaceVariant.withOpacity(0.6);
-
-    // Compact touch targets for filter row buttons
-    const double buttonSize = ButtonSizes.md;
-    const double iconSize = ButtonSizes.iconMd;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(width: 4),
-        // Sort button with popup menu
-        SizedBox(
-          width: buttonSize,
-          height: buttonSize,
-          child: Material(
-            color: fadedCircleColor,
-            shape: const CircleBorder(),
-            child: PopupMenuButton<String>(
-              onSelected: _setSortOrder,
-              itemBuilder: (context) => _getSortOptions(),
-              position: PopupMenuPosition.under,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Transform.rotate(
-                angle: _isSortDescending(currentSort) ? pi : 0,
-                child: Icon(
-                  sortIcon,
-                  size: iconSize,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        // Favorites toggle (all media types support favorites)
-        SizedBox(
-          width: buttonSize,
-          height: buttonSize,
-          child: Material(
-            color: _showFavoritesOnly ? StatusColors.favorite : fadedCircleColor,
-            shape: const CircleBorder(),
-            child: InkWell(
-              onTap: () => _toggleFavoritesMode(!_showFavoritesOnly),
-              customBorder: const CircleBorder(),
-              child: Icon(
-                _showFavoritesOnly ? Icons.favorite : Icons.favorite_border,
-                size: iconSize,
-                color: _showFavoritesOnly ? Colors.white : colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        // View mode toggle
-        SizedBox(
-          width: buttonSize,
-          height: buttonSize,
-          child: Material(
-            color: fadedCircleColor,
-            shape: const CircleBorder(),
-            child: InkWell(
-              onTap: _cycleCurrentViewMode,
-              customBorder: const CircleBorder(),
-              child: Icon(
-                _getViewModeIcon(_getCurrentViewMode()),
-                size: iconSize,
-                color: colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 

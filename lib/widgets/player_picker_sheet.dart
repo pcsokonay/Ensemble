@@ -212,6 +212,7 @@ Future<void> showPlayerPickerSheet({
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
+    useRootNavigator: true, // Required for overlays like QueuePanel
     builder: (context) => PlayerPickerSheet(
       title: title,
       players: players,

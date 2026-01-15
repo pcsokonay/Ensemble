@@ -2521,6 +2521,44 @@ class MusicAssistantAPI {
     }
   }
 
+  /// Transfer the current queue to another player
+  /// This moves the entire playback queue from source player to target player,
+  /// including shuffle and repeat settings.
+  ///
+  /// [sourceQueueId] - The queue ID of the source player (optional, uses first playing player if null)
+  /// [targetQueueId] - The queue ID of the target player (required)
+  /// [autoPlay] - Whether to automatically start playback on the target player (default: true)
+  Future<void> transferQueue({
+    String? sourceQueueId,
+    required String targetQueueId,
+    bool autoPlay = true,
+  }) async {
+    try {
+      _logger.log('🔄 Transferring queue to player: $targetQueueId (source: ${sourceQueueId ?? "auto"}, autoPlay: $autoPlay)');
+
+      final args = <String, dynamic>{
+        'target_queue_id': targetQueueId,
+        'auto_play': autoPlay,
+      };
+
+      // Only include source_queue_id if explicitly provided
+      // When null, MA will use the first playing player
+      if (sourceQueueId != null) {
+        args['source_queue_id'] = sourceQueueId;
+      }
+
+      await _sendCommand(
+        'player_queues/transfer',
+        args: args,
+      );
+
+      _logger.log('✅ Queue transferred successfully');
+    } catch (e) {
+      _logger.log('❌ Error transferring queue: $e');
+      rethrow;
+    }
+  }
+
   // ============================================================================
   // BUILT-IN PLAYER MANAGEMENT
   // ============================================================================

@@ -4,6 +4,7 @@ import '../providers/music_assistant_provider.dart';
 import '../models/player.dart';
 import '../services/debug_logger.dart';
 import '../widgets/common/empty_state.dart';
+import '../widgets/player_picker_sheet.dart';
 import '../l10n/app_localizations.dart';
 
 class QueueScreen extends StatefulWidget {
@@ -67,6 +68,68 @@ class _QueueScreenState extends State<QueueScreen> {
     }
   }
 
+  Future<void> _handleTransferQueue(MusicAssistantProvider maProvider) async {
+    final player = maProvider.selectedPlayer;
+    if (player == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.of(context)!.noPlayerSelected)),
+      );
+      return;
+    }
+
+    // Get available players, excluding the current source player
+    final allPlayers = maProvider.availablePlayers;
+    final targetPlayers = allPlayers
+        .where((p) => p.playerId != player.playerId && p.available)
+        .toList();
+
+    if (targetPlayers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No other players available to transfer to'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Show player picker sheet
+    await showPlayerPickerSheet(
+      context: context,
+      title: 'Transfer Queue To',
+      players: targetPlayers,
+      onPlayerSelected: (targetPlayer) async {
+        try {
+          await maProvider.api?.transferQueue(
+            sourceQueueId: player.playerId,
+            targetQueueId: targetPlayer.playerId,
+            autoPlay: true,
+          );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Queue transferred to ${targetPlayer.name}'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        } catch (e) {
+          _logger.log('Error transferring queue: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to transfer queue: $e'),
+                backgroundColor: Colors.red.shade700,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final maProvider = context.watch<MusicAssistantProvider>();
@@ -87,6 +150,11 @@ class _QueueScreenState extends State<QueueScreen> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.swap_horiz_rounded),
+            tooltip: 'Transfer queue',
+            onPressed: () => _handleTransferQueue(maProvider),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadQueue,

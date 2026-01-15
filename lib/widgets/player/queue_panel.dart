@@ -49,9 +49,13 @@ class QueuePanel extends StatefulWidget {
   State<QueuePanel> createState() => _QueuePanelState();
 }
 
-class _QueuePanelState extends State<QueuePanel> {
+class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateMixin {
   List<QueueItem> _items = [];
   final GlobalKey _stackKey = GlobalKey();
+
+  // Transfer dropdown animation
+  late AnimationController _dropdownController;
+  bool _showingTransferDropdown = false;
 
   // Drag state
   int? _dragIndex;
@@ -90,6 +94,10 @@ class _QueuePanelState extends State<QueuePanel> {
   void initState() {
     super.initState();
     _items = List.from(widget.queue?.items ?? []);
+    _dropdownController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
   }
 
   @override
@@ -125,6 +133,7 @@ class _QueuePanelState extends State<QueuePanel> {
 
   @override
   void dispose() {
+    _dropdownController.dispose();
     _pendingReorderTimer?.cancel();
     super.dispose();
   }
@@ -178,6 +187,173 @@ class _QueuePanelState extends State<QueuePanel> {
       debugPrint('QueuePanel: Error clearing queue: $e');
       // Refresh to restore if failed
       widget.onRefresh();
+    }
+  }
+
+  void _openTransferDropdown() {
+    if (_showingTransferDropdown) return;
+    setState(() => _showingTransferDropdown = true);
+    _dropdownController.forward();
+  }
+
+  void _closeTransferDropdown() {
+    if (!_showingTransferDropdown) return;
+    _dropdownController.reverse().then((_) {
+      if (mounted) setState(() => _showingTransferDropdown = false);
+    });
+  }
+
+  void _handleTransferQueue(BuildContext context) {
+    if (_showingTransferDropdown) {
+      _closeTransferDropdown();
+    } else {
+      _openTransferDropdown();
+    }
+  }
+
+  List<Player> _getTargetPlayers() {
+    final sourcePlayerId = widget.queue?.playerId;
+    if (sourcePlayerId == null) return [];
+    return widget.maProvider.availablePlayers
+        .where((p) => p.playerId != sourcePlayerId && p.available)
+        .toList();
+  }
+
+  Widget _buildTransferDropdown() {
+    final targetPlayers = _getTargetPlayers();
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Use album highlight color's hue/saturation, but at fixed darkness
+    // matching library dropdown. Use ~10% lightness since warm hues (orange/yellow)
+    // appear brighter than cool hues (purple/blue) at the same HSL lightness.
+    final hsl = HSLColor.fromColor(widget.primaryColor);
+    final menuBackground = hsl.withLightness(0.10).toColor();
+    // Use theme's onSurface for text (matches library dropdown styling)
+    final menuTextColor = colorScheme.onSurface;
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 280, maxWidth: 220),
+      decoration: BoxDecoration(
+        color: menuBackground,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title header (matches library dropdown section headers)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Text(
+                'Transfer to...',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: menuTextColor.withOpacity(0.5),
+                ),
+              ),
+            ),
+
+            // Player list
+            if (targetPlayers.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Text(
+                  'No other players available',
+                  style: TextStyle(color: menuTextColor.withOpacity(0.5), fontSize: 14),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  itemCount: targetPlayers.length,
+                  itemBuilder: (context, index) {
+                    final player = targetPlayers[index];
+
+                    // Status color
+                    Color statusColor;
+                    if (!player.powered) {
+                      statusColor = Colors.grey;
+                    } else if (player.state == 'playing') {
+                      statusColor = Colors.green;
+                    } else {
+                      statusColor = Colors.orange;
+                    }
+
+                    // Match library dropdown item styling
+                    return InkWell(
+                      onTap: () => _transferToPlayer(player),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.speaker_rounded, color: menuTextColor, size: 18),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                player.name,
+                                style: TextStyle(color: menuTextColor),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: statusColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _transferToPlayer(Player targetPlayer) async {
+    final sourcePlayerId = widget.queue?.playerId;
+    if (sourcePlayerId == null) return;
+
+    // Close dropdown first
+    _closeTransferDropdown();
+
+    try {
+      await widget.maProvider.api?.transferQueue(
+        sourceQueueId: sourcePlayerId,
+        targetQueueId: targetPlayer.playerId,
+        autoPlay: true,
+      );
+
+      debugPrint('QueuePanel: Queue transferred to ${targetPlayer.name}');
+
+      // Switch to the target player
+      widget.maProvider.selectPlayer(targetPlayer);
+
+      // Close the queue panel after successful transfer
+      widget.onClose();
+    } catch (e) {
+      debugPrint('QueuePanel: Error transferring queue: $e');
     }
   }
 
@@ -506,41 +682,55 @@ class _QueuePanelState extends State<QueuePanel> {
       },
       child: Container(
         color: widget.backgroundColor,
-        child: Column(
+        child: Stack(
           children: [
-            // Header
-            Container(
-              padding: EdgeInsets.only(top: widget.topPadding + 4, left: 4, right: 16),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.arrow_back_rounded, color: widget.textColor, size: IconSizes.md),
-                    onPressed: widget.onClose,
-                    padding: Spacing.paddingAll12,
+            // Main content column
+            Column(
+              children: [
+                // Header
+                Container(
+                  padding: EdgeInsets.only(top: widget.topPadding + 4, left: 4, right: 16),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_rounded, color: widget.textColor, size: IconSizes.md),
+                        onPressed: _showingTransferDropdown ? _closeTransferDropdown : widget.onClose,
+                        padding: Spacing.paddingAll12,
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Queue',
+                        style: TextStyle(
+                          color: widget.textColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Transfer queue button
+                      IconButton(
+                        icon: Icon(
+                          _showingTransferDropdown ? Icons.close : Icons.swap_horiz_rounded,
+                          color: _showingTransferDropdown ? widget.primaryColor : widget.textColor.withOpacity(0.7),
+                          size: IconSizes.sm,
+                        ),
+                        onPressed: () => _handleTransferQueue(context),
+                        padding: Spacing.paddingAll12,
+                        tooltip: 'Transfer queue to another player',
+                      ),
+                      // Clear queue button
+                      IconButton(
+                        icon: Icon(Icons.delete_sweep_rounded, color: widget.textColor.withOpacity(0.7), size: IconSizes.sm),
+                        onPressed: _handleClearQueue,
+                        padding: Spacing.paddingAll12,
+                        tooltip: 'Clear queue',
+                      ),
+                    ],
                   ),
-                  const Spacer(),
-                  Text(
-                    'Queue',
-                    style: TextStyle(
-                      color: widget.textColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  // Clear queue button
-                  IconButton(
-                    icon: Icon(Icons.delete_sweep_rounded, color: widget.textColor.withOpacity(0.7), size: IconSizes.sm),
-                    onPressed: _handleClearQueue,
-                    padding: Spacing.paddingAll12,
-                    tooltip: 'Clear queue',
-                  ),
-                ],
-              ),
-            ),
+                ),
 
-            // Queue content
-            Expanded(
+                // Queue content
+                Expanded(
               child: widget.isLoading
                   ? Center(child: CircularProgressIndicator(color: widget.primaryColor))
                   : widget.queue == null || _items.isEmpty
@@ -585,7 +775,49 @@ class _QueuePanelState extends State<QueuePanel> {
                             ],
                           ),
                         ),
+                ),
+              ],
             ),
+
+            // Floating dropdown overlay for transfer
+            if (_showingTransferDropdown) ...[
+              // Tap-to-dismiss backdrop
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: _closeTransferDropdown,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(color: Colors.transparent),
+                ),
+              ),
+              // Dropdown menu with open/close animation
+              Positioned(
+                top: widget.topPadding + 52, // Below header
+                right: 56, // Aligned with transfer button
+                child: AnimatedBuilder(
+                  animation: CurvedAnimation(
+                    parent: _dropdownController,
+                    curve: Curves.easeInOut,
+                  ),
+                  builder: (context, child) {
+                    final value = _dropdownController.value;
+                    final curvedValue = Curves.easeInOut.transform(value);
+
+                    return ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        widthFactor: 1.0,
+                        heightFactor: curvedValue,
+                        child: Opacity(
+                          opacity: curvedValue,
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _buildTransferDropdown(),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -775,3 +1007,4 @@ class _VelocitySample {
 
   _VelocitySample(this.position, this.timeMs);
 }
+

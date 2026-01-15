@@ -802,7 +802,7 @@ class SearchScreenState extends State<SearchScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           colorScheme.background,
-                          colorScheme.surface.withOpacity(0),
+                          colorScheme.background.withOpacity(0),
                         ],
                       ),
                     ),
