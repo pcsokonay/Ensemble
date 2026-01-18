@@ -56,6 +56,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   bool _isChangingMediaType = false; // Flag to ignore onPageChanged during media type transitions
   bool _showOnlyArtistsWithAlbums = false; // Filter artists tab to only show those with albums
   bool _isSyncingArtists = false; // Show progress while re-syncing artists
+  bool _isSyncingLibraries = false; // Show progress while re-syncing ABS libraries
 
   // All tracks with lazy loading
   List<Track> _allTracks = [];
@@ -122,6 +123,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   // Series book covers cache: seriesId -> list of book thumbnail URLs
   final Map<String, List<String>> _seriesBookCovers = {};
+
+  // ABS library filter state (for Books tab)
+  List<Map<String, String>> _discoveredAbsLibraries = [];
+  Map<String, bool> _absLibraryEnabled = {};
   final Set<String> _seriesCoversLoading = {};
   // Series extracted colors cache: seriesId -> list of colors from book covers
   final Map<String, List<Color>> _seriesExtractedColors = {};
@@ -347,6 +352,16 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     // Artists filter setting
     final showOnlyArtistsWithAlbums = await SettingsService.getShowOnlyArtistsWithAlbums();
 
+    // ABS library settings
+    final discoveredLibraries = await SettingsService.getDiscoveredAbsLibraries() ?? [];
+    final enabledLibraries = await SettingsService.getEnabledAbsLibraries();
+    final libraryEnabled = <String, bool>{};
+    for (final lib in discoveredLibraries) {
+      final path = lib['path'] ?? '';
+      // If enabledLibraries is null, all are enabled by default
+      libraryEnabled[path] = enabledLibraries == null || enabledLibraries.contains(path);
+    }
+
     if (mounted) {
       setState(() {
         // View modes
@@ -372,6 +387,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
         // Artists filter
         _showOnlyArtistsWithAlbums = showOnlyArtistsWithAlbums;
+
+        // ABS library filter
+        _discoveredAbsLibraries = discoveredLibraries;
+        _absLibraryEnabled = libraryEnabled;
       });
     }
   }
@@ -1641,8 +1660,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: () => _showOptionsMenu(colorScheme),
-          // Show spinner on button while syncing artists filter
-          child: _isSyncingArtists
+          // Show spinner on button while syncing artists or libraries filter
+          child: (_isSyncingArtists || _isSyncingLibraries)
               ? Center(
                   child: SizedBox.square(
                     dimension: 18,
@@ -1710,6 +1729,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         relevantProviders: relevantProviders,
         enabledProviderIds: enabledProviders,
         onProviderToggled: _handleProviderToggle,
+        // ABS library filter (Books tab only)
+        absLibraries: _discoveredAbsLibraries,
+        absLibraryEnabled: _absLibraryEnabled,
+        onAbsLibraryToggled: _toggleAbsLibrary,
       ),
     );
 
@@ -1730,6 +1753,24 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       await context.read<MusicAssistantProvider>().forceLibrarySync();
       if (mounted) {
         setState(() => _isSyncingArtists = false);
+      }
+    }
+  }
+
+  /// Toggle an ABS library filter
+  Future<void> _toggleAbsLibrary(String libraryPath, bool enabled) async {
+    setState(() {
+      _absLibraryEnabled[libraryPath] = enabled;
+      _isSyncingLibraries = true;
+    });
+
+    await SettingsService.toggleAbsLibrary(libraryPath, enabled);
+
+    // Force sync library to apply the new filter
+    if (mounted) {
+      await context.read<MusicAssistantProvider>().forceLibrarySync();
+      if (mounted) {
+        setState(() => _isSyncingLibraries = false);
       }
     }
   }
@@ -4454,6 +4495,10 @@ class _OptionsMenuOverlay extends StatefulWidget {
   final List<(ProviderInstance, int)> relevantProviders;
   final Set<String> enabledProviderIds;
   final void Function(String providerId, bool enabled) onProviderToggled;
+  // ABS library filter (Books tab)
+  final List<Map<String, String>> absLibraries;
+  final Map<String, bool> absLibraryEnabled;
+  final void Function(String libraryPath, bool enabled) onAbsLibraryToggled;
 
   const _OptionsMenuOverlay({
     required this.position,
@@ -4477,6 +4522,9 @@ class _OptionsMenuOverlay extends StatefulWidget {
     required this.relevantProviders,
     required this.enabledProviderIds,
     required this.onProviderToggled,
+    required this.absLibraries,
+    required this.absLibraryEnabled,
+    required this.onAbsLibraryToggled,
   });
 
   @override
@@ -4490,6 +4538,7 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
   late bool _showFavoritesOnly;
   late bool _showOnlyArtistsWithAlbums;
   late Set<String> _localEnabledProviders;
+  late Map<String, bool> _localAbsLibraryEnabled;
   late AnimationController _animController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
@@ -4502,6 +4551,7 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
     _showFavoritesOnly = widget.showFavoritesOnly;
     _showOnlyArtistsWithAlbums = widget.showOnlyArtistsWithAlbums;
     _localEnabledProviders = Set.from(widget.enabledProviderIds);
+    _localAbsLibraryEnabled = Map.from(widget.absLibraryEnabled);
 
     _animController = AnimationController(
       duration: const Duration(milliseconds: 150),
@@ -4604,6 +4654,19 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
     // Empty set means all are enabled
     if (_localEnabledProviders.isEmpty) return true;
     return _localEnabledProviders.contains(providerId);
+  }
+
+  void _handleAbsLibraryTap(String libraryPath) {
+    final isEnabled = _localAbsLibraryEnabled[libraryPath] ?? true;
+
+    // Don't allow disabling the last library
+    final enabledCount = _localAbsLibraryEnabled.values.where((v) => v).length;
+    if (isEnabled && enabledCount <= 1) return;
+
+    setState(() {
+      _localAbsLibraryEnabled[libraryPath] = !isEnabled;
+    });
+    widget.onAbsLibraryToggled(libraryPath, !isEnabled);
   }
 
   @override
@@ -4891,6 +4954,65 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
                                           ? colorScheme.primary
                                           : colorScheme.onSurface.withOpacity(0.5),
                                     ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+
+                    // ABS Libraries section - only for Books tab with multiple libraries
+                    if (widget.selectedMediaType == LibraryMediaType.books &&
+                        widget.absLibraries.length > 1) ...[
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4),
+                        child: Text(
+                          'Libraries',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ),
+                      ...widget.absLibraries.map((library) {
+                        final path = library['path'] ?? '';
+                        final name = library['name'] ?? path;
+                        final isEnabled = _localAbsLibraryEnabled[path] ?? true;
+
+                        return InkWell(
+                          onTap: () => _handleAbsLibraryTap(path),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            child: Row(
+                              children: [
+                                // Checkmark on left - fixed width
+                                SizedBox(
+                                  width: 24,
+                                  child: isEnabled
+                                      ? Icon(Icons.check, size: 18, color: colorScheme.primary)
+                                      : null,
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  isEnabled ? Icons.library_books : Icons.library_books_outlined,
+                                  size: 18,
+                                  color: isEnabled
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurface.withOpacity(0.7),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    style: TextStyle(
+                                      color: isEnabled ? colorScheme.primary : null,
+                                      fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
