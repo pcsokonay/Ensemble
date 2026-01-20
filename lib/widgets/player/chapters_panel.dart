@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../providers/music_assistant_provider.dart';
 import '../../models/media_item.dart' show Audiobook, Chapter;
 import '../../theme/design_tokens.dart';
+import '../../utils/duration_formatter.dart';
 import '../common/empty_state.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -25,18 +26,6 @@ class ChaptersPanel extends StatelessWidget {
     required this.topPadding,
     required this.onClose,
   });
-
-  String _formatDuration(int seconds) {
-    final duration = Duration(seconds: seconds);
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes % 60;
-    final secs = duration.inSeconds % 60;
-
-    if (hours > 0) {
-      return '${hours}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
-    }
-    return '${minutes}:${secs.toString().padLeft(2, '0')}';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +136,7 @@ class ChaptersPanel extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                        _formatDuration(chapter.positionMs ~/ 1000),
+                        formatDurationSeconds(chapter.positionMs ~/ 1000),
                         style: TextStyle(
                           color: textColor.withOpacity(0.5),
                           fontSize: 12,

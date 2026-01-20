@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/timings.dart';
+import '../utils/duration_formatter.dart';
 import '../providers/music_assistant_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../models/player.dart';
@@ -398,6 +399,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
   @override
   void dispose() {
+    // Explicitly remove listeners before disposing controllers
+    // (Controllers remove listeners on dispose, but explicit removal is clearer)
+    _controller.removeListener(_notifyExpansionProgress);
+    _controller.removeListener(_recordAnimationFrame);
+    _lyricsScrollController.removeListener(_onLyricsScroll);
+
     _controller.dispose();
     _queuePanelController.dispose();
     _sleepTimerPanelController.dispose();
@@ -799,19 +806,6 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final maProvider = context.read<MusicAssistantProvider>();
     await maProvider.setRepeatMode(_queue!.playerId, nextMode);
     await _loadQueue();
-  }
-
-  String _formatDuration(int seconds) {
-    final duration = Duration(seconds: seconds);
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes % 60;
-    final secs = duration.inSeconds % 60;
-
-    // For audiobooks and long content (>= 1 hour), show hours
-    if (hours > 0) {
-      return '${hours}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
-    }
-    return '${minutes.toString().padLeft(1, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   void _toggleQueuePanel() {
@@ -2878,7 +2872,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          _formatDuration(currentProgress.toInt()),
+                                          formatDurationSeconds(currentProgress.toInt()),
                                           style: TextStyle(
                                             color: textColor50, // PERF: Use cached color
                                             fontSize: 13, // Increased from 11 to 13
@@ -2887,7 +2881,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                                           ),
                                         ),
                                         Text(
-                                          _formatDuration(currentTrack.duration!.inSeconds),
+                                          formatDurationSeconds(currentTrack.duration!.inSeconds),
                                           style: TextStyle(
                                             color: textColor50, // PERF: Use cached color
                                             fontSize: 13, // Increased from 11 to 13
