@@ -474,6 +474,11 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     _controller.duration = _collapseDuration;
     _controller.reverse().then((_) {
       AnimationDebugger.endSession();
+      // Ensure notifier is reset even if animation was already at 0
+      // This fixes a bug where stale notifier values cause invisible nav bar
+      if (playerExpansionNotifier.value.progress != 0.0) {
+        playerExpansionNotifier.value = PlayerExpansionState(0.0, null, null);
+      }
     });
   }
 
@@ -486,7 +491,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     _queuePanelTargetOpen = false;
     // Collapse player
     _controller.duration = _collapseDuration;
-    _controller.reverse();
+    _controller.reverse().then((_) {
+      // Ensure notifier is reset even if animation was already at 0
+      if (playerExpansionNotifier.value.progress != 0.0) {
+        playerExpansionNotifier.value = PlayerExpansionState(0.0, null, null);
+      }
+    });
   }
 
   /// Handle vertical drag start - begin gesture-driven expansion

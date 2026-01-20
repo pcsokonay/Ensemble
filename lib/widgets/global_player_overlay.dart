@@ -642,11 +642,15 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
               duration: const Duration(seconds: 3),
               curve: const Interval(0.67, 1.0, curve: Curves.easeOut),
               builder: (context, opacity, child) {
+                // Use theme-appropriate background color for seamless transition
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                final backdropColor = isDark
+                    ? const Color(0xFF1a1a1a)  // Dark theme background
+                    : colorScheme.surface;      // Light theme surface
                 return BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
                   child: Container(
-                    // Use same dark color as connection screen for seamless transition
-                    color: const Color(0xFF1a1a1a).withOpacity(opacity),
+                    color: backdropColor.withOpacity(opacity),
                   ),
                 );
               },
@@ -755,6 +759,13 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
           builder: (context, state, child) {
             // Only show player if connected and has a selected player
             if (!state.isConnected || !state.hasPlayer) {
+              // Reset expansion state to prevent stale values from causing
+              // invisible/non-interactive nav bar when connection restores.
+              // This fixes a bug where expanded player state persisted after
+              // disconnect, making nav bar opacity=0 and ignoring taps.
+              if (playerExpansionNotifier.value.progress != 0.0) {
+                playerExpansionNotifier.value = PlayerExpansionState(0.0, null, null);
+              }
               return const SizedBox.shrink();
             }
 

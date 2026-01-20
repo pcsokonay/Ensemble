@@ -3946,6 +3946,9 @@ class MusicAssistantProvider with ChangeNotifier {
           item: mediaItem,
           playing: player.state == 'playing',
         );
+      } else {
+        // Builtin player is idle - clear notification (fixes issue #42)
+        audioHandler.clearRemotePlaybackState();
       }
     } else {
       // For remote players, immediately show notification if we have cached track info
@@ -3988,6 +3991,10 @@ class MusicAssistantProvider with ChangeNotifier {
           position: position,
           duration: Duration.zero,
         );
+      } else {
+        // Player is idle - clear the notification to prevent stale metadata
+        // from previous player showing (fixes issue #42)
+        audioHandler.clearRemotePlaybackState();
       }
     }
 
@@ -4099,40 +4106,33 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   /// Update just the notification position (called every 500ms for remote/Sendspin players)
-  void _updateNotificationPosition() {
+  /// Set [forceUpdate] to true to update even when paused (used after seek)
+  void _updateNotificationPosition({bool forceUpdate = false}) {
     if (_selectedPlayer == null || _currentTrack == null) {
       _notificationPositionTimer?.cancel();
       return;
     }
 
-    // Don't update if player is not playing
-    if (_selectedPlayer!.state != 'playing') {
+    final isPlaying = _selectedPlayer!.state == 'playing';
+
+    // Don't update if player is not playing (unless forced for seek)
+    if (!isPlaying && !forceUpdate) {
       _notificationPositionTimer?.cancel();
       return;
     }
 
     final track = _currentTrack!;
-    Duration position;
 
-    // For Sendspin PCM, use the PCM player's elapsed time (based on bytes played)
-    // For remote players, use the position tracker (server-based interpolation)
-    if (_sendspinConnected && _pcmAudioPlayer != null && _pcmAudioPlayer!.isPlaying) {
-      position = _pcmAudioPlayer!.elapsedTime;
+    // Always use position tracker for notification position - it's the single source of truth.
+    // Previously used PCM elapsed time for Sendspin, but this breaks when:
+    // 1. Stream starts mid-track (resume from pause) - PCM elapsed resets to 0
+    // 2. Switching between multiple Sendspin players - PCM elapsed doesn't match
+    final position = _positionTracker.currentPosition;
 
-      // Check if track has ended based on PCM elapsed time
-      if (track.duration != null && position >= track.duration!) {
-        _logger.log('🔔 Sendspin: Track appears to have ended (position >= duration)');
-        return;
-      }
-    } else {
-      // Use position tracker for remote players
-      position = _positionTracker.currentPosition;
-
-      // Check if track has ended (position reached duration)
-      if (_positionTracker.hasReachedEnd) {
-        _logger.log('PositionTracker: Track appears to have ended (position >= duration)');
-        return;
-      }
+    // Check if track has ended (position reached duration)
+    if (_positionTracker.hasReachedEnd) {
+      _logger.log('PositionTracker: Track appears to have ended (position >= duration)');
+      return;
     }
 
     final artworkUrl = _api?.getImageUrl(track, size: 512);
@@ -4150,7 +4150,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
     audioHandler.setRemotePlaybackState(
       item: mediaItem,
-      playing: true,
+      playing: isPlaying,
       position: position,
       duration: track.duration,
     );
@@ -5671,6 +5671,9 @@ class MusicAssistantProvider with ChangeNotifier {
     try {
       // Immediately update position tracker for responsive UI
       _positionTracker.onSeek(position.toDouble());
+      // Immediately update notification position to stay in sync with app
+      // Use forceUpdate since seek can happen while paused
+      _updateNotificationPosition(forceUpdate: true);
       await _api?.seek(playerId, position);
     } catch (e) {
       ErrorHandler.logError('Seek', e);
