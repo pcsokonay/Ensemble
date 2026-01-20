@@ -2,14 +2,19 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'debug_logger.dart';
 import 'settings_service.dart';
+import '../utils/lru_cache.dart';
 
 class MetadataService {
   static final _logger = DebugLogger();
-  // Cache to avoid repeated API calls for the same artist/album
-  static final Map<String, String> _cache = {};
 
-  // Cache for artist images
-  static final Map<String, String?> _artistImageCache = {};
+  // LRU caches to avoid repeated API calls and prevent unbounded memory growth
+  // Using NullableLruCache for caches that store null values (failed lookups)
+
+  /// Cache for artist/album descriptions (100 entries)
+  static final LruCache<String, String> _descriptionCache = LruCache(maxSize: 100);
+
+  /// Cache for artist images - includes null entries for failed lookups (200 entries)
+  static final NullableLruCache<String, String> _artistImageCache = NullableLruCache(maxSize: 200);
 
   /// Fetches artist biography/description with fallback chain:
   /// 1. Music Assistant metadata (passed in)
@@ -34,8 +39,8 @@ class MetadataService {
 
     // Check cache
     final cacheKey = 'artist:$artistName';
-    if (_cache.containsKey(cacheKey)) {
-      return _cache[cacheKey];
+    if (_descriptionCache.containsKey(cacheKey)) {
+      return _descriptionCache[cacheKey];
     }
 
     // Try Last.fm API
@@ -43,7 +48,7 @@ class MetadataService {
     if (lastFmKey != null && lastFmKey.isNotEmpty) {
       final lastFmDesc = await _fetchFromLastFm(artistName, null, lastFmKey);
       if (lastFmDesc != null) {
-        _cache[cacheKey] = lastFmDesc;
+        _descriptionCache[cacheKey] = lastFmDesc;
         return lastFmDesc;
       }
     }
@@ -53,7 +58,7 @@ class MetadataService {
     if (audioDbKey != null && audioDbKey.isNotEmpty) {
       final audioDbDesc = await _fetchFromTheAudioDb(artistName, audioDbKey);
       if (audioDbDesc != null) {
-        _cache[cacheKey] = audioDbDesc;
+        _descriptionCache[cacheKey] = audioDbDesc;
         return audioDbDesc;
       }
     }
@@ -83,8 +88,8 @@ class MetadataService {
 
     // Check cache
     final cacheKey = 'album:$artistName:$albumName';
-    if (_cache.containsKey(cacheKey)) {
-      return _cache[cacheKey];
+    if (_descriptionCache.containsKey(cacheKey)) {
+      return _descriptionCache[cacheKey];
     }
 
     // Try Last.fm API (TheAudioDB doesn't have good album info)
@@ -92,7 +97,7 @@ class MetadataService {
     if (lastFmKey != null && lastFmKey.isNotEmpty) {
       final lastFmDesc = await _fetchFromLastFm(artistName, albumName, lastFmKey);
       if (lastFmDesc != null) {
-        _cache[cacheKey] = lastFmDesc;
+        _descriptionCache[cacheKey] = lastFmDesc;
         return lastFmDesc;
       }
     }
@@ -251,11 +256,11 @@ class MetadataService {
     return null;
   }
 
-  // Cache for album images
-  static final Map<String, String?> _albumImageCache = {};
+  /// Cache for album images - includes null entries for failed lookups (200 entries)
+  static final NullableLruCache<String, String> _albumImageCache = NullableLruCache(maxSize: 200);
 
-  // Cache for author images (audiobooks)
-  static final Map<String, String?> _authorImageCache = {};
+  /// Cache for author images (audiobooks) - includes null entries for failed lookups (100 entries)
+  static final NullableLruCache<String, String> _authorImageCache = NullableLruCache(maxSize: 100);
 
   /// Fetches album cover URL from Deezer (free, no API key required)
   /// Returns the image URL if found, null otherwise
@@ -740,8 +745,10 @@ class MetadataService {
     return null;
   }
 
-  // Cache for lyrics
+  /// Cache for lyrics - uses bounded Map with manual size limiting (500 entries max)
+  /// Stores (plainLyrics, syncedLyrics) tuples or null for failed lookups
   static final Map<String, (String?, String?)?> _lyricsCache = {};
+  static const int _lyricsCacheMaxSize = 500;
 
   /// Fetches lyrics from LRCLIB (free, no API key required)
   /// Returns a tuple of (plainLyrics, syncedLyrics) or null if not found
@@ -790,6 +797,7 @@ class MetadataService {
             (syncedLyrics != null && syncedLyrics.isNotEmpty)) {
           _logger.log('🎤 LRCLIB found lyrics: plain=${plainLyrics?.length ?? 0} chars, synced=${syncedLyrics?.length ?? 0} chars');
           final result = (plainLyrics, syncedLyrics);
+          _evictLyricsCacheIfNeeded();
           _lyricsCache[cacheKey] = result;
           return result;
         }
@@ -803,13 +811,21 @@ class MetadataService {
     }
 
     // Cache the null result to avoid repeated failed lookups
+    _evictLyricsCacheIfNeeded();
     _lyricsCache[cacheKey] = null;
     return null;
   }
 
-  /// Clears the metadata cache
+  /// Evict oldest entries from lyrics cache if over max size
+  static void _evictLyricsCacheIfNeeded() {
+    while (_lyricsCache.length >= _lyricsCacheMaxSize) {
+      _lyricsCache.remove(_lyricsCache.keys.first);
+    }
+  }
+
+  /// Clears all metadata caches
   static void clearCache() {
-    _cache.clear();
+    _descriptionCache.clear();
     _artistImageCache.clear();
     _albumImageCache.clear();
     _authorImageCache.clear();
