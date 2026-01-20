@@ -36,7 +36,8 @@ This application was built with AI-assisted development using **Claude Code** an
 ### Queue Management
 - **View & Manage Queue** - See upcoming tracks in the playback queue
 - **Drag to Reorder** - Instant drag handles for reordering tracks
-- **Swipe to Delete** - Remove tracks with a simple swipe gesture
+- **Swipe left to Delete** - Remove tracks with a simple swipe gesture
+- **Swipe right to play next** - Move tracks with a simple swipe gesture
 
 ### Home Screen
 - **Customizable Rows** - Toggle and reorder: Recently Played, Discover Artists, Discover Albums
@@ -50,7 +51,9 @@ This application was built with AI-assisted development using **Claude Code** an
 - **Podcasts** - Browse podcasts, view episodes with descriptions and publish dates
 - **Audiobooks** - Browse by title, series, or author with progress tracking
 - **Favorites Filter** - Toggle to show only your favorite items
+- **Providers Filter** - Toggle to show only specific provider items
 - **Letter Scrollbar** - Fast navigation through long lists
+- **Provider Icons** - Provider icons on library covers
 
 ### Search
 - **Universal Search** - Find music, podcasts, radio stations, playlists, and audiobooks
