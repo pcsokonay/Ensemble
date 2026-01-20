@@ -42,7 +42,8 @@ class _ArtistCardState extends State<ArtistCard> {
   bool _isNavigating = false;
 
   /// Delay before fetching fallback images to avoid requests during fast scroll
-  static const _fallbackDelay = Duration(milliseconds: 200);
+  /// PERF: Increased from 200ms to 400ms to reduce network requests during slow scroll
+  static const _fallbackDelay = Duration(milliseconds: 400);
 
   @override
   void initState() {
@@ -116,8 +117,8 @@ class _ArtistCardState extends State<ArtistCard> {
           if (_isNavigating) return;
           _isNavigating = true;
 
-          // Update adaptive colors immediately on tap
-          updateAdaptiveColorsFromImage(context, imageUrl);
+          // PERF: Color extraction deferred to detail screen's initState
+          // to avoid competing with Hero animation for GPU resources
           Navigator.push(
             context,
             FadeSlidePageRoute(
@@ -186,23 +187,18 @@ class _ArtistCardState extends State<ArtistCard> {
             ),
           const SizedBox(height: 8),
           // Artist name - fixed height container so image size is consistent
+          // PERF: Removed Hero - text animations provide minimal benefit but add overhead
           SizedBox(
             height: 36, // Fixed height for 2 lines of text
-            child: Hero(
-              tag: HeroTags.artistName + (widget.artist.uri ?? widget.artist.itemId) + suffix,
-              child: Material(
-                color: Colors.transparent,
-                child: Text(
-                  widget.artist.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: textTheme.titleSmall?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                    height: 1.15,
-                  ),
-                ),
+            child: Text(
+              widget.artist.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+                height: 1.15,
               ),
             ),
           ),

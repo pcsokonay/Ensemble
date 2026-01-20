@@ -910,6 +910,12 @@ class SFr extends S {
   String get smartSortPlayersDescription => 'Trier par statut (en lecture, allume, eteint) au lieu d\'alphabétiquement';
 
   @override
+  String get disableAutoSwitch => 'Disable Auto-Switch';
+
+  @override
+  String get disableAutoSwitchDescription => 'Never automatically switch to a different player';
+
+  @override
   String get playerStateUnavailable => 'Indisponible';
 
   @override
@@ -940,6 +946,15 @@ class SFr extends S {
 
   @override
   String get showHintsDescription => 'Afficher des conseils utiles pour découvrir les fonctionnalites';
+
+  @override
+  String get display => 'Display';
+
+  @override
+  String get showProviderIcons => 'Show Provider Icons';
+
+  @override
+  String get showProviderIconsDescription => 'Display provider logos on album art';
 
   @override
   String get pullToSelectPlayers => 'Tirez pour sélectionner les lecteurs';

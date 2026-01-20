@@ -1292,6 +1292,16 @@
     "description": "Description for smart sort players setting"
   },
 
+  "disableAutoSwitch": "Disable Auto-Switch",
+  "@disableAutoSwitch": {
+    "description": "Setting to disable automatic player switching"
+  },
+
+  "disableAutoSwitchDescription": "Never automatically switch to a different player",
+  "@disableAutoSwitchDescription": {
+    "description": "Description for disable auto-switch setting"
+  },
+
   "playerStateUnavailable": "Unavailable",
   "@playerStateUnavailable": {
     "description": "Player state when unavailable"
@@ -1345,6 +1355,21 @@
   "showHintsDescription": "Display helpful tips for discovering features",
   "@showHintsDescription": {
     "description": "Description for show hints toggle"
+  },
+
+  "display": "Display",
+  "@display": {
+    "description": "Settings section title for display options"
+  },
+
+  "showProviderIcons": "Show Provider Icons",
+  "@showProviderIcons": {
+    "description": "Toggle label for showing provider icons on album art"
+  },
+
+  "showProviderIconsDescription": "Display provider logos on album art",
+  "@showProviderIconsDescription": {
+    "description": "Description for show provider icons toggle"
   },
 
   "pullToSelectPlayers": "Pull to select players",

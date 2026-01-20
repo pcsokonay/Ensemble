@@ -9,6 +9,7 @@ import '../constants/timings.dart' show Timings, LibraryConstants;
 import '../models/media_item.dart';
 import '../models/player.dart';
 import '../models/provider_instance.dart';
+import '../models/provider_manifest.dart';
 import 'debug_logger.dart';
 import 'settings_service.dart';
 import 'device_id_service.dart';
@@ -59,6 +60,10 @@ class MusicAssistantAPI {
   bool get authRequired => _authRequired;
   int? get schemaVersion => _schemaVersion;
   Map<String, dynamic>? get serverInfo => _serverInfo;
+
+  // Provider manifests (contains icons)
+  final Map<String, ProviderManifest> _providerManifests = {};
+  Map<String, ProviderManifest> get providerManifests => _providerManifests;
 
   MusicAssistantAPI(this.serverUrl, this.authManager);
 
@@ -821,10 +826,11 @@ class MusicAssistantAPI {
 
       // Only call library_items API if:
       // 1. No ABS libraries configured (traditional mode), OR
-      // 2. We have non-ABS providers to query
+      // 2. We have specific non-ABS providers to query
+      // NOTE: Do NOT call when ABS filtering is active but no non-ABS providers exist,
+      // as library_items API would return all audiobooks bypassing the library filter
       final shouldFetchFromApi = enabledLibraries == null ||
                                   enabledLibraries.isEmpty ||
-                                  (nonAbsProviders == null && absProviderIds.isNotEmpty) ||
                                   (nonAbsProviders != null && nonAbsProviders.isNotEmpty);
 
       if (shouldFetchFromApi) {
@@ -3422,10 +3428,22 @@ class MusicAssistantAPI {
     try {
       _logger.log('📥 Fetching initial state...');
 
-      // Fetch provider manifests (available providers)
+      // Fetch provider manifests (available providers with icons)
       try {
-        await _sendCommand('providers/manifests');
-        _logger.log('✓ Provider manifests loaded');
+        final manifestResponse = await _sendCommand('providers/manifests');
+        final manifests = manifestResponse['result'];
+        if (manifests is List) {
+          _providerManifests.clear();
+          for (final manifestData in manifests) {
+            if (manifestData is Map<String, dynamic>) {
+              final manifest = ProviderManifest.fromJson(manifestData);
+              if (manifest.domain.isNotEmpty) {
+                _providerManifests[manifest.domain] = manifest;
+              }
+            }
+          }
+          _logger.log('✓ Provider manifests loaded: ${_providerManifests.length} providers with ${_providerManifests.values.where((m) => m.hasSvgIcon).length} icons');
+        }
       } catch (e) {
         _logger.log('⚠️ Could not load provider manifests: $e');
       }
@@ -3468,6 +3486,18 @@ class MusicAssistantAPI {
       _logger.log('❌ Error getting music providers: $e');
       return [];
     }
+  }
+
+  /// Get provider manifest by domain
+  ProviderManifest? getProviderManifest(String domain) {
+    return _providerManifests[domain];
+  }
+
+  /// Get SVG icon for a provider domain
+  /// Returns null if no icon is available
+  String? getProviderIconSvg(String domain, {bool isDark = false}) {
+    final manifest = _providerManifests[domain];
+    return manifest?.getSvgIcon(isDark: isDark);
   }
 
   /// Get current authenticated user's profile

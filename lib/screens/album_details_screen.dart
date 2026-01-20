@@ -10,6 +10,7 @@ import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
 import '../services/recently_played_service.dart';
 import '../widgets/global_player_overlay.dart';
+import '../widgets/provider_icon.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 import 'artist_details_screen.dart';
@@ -877,31 +878,45 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                         // FIXED: Match source structure - ClipRRect(12) → Container → CachedNetworkImage
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Container(
+                          child: SizedBox(
                             width: coverSize,
                             height: coverSize,
-                            color: colorScheme.surfaceVariant,
-                            child: imageUrl != null
-                                ? CachedNetworkImage(
-                                    imageUrl: imageUrl,
-                                    fit: BoxFit.cover,
-                                    // Match source memCacheWidth for smooth Hero
-                                    memCacheWidth: 256,
-                                    memCacheHeight: 256,
-                                    fadeInDuration: Duration.zero,
-                                    fadeOutDuration: Duration.zero,
-                                    placeholder: (_, __) => const SizedBox(),
-                                    errorWidget: (_, __, ___) => Icon(
-                                      Icons.album_rounded,
-                                      size: coverSize * 0.43,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  )
-                                : Icon(
-                                    Icons.album_rounded,
-                                    size: coverSize * 0.43,
-                                    color: colorScheme.onSurfaceVariant,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Container(
+                                  color: colorScheme.surfaceVariant,
+                                  child: imageUrl != null
+                                      ? CachedNetworkImage(
+                                          imageUrl: imageUrl,
+                                          fit: BoxFit.cover,
+                                          // Match source memCacheWidth for smooth Hero
+                                          memCacheWidth: 256,
+                                          memCacheHeight: 256,
+                                          fadeInDuration: Duration.zero,
+                                          fadeOutDuration: Duration.zero,
+                                          placeholder: (_, __) => const SizedBox(),
+                                          errorWidget: (_, __, ___) => Icon(
+                                            Icons.album_rounded,
+                                            size: coverSize * 0.43,
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                        )
+                                      : Icon(
+                                          Icons.album_rounded,
+                                          size: coverSize * 0.43,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                ),
+                                // Provider icon overlay
+                                if (widget.album.providerMappings?.isNotEmpty == true)
+                                  ProviderIconOverlay(
+                                    domain: widget.album.providerMappings!.first.providerDomain,
+                                    size: 24,
+                                    margin: 8,
                                   ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

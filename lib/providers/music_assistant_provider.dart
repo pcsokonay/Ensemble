@@ -8,6 +8,7 @@ import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import '../models/media_item.dart';
 import '../models/player.dart';
 import '../models/provider_instance.dart';
+import '../models/provider_manifest.dart';
 import '../services/music_assistant_api.dart';
 import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
@@ -63,6 +64,8 @@ class MusicAssistantProvider with ChangeNotifier {
   Player? _selectedPlayer;
   List<Player> _availablePlayers = [];
   bool _selectPlayerInProgress = false; // Reentrancy guard for selectPlayer()
+  DateTime? _lastPlayerSwitchTime; // Debounce for auto-selection
+  static const _playerSwitchCooldown = Duration(seconds: 3); // Minimum time between auto-switches
   Map<String, String> _castToSendspinIdMap = {}; // Maps regular Cast IDs to Sendspin IDs for grouping
   Track? _currentTrack;
   Audiobook? _currentAudiobook; // Currently playing audiobook context (with chapters)
@@ -226,6 +229,21 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// List of available music providers from MA
   List<ProviderInstance> get availableMusicProviders => _availableMusicProviders;
+
+  /// Get all provider manifests (contains icons)
+  Map<String, ProviderManifest> get providerManifests =>
+      _api?.providerManifests ?? {};
+
+  /// Get SVG icon for a provider domain
+  /// Returns null if no icon is available
+  String? getProviderIconSvg(String domain, {bool isDark = false}) {
+    return _api?.getProviderIconSvg(domain, isDark: isDark);
+  }
+
+  /// Get provider manifest by domain
+  ProviderManifest? getProviderManifest(String domain) {
+    return _api?.getProviderManifest(domain);
+  }
 
   /// List of enabled provider instance IDs (empty = all enabled)
   List<String> get enabledProviderIds => _enabledProviderIds;
@@ -3727,7 +3745,12 @@ class MusicAssistantProvider with ChangeNotifier {
       if (_availablePlayers.isNotEmpty) {
         Player? playerToSelect;
         final preferLocalPlayer = await SettingsService.getPreferLocalPlayer();
+        final disableAutoSwitch = await SettingsService.getDisableAutoSwitch();
         final lastSelectedPlayerId = await SettingsService.getLastSelectedPlayerId();
+
+        // Log settings for debugging player selection issues
+        _logger.log('⚙️ Player selection settings: preferLocal=$preferLocalPlayer, disableAutoSwitch=$disableAutoSwitch, coldStart=$coldStart');
+        _logger.log('⚙️ Current selection: ${_selectedPlayer?.name ?? 'none'}, lastSelected=$lastSelectedPlayerId');
 
         // If "Prefer Local Player" is ON, always try to select local player first
         // This takes priority even over the currently selected player
@@ -3739,12 +3762,12 @@ class MusicAssistantProvider with ChangeNotifier {
             _logger.log('📱 Auto-selected local player (preferred): ${playerToSelect?.name}');
           } catch (e) {
             // Local player not available yet, will fall through to other options
+            _logger.log('⚠️ Prefer local player ON but local player not available');
           }
         }
 
         // Keep currently selected player if still available (and not overridden by prefer local)
-        // But allow switching to a playing player when preferLocalPlayer is OFF
-        // On coldStart, skip this block and apply full priority logic (playing > local > last selected)
+        // On coldStart, skip this block and apply full priority logic
         if (playerToSelect == null && _selectedPlayer != null && !coldStart) {
           // Check if selected player is still available - also check translated Cast/Sendspin IDs
           // When Cast player gets replaced by Sendspin version (or vice versa), we should keep selection
@@ -3771,71 +3794,73 @@ class MusicAssistantProvider with ChangeNotifier {
                      (reverseTranslatedId != null && p.playerId == reverseTranslatedId),
             );
 
-            // If preferLocalPlayer is OFF, check if we should switch to a playing player
-            if (!preferLocalPlayer) {
-              final currentIsPlaying = currentPlayer.state == 'playing';
-              // Exclude external sources - they're not playing MA content
-              final playingPlayers = _availablePlayers.where(
-                (p) => p.state == 'playing' && p.available && !p.isExternalSource,
-              ).toList();
-
-              // Switch to playing player only if current isn't playing and exactly one other is
-              if (!currentIsPlaying && playingPlayers.length == 1) {
-                playerToSelect = playingPlayers.first;
-                _logger.log('🎵 Switched to playing player: ${playerToSelect?.name}');
-              }
-            }
-
-            // Keep current selection if no switch happened
-            if (playerToSelect == null) {
-              playerToSelect = currentPlayer;
-              if (currentPlayer.playerId != selectedId) {
-                _logger.log('🔄 Selected player ID changed (Cast<->Sendspin): $selectedId -> ${currentPlayer.playerId}');
-              }
+            // Keep current selection - no auto-switching during non-coldStart refreshes
+            // Auto-switch to playing player is now ONLY done on coldStart (see below)
+            playerToSelect = currentPlayer;
+            if (currentPlayer.playerId != selectedId) {
+              _logger.log('🔄 Selected player ID changed (Cast<->Sendspin): $selectedId -> ${currentPlayer.playerId}');
+            } else {
+              _logger.log('✓ Keeping current selection: ${currentPlayer.name}');
             }
           }
         }
 
         if (coldStart) {
-          _logger.log('🚀 Cold start: applying full priority logic (playing > local > last selected)');
+          _logger.log('🚀 Cold start: applying full priority logic');
         }
 
         if (playerToSelect == null) {
-          // Smart auto-selection priority:
-          // If "Prefer Local Player" is OFF: Single playing player -> Local player -> Last selected -> First available
+          // Smart auto-selection priority (coldStart only for auto-switch to playing):
+          // Priority 1: Single playing player (only on coldStart and if disableAutoSwitch is OFF)
+          // Priority 2: Local player (if preferLocalPlayer is OFF but we still try local as fallback)
+          // Priority 3: Last manually selected player
+          // Priority 4: First available player
 
-          if (!preferLocalPlayer) {
-            // Priority 1 (normal): Single playing player (skip if multiple are playing)
-            // Exclude external sources - they're not playing MA content
+          // Priority 1: Auto-switch to single playing player
+          // ONLY on coldStart AND only if disableAutoSwitch is OFF
+          // Also apply cooldown to prevent rapid successive auto-switches
+          final cooldownActive = _lastPlayerSwitchTime != null &&
+              DateTime.now().difference(_lastPlayerSwitchTime!) < _playerSwitchCooldown;
+
+          if (coldStart && !disableAutoSwitch && !preferLocalPlayer && !cooldownActive) {
             final playingPlayers = _availablePlayers.where(
               (p) => p.state == 'playing' && p.available && !p.isExternalSource,
             ).toList();
             if (playingPlayers.length == 1) {
               playerToSelect = playingPlayers.first;
+              _lastPlayerSwitchTime = DateTime.now(); // Update cooldown timestamp
               _logger.log('🎵 Auto-selected playing player: ${playerToSelect?.name}');
+            } else if (playingPlayers.length > 1) {
+              _logger.log('⚠️ Multiple players playing (${playingPlayers.length}), skipping auto-switch');
             }
+          } else if (cooldownActive) {
+            _logger.log('⏳ Auto-switch cooldown active, skipping');
+          } else if (!coldStart) {
+            _logger.log('⚠️ Not coldStart, skipping auto-switch to playing player');
+          } else if (disableAutoSwitch) {
+            _logger.log('⚠️ Auto-switch disabled by user setting');
+          }
 
-            // Priority 2: Local player
-            if (playerToSelect == null && builtinPlayerId != null) {
-              try {
-                playerToSelect = _availablePlayers.firstWhere(
-                  (p) => p.playerId == builtinPlayerId && p.available,
-                );
-                _logger.log('📱 Auto-selected local player: ${playerToSelect?.name}');
-              } catch (e) {
-                // Local player not found or not available - check why
-                final localPlayer = _availablePlayers
-                    .where((p) => p.playerId == builtinPlayerId)
-                    .toList();
-                if (localPlayer.isEmpty) {
-                  _logger.log('⚠️ Priority 2 skipped: local player ($builtinPlayerId) not in available players list');
-                } else {
-                  _logger.log('⚠️ Priority 2 skipped: local player found but available=${localPlayer.first.available}');
-                }
+          // Priority 2: Local player (fallback even when preferLocalPlayer is OFF)
+          if (playerToSelect == null && builtinPlayerId != null) {
+            try {
+              playerToSelect = _availablePlayers.firstWhere(
+                (p) => p.playerId == builtinPlayerId && p.available,
+              );
+              _logger.log('📱 Auto-selected local player: ${playerToSelect?.name}');
+            } catch (e) {
+              // Local player not found or not available - check why
+              final localPlayer = _availablePlayers
+                  .where((p) => p.playerId == builtinPlayerId)
+                  .toList();
+              if (localPlayer.isEmpty) {
+                _logger.log('⚠️ Priority 2 skipped: local player ($builtinPlayerId) not in available players list');
+              } else {
+                _logger.log('⚠️ Priority 2 skipped: local player found but available=${localPlayer.first.available}');
               }
-            } else if (playerToSelect == null && builtinPlayerId == null) {
-              _logger.log('⚠️ Priority 2 skipped: builtinPlayerId is null');
             }
+          } else if (playerToSelect == null && builtinPlayerId == null) {
+            _logger.log('⚠️ Priority 2 skipped: builtinPlayerId is null');
           }
 
           // Priority 3: Last manually selected player
@@ -3855,6 +3880,7 @@ class MusicAssistantProvider with ChangeNotifier {
               (p) => p.available,
               orElse: () => _availablePlayers.first,
             );
+            _logger.log('🔄 Fallback to first available player: ${playerToSelect.name}');
           }
         }
 
@@ -3890,12 +3916,10 @@ class MusicAssistantProvider with ChangeNotifier {
     // IMPORTANT: Always set from cache, even if null - this prevents showing
     // stale track info when switching to a non-playing player.
     // For grouped child players, this returns the leader's track
-    // IMPORTANT: Clear track for external sources - they're playing non-MA content
-    if (player.isExternalSource) {
-      _currentTrack = null;
-    } else {
-      _currentTrack = getCachedTrackForPlayer(player.playerId);
-    }
+    // NOTE: Always use cache even for external sources - the overlay shows cached
+    // track info, so we should match that. The async _updatePlayerState() will
+    // clear it if the player is truly playing external content.
+    _currentTrack = getCachedTrackForPlayer(player.playerId);
 
     // Initialize position tracker for this player (skip for external sources)
     _positionTracker.onPlayerSelected(player.playerId);

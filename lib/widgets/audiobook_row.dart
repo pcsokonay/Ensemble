@@ -8,6 +8,7 @@ import '../services/debug_logger.dart';
 import '../utils/page_transitions.dart';
 import '../screens/audiobook_detail_screen.dart';
 import '../constants/hero_tags.dart';
+import 'provider_icon.dart';
 
 class AudiobookRow extends StatefulWidget {
   final String title;
@@ -284,6 +285,11 @@ class _AudiobookCard extends StatelessWidget {
                         minHeight: 4,
                       ),
                     ),
+                  ),
+                // Provider icon overlay
+                if (audiobook.providerMappings?.isNotEmpty == true)
+                  ProviderIconOverlay(
+                    domain: audiobook.providerMappings!.first.providerDomain,
                   ),
               ],
             ),

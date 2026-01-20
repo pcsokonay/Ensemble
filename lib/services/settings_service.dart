@@ -92,6 +92,7 @@ class SettingsService {
   static const String _keyLastSelectedPlayerId = 'last_selected_player_id';
   static const String _keyPreferLocalPlayer = 'prefer_local_player';
   static const String _keySmartSortPlayers = 'smart_sort_players';
+  static const String _keyDisableAutoSwitch = 'disable_auto_switch';
   static const String _keyShowRecentAlbums = 'show_recent_albums';
   static const String _keyShowDiscoverArtists = 'show_discover_artists';
   static const String _keyShowDiscoverAlbums = 'show_discover_albums';
@@ -167,6 +168,7 @@ class SettingsService {
 
   // Hint System Settings
   static const String _keyShowHints = 'show_hints'; // Master toggle for hints
+  static const String _keyShowProviderIcons = 'show_provider_icons'; // Show provider icons on album art
   static const String _keyHasUsedPlayerReveal = 'has_used_player_reveal'; // Track if user has pulled to reveal players
   static const String _keyHasCompletedOnboarding = 'has_completed_onboarding'; // Track if user has seen welcome screen
 
@@ -359,6 +361,10 @@ class SettingsService {
   // Smart Sort Players - sort by status (playing > on > off) instead of alphabetically
   static Future<bool> getSmartSortPlayers() => _getBool(_keySmartSortPlayers, defaultValue: false);
   static Future<void> setSmartSortPlayers(bool smartSort) => _setBool(_keySmartSortPlayers, smartSort);
+
+  // Disable Auto-Switch - prevents automatic switching to playing players
+  static Future<bool> getDisableAutoSwitch() => _getBool(_keyDisableAutoSwitch, defaultValue: false);
+  static Future<void> setDisableAutoSwitch(bool disable) => _setBool(_keyDisableAutoSwitch, disable);
 
   // Helper to create player name with possessive apostrophe
   // Automatically detects Phone vs Tablet based on screen size
@@ -880,6 +886,24 @@ class SettingsService {
   static Future<void> setShowHints(bool show) async {
     final prefs = await _getPrefs();
     await prefs.setBool(_keyShowHints, show);
+  }
+
+  /// Get whether provider icons are shown on album art (default: true)
+  static Future<bool> getShowProviderIcons() async {
+    final prefs = await _getPrefs();
+    return prefs.getBool(_keyShowProviderIcons) ?? true;
+  }
+
+  /// Synchronous getter for provider icons setting (uses cached prefs)
+  /// Returns true if prefs not yet initialized
+  static bool getShowProviderIconsSync() {
+    return _prefsCache?.getBool(_keyShowProviderIcons) ?? true;
+  }
+
+  /// Set whether provider icons are shown on album art
+  static Future<void> setShowProviderIcons(bool show) async {
+    final prefs = await _getPrefs();
+    await prefs.setBool(_keyShowProviderIcons, show);
   }
 
   /// Check if user has ever used the player reveal gesture

@@ -10,6 +10,7 @@ import '../constants/timings.dart';
 import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
 import '../services/metadata_service.dart';
+import 'provider_icon.dart';
 
 class AlbumCard extends StatefulWidget {
   final Album album;
@@ -40,7 +41,8 @@ class _AlbumCardState extends State<AlbumCard> {
   bool _isNavigating = false;
 
   /// Delay before fetching fallback images to avoid requests during fast scroll
-  static const _fallbackDelay = Duration(milliseconds: 200);
+  /// PERF: Increased from 200ms to 400ms to reduce network requests during slow scroll
+  static const _fallbackDelay = Duration(milliseconds: 400);
 
   @override
   void initState() {
@@ -123,8 +125,8 @@ class _AlbumCardState extends State<AlbumCard> {
           if (_isNavigating) return;
           _isNavigating = true;
 
-          // Update adaptive colors immediately on tap
-          updateAdaptiveColorsFromImage(context, imageUrl);
+          // PERF: Color extraction deferred to detail screen's initState
+          // to avoid competing with Hero animation for GPU resources
           Navigator.push(
             context,
             FadeSlidePageRoute(
@@ -151,72 +153,71 @@ class _AlbumCardState extends State<AlbumCard> {
                 tag: HeroTags.albumCover + (widget.album.uri ?? widget.album.itemId) + suffix,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12.0),
-                  child: Container(
-                    color: colorScheme.surfaceVariant,
-                    child: imageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            memCacheWidth: cacheSize,
-                            memCacheHeight: cacheSize,
-                            fadeInDuration: Duration.zero,
-                            fadeOutDuration: Duration.zero,
-                            placeholder: (context, url) => const SizedBox(),
-                            errorWidget: (context, url, error) {
-                              // Try fallback on error (only for MA URLs, not fallback URLs)
-                              if (!_maImageFailed && url == maImageUrl) {
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  _onImageError();
-                                });
-                              }
-                              return Icon(
-                                Icons.album_rounded,
-                                size: 64,
-                                color: colorScheme.onSurfaceVariant,
-                              );
-                            },
-                          )
-                        : Center(
-                            child: Icon(
-                              Icons.album_rounded,
-                              size: 64,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(
+                        color: colorScheme.surfaceVariant,
+                        child: imageUrl != null
+                            ? CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                memCacheWidth: cacheSize,
+                                memCacheHeight: cacheSize,
+                                fadeInDuration: Duration.zero,
+                                fadeOutDuration: Duration.zero,
+                                placeholder: (context, url) => const SizedBox(),
+                                errorWidget: (context, url, error) {
+                                  // Try fallback on error (only for MA URLs, not fallback URLs)
+                                  if (!_maImageFailed && url == maImageUrl) {
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      _onImageError();
+                                    });
+                                  }
+                                  return Icon(
+                                    Icons.album_rounded,
+                                    size: 64,
+                                    color: colorScheme.onSurfaceVariant,
+                                  );
+                                },
+                              )
+                            : Center(
+                                child: Icon(
+                                  Icons.album_rounded,
+                                  size: 64,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                      ),
+                      // Provider icon overlay
+                      if (widget.album.providerMappings?.isNotEmpty == true)
+                        ProviderIconOverlay(
+                          domain: widget.album.providerMappings!.first.providerDomain,
+                        ),
+                    ],
                   ),
                 ),
               ),
             ),
           const SizedBox(height: 8),
           // Album title with year
-          Hero(
-            tag: HeroTags.albumTitle + (widget.album.uri ?? widget.album.itemId) + suffix,
-            child: Material(
-              color: Colors.transparent,
-              child: Text(
-                widget.album.nameWithYear,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.titleSmall?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+          // PERF: Removed Hero - text animations provide minimal benefit but add overhead
+          Text(
+            widget.album.nameWithYear,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleSmall?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
             ),
           ),
           // Artist name
-          Hero(
-            tag: HeroTags.artistName + (widget.album.uri ?? widget.album.itemId) + suffix,
-            child: Material(
-              color: Colors.transparent,
-              child: Text(
-                widget.album.artistsString,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
+          Text(
+            widget.album.artistsString,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.7),
             ),
           ),
           ],

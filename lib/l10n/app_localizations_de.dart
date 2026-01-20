@@ -910,6 +910,12 @@ class SDe extends S {
   String get smartSortPlayersDescription => 'Nach Status sortieren (spielt, an, aus) statt alphabetisch';
 
   @override
+  String get disableAutoSwitch => 'Disable Auto-Switch';
+
+  @override
+  String get disableAutoSwitchDescription => 'Never automatically switch to a different player';
+
+  @override
   String get playerStateUnavailable => 'Nicht verfügbar';
 
   @override
@@ -940,6 +946,15 @@ class SDe extends S {
 
   @override
   String get showHintsDescription => 'Hilfreiche Tipps zum Entdecken von Funktionen anzeigen';
+
+  @override
+  String get display => 'Display';
+
+  @override
+  String get showProviderIcons => 'Show Provider Icons';
+
+  @override
+  String get showProviderIconsDescription => 'Display provider logos on album art';
 
   @override
   String get pullToSelectPlayers => 'Ziehen um Geräte auszuwählen';

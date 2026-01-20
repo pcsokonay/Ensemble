@@ -910,6 +910,12 @@ class SEn extends S {
   String get smartSortPlayersDescription => 'Sort by status (playing, on, off) instead of alphabetically';
 
   @override
+  String get disableAutoSwitch => 'Disable Auto-Switch';
+
+  @override
+  String get disableAutoSwitchDescription => 'Never automatically switch to a different player';
+
+  @override
   String get playerStateUnavailable => 'Unavailable';
 
   @override
@@ -940,6 +946,15 @@ class SEn extends S {
 
   @override
   String get showHintsDescription => 'Display helpful tips for discovering features';
+
+  @override
+  String get display => 'Display';
+
+  @override
+  String get showProviderIcons => 'Show Provider Icons';
+
+  @override
+  String get showProviderIconsDescription => 'Display provider logos on album art';
 
   @override
   String get pullToSelectPlayers => 'Pull to select players';

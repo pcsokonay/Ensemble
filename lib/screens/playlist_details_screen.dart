@@ -9,6 +9,7 @@ import '../theme/theme_provider.dart';
 import '../services/debug_logger.dart';
 import '../services/recently_played_service.dart';
 import '../widgets/global_player_overlay.dart';
+import '../widgets/provider_icon.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 
@@ -691,30 +692,44 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                               tag: HeroTags.playlistCover + (widget.playlist.uri ?? widget.playlist.itemId) + _heroTagSuffix,
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Container(
+                                child: SizedBox(
                                   width: coverSize,
                                   height: coverSize,
-                                  color: colorScheme.surfaceContainerHighest,
-                                  child: imageUrl != null
-                                      ? CachedNetworkImage(
-                                          imageUrl: imageUrl,
-                                          fit: BoxFit.cover,
-                                          memCacheWidth: 256,
-                                          memCacheHeight: 256,
-                                          fadeInDuration: Duration.zero,
-                                          fadeOutDuration: Duration.zero,
-                                          placeholder: (_, __) => const SizedBox(),
-                                          errorWidget: (_, __, ___) => Icon(
-                                            Icons.playlist_play_rounded,
-                                            size: coverSize * 0.43,
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                        )
-                                      : Icon(
-                                          Icons.playlist_play_rounded,
-                                          size: coverSize * 0.43,
-                                          color: colorScheme.onSurfaceVariant,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Container(
+                                        color: colorScheme.surfaceContainerHighest,
+                                        child: imageUrl != null
+                                            ? CachedNetworkImage(
+                                                imageUrl: imageUrl,
+                                                fit: BoxFit.cover,
+                                                memCacheWidth: 256,
+                                                memCacheHeight: 256,
+                                                fadeInDuration: Duration.zero,
+                                                fadeOutDuration: Duration.zero,
+                                                placeholder: (_, __) => const SizedBox(),
+                                                errorWidget: (_, __, ___) => Icon(
+                                                  Icons.playlist_play_rounded,
+                                                  size: coverSize * 0.43,
+                                                  color: colorScheme.onSurfaceVariant,
+                                                ),
+                                              )
+                                            : Icon(
+                                                Icons.playlist_play_rounded,
+                                                size: coverSize * 0.43,
+                                                color: colorScheme.onSurfaceVariant,
+                                              ),
+                                      ),
+                                      // Provider icon overlay
+                                      if (widget.playlist.providerMappings?.isNotEmpty == true)
+                                        ProviderIconOverlay(
+                                          domain: widget.playlist.providerMappings!.first.providerDomain,
+                                          size: 24,
+                                          margin: 8,
                                         ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),

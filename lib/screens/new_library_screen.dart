@@ -11,6 +11,7 @@ import '../models/provider_instance.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/album_card.dart';
 import '../widgets/artist_avatar.dart';
+import '../widgets/provider_icon.dart';
 import '../utils/page_transitions.dart';
 import '../constants/hero_tags.dart';
 import '../theme/theme_provider.dart';
@@ -57,6 +58,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   bool _showOnlyArtistsWithAlbums = false; // Filter artists tab to only show those with albums
   bool _isSyncingArtists = false; // Show progress while re-syncing artists
   bool _isSyncingLibraries = false; // Show progress while re-syncing ABS libraries
+  bool _isSyncingProviders = false; // Show progress while syncing after provider toggle
 
   // All tracks with lazy loading
   List<Track> _allTracks = [];
@@ -78,6 +80,17 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   Map<String, List<Audiobook>> _groupedAudiobooksByAuthor = {};
   List<AudiobookSeries> _sortedSeries = [];
   List<String> _seriesNames = [];
+
+  // PERF: Cached sorted albums/artists - only re-sort when data or sort order changes
+  List<Album> _cachedSortedAlbums = [];
+  List<String> _cachedAlbumNames = [];
+  String _albumsCacheKey = '';
+  List<Artist> _cachedSortedArtists = [];
+  List<String> _cachedArtistNames = [];
+  String _artistsCacheKey = '';
+  String _authorsCacheKey = '';
+  List<String> _cachedTrackSortKeys = [];
+  String _trackSortKeysCacheKey = '';
 
   // Media type selection (Music, Books, Podcasts)
   LibraryMediaType _selectedMediaType = LibraryMediaType.music;
@@ -221,10 +234,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   void _onSyncServiceChanged() {
-    // Rebuild when SyncService data changes (e.g., after sync completes)
-    if (mounted) {
-      setState(() {});
-    }
+    // Only rebuild when sync completes, not during sync
+    // SyncService.isSyncing is already checked in menu button spinner
+    if (!mounted || SyncService.instance.isSyncing) return;
+    setState(() {});
   }
 
   void _onNavigationChanged() {
@@ -283,12 +296,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   void _handleProviderToggle(String providerId, bool enabled) {
     final maProvider = context.read<MusicAssistantProvider>();
 
+    // PERF: Set flag without setState - Provider change already triggers rebuild
+    // This avoids a redundant double rebuild
+    _isSyncingProviders = true;
+
     // Instant UI update - client-side filtering will use the new enabled set
     // The toggle updates MusicAssistantProvider.enabledProviderIds which we read during build
     maProvider.toggleProviderEnabled(providerId, enabled);
-
-    // Immediately rebuild the UI with client-side filtering
-    setState(() {});
 
     // Cancel any pending debounce for background sync
     _providerFilterDebounce?.cancel();
@@ -300,7 +314,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         DebugLogger().log('🔄 Background sync to refresh source tracking...');
         await maProvider.forceLibrarySync();
         if (mounted) {
-          setState(() {});
+          setState(() {
+            _isSyncingProviders = false;
+          });
         }
       }
     });
@@ -427,6 +443,139 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
     _sortedAudiobooks = sorted;
     _audiobookNames = sorted.map((a) => a.name).toList();
+  }
+
+  /// Sort albums and cache the result - only re-sorts when key changes
+  /// Returns cached sorted list if data hasn't changed
+  List<Album> _getSortedAlbums(List<Album> albums) {
+    final cacheKey = '${albums.length}_${albums.isNotEmpty ? albums.first.itemId : ''}_${albums.isNotEmpty ? albums.last.itemId : ''}_$_albumsSortOrder';
+    if (cacheKey == _albumsCacheKey && _cachedSortedAlbums.isNotEmpty) {
+      return _cachedSortedAlbums;
+    }
+
+    final sortedAlbums = List<Album>.from(albums);
+    switch (_albumsSortOrder) {
+      case 'name_desc':
+        sortedAlbums.sort((a, b) => (b.sortName ?? b.name ?? '').toLowerCase().compareTo((a.sortName ?? a.name ?? '').toLowerCase()));
+        break;
+      case 'year':
+        sortedAlbums.sort((a, b) {
+          if (a.year == null && b.year == null) return (a.name ?? '').compareTo(b.name ?? '');
+          if (a.year == null) return 1;
+          if (b.year == null) return -1;
+          return a.year!.compareTo(b.year!);
+        });
+        break;
+      case 'year_desc':
+        sortedAlbums.sort((a, b) {
+          if (a.year == null && b.year == null) return (a.name ?? '').compareTo(b.name ?? '');
+          if (a.year == null) return 1;
+          if (b.year == null) return -1;
+          return b.year!.compareTo(a.year!);
+        });
+        break;
+      case 'artist_name':
+        sortedAlbums.sort((a, b) => (a.artistsString).toLowerCase().compareTo((b.artistsString).toLowerCase()));
+        break;
+      case 'artist_name_desc':
+        sortedAlbums.sort((a, b) => (b.artistsString).toLowerCase().compareTo((a.artistsString).toLowerCase()));
+        break;
+      default:
+        // Default: name ascending
+        sortedAlbums.sort((a, b) => (a.sortName ?? a.name ?? '').toLowerCase().compareTo((b.sortName ?? b.name ?? '').toLowerCase()));
+    }
+
+    _albumsCacheKey = cacheKey;
+    _cachedSortedAlbums = sortedAlbums;
+    _cachedAlbumNames = sortedAlbums.map((a) => a.name ?? '').toList();
+    return sortedAlbums;
+  }
+
+  /// Sort artists and cache the result - only re-sorts when key changes
+  List<Artist> _getSortedArtists(List<Artist> artists) {
+    final cacheKey = '${artists.length}_${artists.isNotEmpty ? artists.first.itemId : ''}_${artists.isNotEmpty ? artists.last.itemId : ''}_$_artistsSortOrder';
+    if (cacheKey == _artistsCacheKey && _cachedSortedArtists.isNotEmpty) {
+      return _cachedSortedArtists;
+    }
+
+    final sortedArtists = List<Artist>.from(artists);
+    if (_artistsSortOrder == 'name_desc') {
+      sortedArtists.sort((a, b) => (b.sortName ?? b.name ?? '').toLowerCase().compareTo((a.sortName ?? a.name ?? '').toLowerCase()));
+    } else {
+      // Default: name ascending
+      sortedArtists.sort((a, b) => (a.sortName ?? a.name ?? '').toLowerCase().compareTo((b.sortName ?? b.name ?? '').toLowerCase()));
+    }
+
+    _artistsCacheKey = cacheKey;
+    _cachedSortedArtists = sortedArtists;
+    _cachedArtistNames = sortedArtists.map((a) => a.name ?? '').toList();
+    return sortedArtists;
+  }
+
+  /// Sort authors and cache the result - groups audiobooks by author and sorts names
+  (List<String>, Map<String, List<Audiobook>>) _getSortedAuthors(List<Audiobook> audiobooks) {
+    final cacheKey = '${audiobooks.length}_${audiobooks.isNotEmpty ? audiobooks.first.itemId : ''}_${audiobooks.isNotEmpty ? audiobooks.last.itemId : ''}_$_authorsSortOrder';
+    if (cacheKey == _authorsCacheKey && _sortedAuthorNames.isNotEmpty) {
+      return (_sortedAuthorNames, _groupedAudiobooksByAuthor);
+    }
+
+    // Group audiobooks by author
+    final groupedByAuthor = <String, List<Audiobook>>{};
+    for (final book in audiobooks) {
+      final authorName = book.authorsString;
+      groupedByAuthor.putIfAbsent(authorName, () => []).add(book);
+    }
+
+    // Sort authors based on current sort order
+    final sortedNames = groupedByAuthor.keys.toList();
+    switch (_authorsSortOrder) {
+      case 'alpha':
+        sortedNames.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+        break;
+      case 'alpha_desc':
+        sortedNames.sort((a, b) => b.toLowerCase().compareTo(a.toLowerCase()));
+        break;
+      case 'books':
+        sortedNames.sort((a, b) {
+          final aCount = groupedByAuthor[a]?.length ?? 0;
+          final bCount = groupedByAuthor[b]?.length ?? 0;
+          if (bCount != aCount) return bCount.compareTo(aCount);
+          return a.toLowerCase().compareTo(b.toLowerCase());
+        });
+        break;
+    }
+
+    _authorsCacheKey = cacheKey;
+    _sortedAuthorNames = sortedNames;
+    _groupedAudiobooksByAuthor = groupedByAuthor;
+    return (sortedNames, groupedByAuthor);
+  }
+
+  /// Get track sort keys for LetterScrollbar - cached to avoid recomputation on every build
+  List<String> _getTrackSortKeys(List<Track> tracks) {
+    final cacheKey = '${tracks.length}_${tracks.isNotEmpty ? tracks.first.itemId : ''}_${tracks.isNotEmpty ? tracks.last.itemId : ''}_$_tracksSortOrder';
+    if (cacheKey == _trackSortKeysCacheKey && _cachedTrackSortKeys.isNotEmpty) {
+      return _cachedTrackSortKeys;
+    }
+
+    final List<String> sortKeys;
+    switch (_tracksSortOrder) {
+      case 'artist':
+      case 'artist_name':
+        sortKeys = tracks.map((t) => t.artistsString).toList();
+        break;
+      case 'album':
+        sortKeys = tracks.map((t) => t.album?.name ?? t.name).toList();
+        break;
+      default:
+        // For name, duration, timestamp, etc. - use track name for letter scrollbar
+        sortKeys = tracks.map((t) => t.name).toList();
+        break;
+    }
+
+    _trackSortKeysCacheKey = cacheKey;
+    _cachedTrackSortKeys = sortKeys;
+    return sortKeys;
   }
 
   String _getCurrentViewMode() {
@@ -1660,8 +1809,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: () => _showOptionsMenu(colorScheme),
-          // Show spinner on button while syncing artists or libraries filter
-          child: (_isSyncingArtists || _isSyncingLibraries)
+          // Show spinner on button while syncing (artists filter, libraries filter, provider filter, or initial library build)
+          child: (_isSyncingArtists || _isSyncingLibraries || _isSyncingProviders || SyncService.instance.isSyncing)
               ? Center(
                   child: SizedBox.square(
                     dimension: 18,
@@ -1770,7 +1919,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     if (mounted) {
       await context.read<MusicAssistantProvider>().forceLibrarySync();
       if (mounted) {
-        setState(() => _isSyncingLibraries = false);
+        // Reload audiobooks to reflect the new filter
+        await _loadAudiobooks(favoriteOnly: _showFavoritesOnly ? true : null);
+        if (mounted) {
+          setState(() => _isSyncingLibraries = false);
+        }
       }
     }
   }
@@ -2130,31 +2283,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           );
         }
 
-        // Group filtered audiobooks by author
-        final groupedByAuthor = <String, List<Audiobook>>{};
-        for (final book in audiobooks) {
-          final authorName = book.authorsString;
-          groupedByAuthor.putIfAbsent(authorName, () => []).add(book);
-        }
-
-        // Sort authors based on current sort order
-        final sortedAuthorNames = groupedByAuthor.keys.toList();
-        switch (_authorsSortOrder) {
-          case 'alpha':
-            sortedAuthorNames.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-            break;
-          case 'alpha_desc':
-            sortedAuthorNames.sort((a, b) => b.toLowerCase().compareTo(a.toLowerCase()));
-            break;
-          case 'books':
-            sortedAuthorNames.sort((a, b) {
-              final aCount = groupedByAuthor[a]?.length ?? 0;
-              final bCount = groupedByAuthor[b]?.length ?? 0;
-              if (bCount != aCount) return bCount.compareTo(aCount);
-              return a.toLowerCase().compareTo(b.toLowerCase());
-            });
-            break;
-        }
+        // PERF: Use cached grouping/sorting - only re-sorts when data or sort order changes
+        final (sortedAuthorNames, groupedByAuthor) = _getSortedAuthors(audiobooks);
 
         // Match music artists tab layout - no header, direct list/grid
         return RefreshIndicator(
@@ -2239,8 +2369,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     fit: BoxFit.cover,
                     width: 48,
                     height: 48,
-                    // Only set width - height scales proportionally to preserve aspect ratio
+                    // PERF: Match display size to avoid unnecessary memory usage
                     memCacheWidth: 128,
+                    memCacheHeight: 128,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
                     // Transparent placeholder - icon shows through
@@ -2589,8 +2720,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                           ? CachedNetworkImage(
                               imageUrl: imageUrl,
                               fit: BoxFit.cover,
-                              memCacheWidth: 512,
-                              memCacheHeight: 512,
+                              // PERF: Reduced from 512 to 128 - display is ~56px
+                              memCacheWidth: 128,
+                              memCacheHeight: 128,
                               fadeInDuration: Duration.zero,
                               fadeOutDuration: Duration.zero,
                               placeholder: (_, __) => const SizedBox(),
@@ -2627,6 +2759,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                         minHeight: 4,
                       ),
                     ),
+                  ),
+                // Provider icon overlay
+                if (book.providerMappings?.isNotEmpty == true)
+                  ProviderIconOverlay(
+                    domain: book.providerMappings!.first.providerDomain,
                   ),
               ],
             ),
@@ -3022,6 +3159,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                   child: CachedNetworkImage(
                     imageUrl: displayCovers[index],
                     fit: BoxFit.cover,
+                    // PERF: Add cache sizing for series cover thumbnails
+                    memCacheWidth: 150,
+                    memCacheHeight: 150,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
                     placeholder: (_, __) => Container(
@@ -3303,33 +3443,43 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 // Match detail screen structure exactly
-                child: Container(
-                  color: colorScheme.surfaceContainerHighest,
-                  child: imageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.cover,
-                          // FIXED: Add memCacheWidth to ensure consistent decode size for smooth Hero
-                          memCacheWidth: 256,
-                          memCacheHeight: 256,
-                          fadeInDuration: Duration.zero,
-                          fadeOutDuration: Duration.zero,
-                          placeholder: (_, __) => const SizedBox(),
-                          errorWidget: (_, __, ___) => Center(
-                            child: Icon(
-                              MdiIcons.podcast,
-                              size: 48,
-                              color: colorScheme.onSurfaceVariant,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      color: colorScheme.surfaceContainerHighest,
+                      child: imageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              // FIXED: Add memCacheWidth to ensure consistent decode size for smooth Hero
+                              memCacheWidth: 256,
+                              memCacheHeight: 256,
+                              fadeInDuration: Duration.zero,
+                              fadeOutDuration: Duration.zero,
+                              placeholder: (_, __) => const SizedBox(),
+                              errorWidget: (_, __, ___) => Center(
+                                child: Icon(
+                                  MdiIcons.podcast,
+                                  size: 48,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Icon(
+                                MdiIcons.podcast,
+                                size: 48,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                        )
-                      : Center(
-                          child: Icon(
-                            MdiIcons.podcast,
-                            size: 48,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                    ),
+                    // Provider icon overlay
+                    if (podcast.providerMappings?.isNotEmpty == true)
+                      ProviderIconOverlay(
+                        domain: podcast.providerMappings!.first.providerDomain,
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -3650,15 +3800,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               );
             }
 
-            // Apply client-side sorting since we're combining data from multiple providers
-            final sortedArtists = List<Artist>.from(artists);
-            if (_artistsSortOrder == 'name_desc') {
-              sortedArtists.sort((a, b) => (b.sortName ?? b.name ?? '').toLowerCase().compareTo((a.sortName ?? a.name ?? '').toLowerCase()));
-            } else {
-              // Default: name ascending
-              sortedArtists.sort((a, b) => (a.sortName ?? a.name ?? '').toLowerCase().compareTo((b.sortName ?? b.name ?? '').toLowerCase()));
-            }
-            final artistNames = sortedArtists.map((a) => a.name ?? '').toList();
+            // PERF: Use cached sorting - only re-sorts when data or sort order changes
+            final sortedArtists = _getSortedArtists(artists);
+            final artistNames = _cachedArtistNames;
 
             return RefreshIndicator(
               color: colorScheme.primary,
@@ -3866,39 +4010,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           );
         }
 
-        // Apply client-side sorting since we're combining data from multiple providers
-        final sortedAlbums = List<Album>.from(albums);
-        switch (_albumsSortOrder) {
-          case 'name_desc':
-            sortedAlbums.sort((a, b) => (b.sortName ?? b.name ?? '').toLowerCase().compareTo((a.sortName ?? a.name ?? '').toLowerCase()));
-            break;
-          case 'year':
-            sortedAlbums.sort((a, b) {
-              if (a.year == null && b.year == null) return (a.name ?? '').compareTo(b.name ?? '');
-              if (a.year == null) return 1;
-              if (b.year == null) return -1;
-              return a.year!.compareTo(b.year!);
-            });
-            break;
-          case 'year_desc':
-            sortedAlbums.sort((a, b) {
-              if (a.year == null && b.year == null) return (a.name ?? '').compareTo(b.name ?? '');
-              if (a.year == null) return 1;
-              if (b.year == null) return -1;
-              return b.year!.compareTo(a.year!);
-            });
-            break;
-          case 'artist_name':
-            sortedAlbums.sort((a, b) => (a.artistsString).toLowerCase().compareTo((b.artistsString).toLowerCase()));
-            break;
-          case 'artist_name_desc':
-            sortedAlbums.sort((a, b) => (b.artistsString).toLowerCase().compareTo((a.artistsString).toLowerCase()));
-            break;
-          default:
-            // Default: name ascending
-            sortedAlbums.sort((a, b) => (a.sortName ?? a.name ?? '').toLowerCase().compareTo((b.sortName ?? b.name ?? '').toLowerCase()));
-        }
-        final albumNames = sortedAlbums.map((a) => a.name ?? '').toList();
+        // PERF: Use cached sorting - only re-sorts when data or sort order changes
+        final sortedAlbums = _getSortedAlbums(albums);
+        final albumNames = _cachedAlbumNames;
 
         return RefreshIndicator(
           color: colorScheme.primary,
@@ -4102,28 +4216,41 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           tag: HeroTags.playlistCover + (playlist.uri ?? playlist.itemId) + heroSuffix,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Container(
+            child: SizedBox(
               width: 48,
               height: 48,
-              color: colorScheme.surfaceContainerHighest,
-              child: imageUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.cover,
-                      memCacheWidth: 96,
-                      memCacheHeight: 96,
-                      fadeInDuration: Duration.zero,
-                      fadeOutDuration: Duration.zero,
-                      placeholder: (_, __) => const SizedBox(),
-                      errorWidget: (_, __, ___) => Icon(
-                        Icons.playlist_play_rounded,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    )
-                  : Icon(
-                      Icons.playlist_play_rounded,
-                      color: colorScheme.onSurfaceVariant,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    color: colorScheme.surfaceContainerHighest,
+                    child: imageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 96,
+                            memCacheHeight: 96,
+                            fadeInDuration: Duration.zero,
+                            fadeOutDuration: Duration.zero,
+                            placeholder: (_, __) => const SizedBox(),
+                            errorWidget: (_, __, ___) => Icon(
+                              Icons.playlist_play_rounded,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          )
+                        : Icon(
+                            Icons.playlist_play_rounded,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                  ),
+                  // Provider icon overlay
+                  if (playlist.providerMappings?.isNotEmpty == true)
+                    ProviderIconOverlay(
+                      domain: playlist.providerMappings!.first.providerDomain,
+                      size: 16,
                     ),
+                ],
+              ),
             ),
           ),
         ),
@@ -4202,34 +4329,44 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 tag: HeroTags.playlistCover + (playlist.uri ?? playlist.itemId) + heroSuffix,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    color: colorScheme.surfaceContainerHighest,
-                    child: imageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            memCacheWidth: 256,
-                            memCacheHeight: 256,
-                            fadeInDuration: Duration.zero,
-                            fadeOutDuration: Duration.zero,
-                            placeholder: (_, __) => const SizedBox(),
-                            errorWidget: (_, __, ___) => Center(
-                              child: Icon(
-                                Icons.playlist_play_rounded,
-                                size: 48,
-                                color: colorScheme.onSurfaceVariant,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(
+                        color: colorScheme.surfaceContainerHighest,
+                        child: imageUrl != null
+                            ? CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                memCacheWidth: 256,
+                                memCacheHeight: 256,
+                                fadeInDuration: Duration.zero,
+                                fadeOutDuration: Duration.zero,
+                                placeholder: (_, __) => const SizedBox(),
+                                errorWidget: (_, __, ___) => Center(
+                                  child: Icon(
+                                    Icons.playlist_play_rounded,
+                                    size: 48,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Icon(
+                                  Icons.playlist_play_rounded,
+                                  size: 48,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                               ),
-                            ),
-                          )
-                        : Center(
-                            child: Icon(
-                              Icons.playlist_play_rounded,
-                              size: 48,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
+                      ),
+                      // Provider icon overlay
+                      if (playlist.providerMappings?.isNotEmpty == true)
+                        ProviderIconOverlay(
+                          domain: playlist.providerMappings!.first.providerDomain,
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -4302,21 +4439,8 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       );
     }
 
-    // Build items list based on current sort order for accurate letter display
-    final List<String> trackSortKeys;
-    switch (_tracksSortOrder) {
-      case 'artist':
-      case 'artist_name':
-        trackSortKeys = displayTracks.map((t) => t.artistsString).toList();
-        break;
-      case 'album':
-        trackSortKeys = displayTracks.map((t) => t.album?.name ?? t.name).toList();
-        break;
-      default:
-        // For name, duration, timestamp, etc. - use track name for letter scrollbar
-        trackSortKeys = displayTracks.map((t) => t.name).toList();
-        break;
-    }
+    // PERF: Use cached track sort keys - only recompute when data or sort order changes
+    final trackSortKeys = _getTrackSortKeys(displayTracks);
 
     return RefreshIndicator(
       color: colorScheme.primary,

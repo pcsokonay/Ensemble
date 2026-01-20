@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
+import '../widgets/provider_icon.dart';
 import 'album_details_screen.dart';
 import '../constants/hero_tags.dart';
 import '../theme/palette_helper.dart';
@@ -366,6 +367,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
               _isInLibrary = !newState;
             });
           }
+          return false;
         });
       } else {
         // Remove from library
@@ -413,6 +415,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
               _isInLibrary = !newState;
             });
           }
+          return false;
         });
       }
     } catch (e) {
@@ -1002,37 +1005,46 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
         children: [
           AspectRatio(
             aspectRatio: 1.0,  // Square album art
-            child: Hero(
-              tag: HeroTags.albumCover + (album.uri ?? album.itemId) + '_$heroSuffix',
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  color: colorScheme.surfaceVariant,
-                  child: imageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          fadeInDuration: Duration.zero,
-                          fadeOutDuration: Duration.zero,
-                          errorWidget: (_, __, ___) => Center(
-                            child: Icon(
-                              Icons.album_rounded,
-                              size: 64,
-                              color: colorScheme.onSurfaceVariant,
+            child: Stack(
+              children: [
+                Hero(
+                  tag: HeroTags.albumCover + (album.uri ?? album.itemId) + '_$heroSuffix',
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      color: colorScheme.surfaceVariant,
+                      child: imageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fadeInDuration: Duration.zero,
+                              fadeOutDuration: Duration.zero,
+                              errorWidget: (_, __, ___) => Center(
+                                child: Icon(
+                                  Icons.album_rounded,
+                                  size: 64,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Icon(
+                                Icons.album_rounded,
+                                size: 64,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                        )
-                      : Center(
-                          child: Icon(
-                            Icons.album_rounded,
-                            size: 64,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                    ),
+                  ),
                 ),
-              ),
+                // Provider icon overlay
+                if (album.providerMappings?.isNotEmpty == true)
+                  ProviderIconOverlay(
+                    domain: album.providerMappings!.first.providerDomain,
+                  ),
+              ],
             ),
           ),
           Spacing.vGap8,

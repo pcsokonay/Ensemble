@@ -623,16 +623,14 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
     try {
       await widget.maProvider.api?.queueCommandPlayIndex(playerId, item.queueItemId);
     } catch (e) {
-      // Error playing index - handled silently
+      // Error playing index - clear optimistic state
+      if (mounted) {
+        setState(() {
+          _optimisticCurrentIndex = null;
+        });
+      }
     }
-
-    // Clear optimistic state after delay - server state will take over
-    await Future.delayed(const Duration(milliseconds: 1500));
-    if (mounted) {
-      setState(() {
-        _optimisticCurrentIndex = null;
-      });
-    }
+    // Note: didUpdateWidget clears _optimisticCurrentIndex when server state catches up
   }
 
   void _handleMoveToPlayNext(QueueItem item, int index, bool isCurrentItem) async {
@@ -789,7 +787,7 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
                         onPressed: _showingTransferDropdown ? _closeTransferDropdown : widget.onClose,
                         padding: Spacing.paddingAll12,
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       Text(
                         'Queue',
                         style: TextStyle(

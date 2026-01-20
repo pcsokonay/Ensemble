@@ -910,6 +910,12 @@ class SEs extends S {
   String get smartSortPlayersDescription => 'Ordenar por estado (reproduciendo, encendido, apagado) en lugar de alfabéticamente';
 
   @override
+  String get disableAutoSwitch => 'Disable Auto-Switch';
+
+  @override
+  String get disableAutoSwitchDescription => 'Never automatically switch to a different player';
+
+  @override
   String get playerStateUnavailable => 'No disponible';
 
   @override
@@ -940,6 +946,15 @@ class SEs extends S {
 
   @override
   String get showHintsDescription => 'Mostrar consejos útiles para descubrir funciones';
+
+  @override
+  String get display => 'Display';
+
+  @override
+  String get showProviderIcons => 'Show Provider Icons';
+
+  @override
+  String get showProviderIconsDescription => 'Display provider logos on album art';
 
   @override
   String get pullToSelectPlayers => 'Desliza para seleccionar dispositivos';

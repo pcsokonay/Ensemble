@@ -1761,6 +1761,18 @@ abstract class S {
   /// **'Sort by status (playing, on, off) instead of alphabetically'**
   String get smartSortPlayersDescription;
 
+  /// Setting to disable automatic player switching
+  ///
+  /// In en, this message translates to:
+  /// **'Disable Auto-Switch'**
+  String get disableAutoSwitch;
+
+  /// Description for disable auto-switch setting
+  ///
+  /// In en, this message translates to:
+  /// **'Never automatically switch to a different player'**
+  String get disableAutoSwitchDescription;
+
   /// Player state when unavailable
   ///
   /// In en, this message translates to:
@@ -1820,6 +1832,24 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Display helpful tips for discovering features'**
   String get showHintsDescription;
+
+  /// Settings section title for display options
+  ///
+  /// In en, this message translates to:
+  /// **'Display'**
+  String get display;
+
+  /// Toggle label for showing provider icons on album art
+  ///
+  /// In en, this message translates to:
+  /// **'Show Provider Icons'**
+  String get showProviderIcons;
+
+  /// Description for show provider icons toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Display provider logos on album art'**
+  String get showProviderIconsDescription;
 
   /// Hint shown when mini player bounces
   ///

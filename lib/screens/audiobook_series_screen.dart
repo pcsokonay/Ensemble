@@ -6,6 +6,7 @@ import 'package:palette_generator/palette_generator.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart' show BottomSpacing;
+import '../widgets/provider_icon.dart';
 import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
 import '../utils/page_transitions.dart';
@@ -690,6 +691,11 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                     ),
                   ),
                 ),
+                // Provider icon overlay
+                if (book.providerMappings?.isNotEmpty == true)
+                  ProviderIconOverlay(
+                    domain: book.providerMappings!.first.providerDomain,
+                  ),
                 // Progress indicator
                 if (book.progress > 0)
                   Positioned(
@@ -748,45 +754,55 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
         tag: HeroTags.audiobookCover + (book.uri ?? book.itemId) + '_$heroSuffix',
         child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: Stack(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                color: colorScheme.surfaceContainerHighest,
-                child: imageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        fit: BoxFit.cover,
-                        fadeInDuration: Duration.zero,
-                        fadeOutDuration: Duration.zero,
-                        placeholder: (_, __) => Icon(
+          child: SizedBox(
+            width: 56,
+            height: 56,
+            child: Stack(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  color: colorScheme.surfaceContainerHighest,
+                  child: imageUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.cover,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          placeholder: (_, __) => Icon(
+                            MdiIcons.bookOutline,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          errorWidget: (_, __, ___) => Icon(
+                            MdiIcons.bookOutline,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        )
+                      : Icon(
                           MdiIcons.bookOutline,
                           color: colorScheme.onSurfaceVariant,
                         ),
-                        errorWidget: (_, __, ___) => Icon(
-                          MdiIcons.bookOutline,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      )
-                    : Icon(
-                        MdiIcons.bookOutline,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-              ),
-              if (book.progress > 0)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: LinearProgressIndicator(
-                    value: book.progress,
-                    backgroundColor: Colors.black54,
-                    valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-                    minHeight: 2,
-                  ),
                 ),
-            ],
+                // Provider icon overlay
+                if (book.providerMappings?.isNotEmpty == true)
+                  ProviderIconOverlay(
+                    domain: book.providerMappings!.first.providerDomain,
+                    size: 16,
+                  ),
+                if (book.progress > 0)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: LinearProgressIndicator(
+                      value: book.progress,
+                      backgroundColor: Colors.black54,
+                      valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+                      minHeight: 2,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

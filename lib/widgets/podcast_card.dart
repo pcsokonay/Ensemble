@@ -10,6 +10,7 @@ import '../constants/hero_tags.dart';
 import '../constants/timings.dart';
 import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
+import 'provider_icon.dart';
 
 class PodcastCard extends StatefulWidget {
   final MediaItem podcast;
@@ -54,8 +55,8 @@ class _PodcastCardState extends State<PodcastCard> {
           if (_isNavigating) return;
           _isNavigating = true;
 
-          // Update adaptive colors immediately on tap
-          updateAdaptiveColorsFromImage(context, imageUrl);
+          // PERF: Color extraction deferred to detail screen's initState
+          // to avoid competing with Hero animation for GPU resources
           Navigator.push(
             context,
             FadeSlidePageRoute(
@@ -82,51 +83,56 @@ class _PodcastCardState extends State<PodcastCard> {
                 tag: HeroTags.podcastCover + (widget.podcast.uri ?? widget.podcast.itemId) + suffix,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12.0),
-                  child: Container(
-                    color: colorScheme.surfaceVariant,
-                    child: imageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            memCacheWidth: cacheSize,
-                            memCacheHeight: cacheSize,
-                            fadeInDuration: Duration.zero,
-                            fadeOutDuration: Duration.zero,
-                            placeholder: (context, url) => const SizedBox(),
-                            errorWidget: (context, url, error) => Center(
-                              child: Icon(
-                                MdiIcons.podcast,
-                                size: 64,
-                                color: colorScheme.onSurfaceVariant,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(
+                        color: colorScheme.surfaceVariant,
+                        child: imageUrl != null
+                            ? CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                memCacheWidth: cacheSize,
+                                memCacheHeight: cacheSize,
+                                fadeInDuration: Duration.zero,
+                                fadeOutDuration: Duration.zero,
+                                placeholder: (context, url) => const SizedBox(),
+                                errorWidget: (context, url, error) => Center(
+                                  child: Icon(
+                                    MdiIcons.podcast,
+                                    size: 64,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Icon(
+                                  MdiIcons.podcast,
+                                  size: 64,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                               ),
-                            ),
-                          )
-                        : Center(
-                            child: Icon(
-                              MdiIcons.podcast,
-                              size: 64,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
+                      ),
+                      // Provider icon overlay
+                      if (widget.podcast.providerMappings?.isNotEmpty == true)
+                        ProviderIconOverlay(
+                          domain: widget.podcast.providerMappings!.first.providerDomain,
+                        ),
+                    ],
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 8),
             // Podcast title
-            Hero(
-              tag: HeroTags.podcastTitle + (widget.podcast.uri ?? widget.podcast.itemId) + suffix,
-              child: Material(
-                color: Colors.transparent,
-                child: Text(
-                  widget.podcast.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleSmall?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+            // PERF: Removed Hero - text animations provide minimal benefit but add overhead
+            Text(
+              widget.podcast.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
               ),
             ),
             // Podcast author (if available)

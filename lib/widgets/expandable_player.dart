@@ -23,6 +23,7 @@ import '../screens/album_details_screen.dart';
 import '../utils/page_transitions.dart';
 import 'animated_icon_button.dart';
 import 'global_player_overlay.dart';
+import 'provider_icon.dart';
 import 'volume_control.dart';
 import 'player/player_widgets.dart';
 import 'player/mini_player_content.dart';
@@ -2589,20 +2590,32 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                           child: RepaintBoundary(
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(artBorderRadius),
-                              child: imageUrl != null
-                                  ? CachedNetworkImage(
-                                      imageUrl: imageUrl,
-                                      fit: BoxFit.cover,
-                                      // Fixed cache size to avoid mid-animation cache thrashing
-                                      memCacheWidth: 512,
-                                      memCacheHeight: 512,
-                                      fadeInDuration: Duration.zero,
-                                      fadeOutDuration: Duration.zero,
-                                      placeholderFadeInDuration: Duration.zero,
-                                      placeholder: (_, __) => _buildPlaceholderArt(colorScheme, t),
-                                      errorWidget: (_, __, ___) => _buildPlaceholderArt(colorScheme, t),
-                                    )
-                                  : _buildPlaceholderArt(colorScheme, t),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  imageUrl != null
+                                      ? CachedNetworkImage(
+                                          imageUrl: imageUrl,
+                                          fit: BoxFit.cover,
+                                          // Fixed cache size to avoid mid-animation cache thrashing
+                                          memCacheWidth: 512,
+                                          memCacheHeight: 512,
+                                          fadeInDuration: Duration.zero,
+                                          fadeOutDuration: Duration.zero,
+                                          placeholderFadeInDuration: Duration.zero,
+                                          placeholder: (_, __) => _buildPlaceholderArt(colorScheme, t),
+                                          errorWidget: (_, __, ___) => _buildPlaceholderArt(colorScheme, t),
+                                        )
+                                      : _buildPlaceholderArt(colorScheme, t),
+                                  // Provider icon overlay (only show when expanded enough)
+                                  if (t > 0.5 && currentTrack.providerMappings?.isNotEmpty == true)
+                                    ProviderIconOverlay(
+                                      domain: currentTrack.providerMappings!.first.providerDomain,
+                                      size: 24,
+                                      margin: 8,
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -3277,7 +3290,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                 // GPU PERF: Use icon color alpha instead of Opacity
                 if (t > 0.3)
                   Positioned(
-                    top: topPadding + 4,
+                    top: topPadding - 4,
                     left: 4,
                     child: IconButton(
                       icon: Icon(
@@ -3294,7 +3307,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                 // GPU PERF: Use text color alpha instead of Opacity
                 if (t > 0.5)
                   Positioned(
-                    top: topPadding + 12,
+                    top: topPadding + 6,
                     left: 56,
                     right: 56,
                     child: IgnorePointer(
@@ -3302,7 +3315,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                         selectedPlayer.name,
                         style: TextStyle(
                           color: textColor.withOpacity(0.6 * ((t - 0.5) / 0.5).clamp(0.0, 1.0)),
-                          fontSize: 15,
+                          fontSize: 17,
                           fontWeight: FontWeight.w500,
                           letterSpacing: 0.2,
                         ),
@@ -3912,62 +3925,30 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         top: false,
         child: Column(
           children: [
-            // Drag handle area (visual only - swipe-to-close handled by outer wrapper)
-            Column(
-              children: [
-                // Drag handle
-                Center(
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 8),
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: textColor.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+            // Header (matches queue and sleep timer style)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor, size: 28),
+                    onPressed: _closeLyricsPanel,
+                    padding: const EdgeInsets.all(8),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Lyrics',
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  // Header
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor, size: 28),
-                          onPressed: _closeLyricsPanel,
-                          padding: const EdgeInsets.all(8),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Lyrics',
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              if (currentTrack != null)
-                                Text(
-                                  '${currentTrack.name} • ${currentTrack.artistsString}',
-                                  style: TextStyle(
-                                    color: textColor.withOpacity(0.6),
-                                    fontSize: 13,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const Spacer(),
+                  const SizedBox(width: 16),
                 ],
               ),
+            ),
             const SizedBox(height: 8),
             Divider(color: textColor.withOpacity(0.1), height: 1),
             // Lyrics content
@@ -4069,16 +4050,48 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                               ),
                             )
                           // Plain lyrics - show as scrollable text
-                          : SingleChildScrollView(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                _currentLyrics!,
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 16,
-                                  height: 1.8,
+                          // Wrapped with Listener for swipe-to-close (always at "top" for plain text)
+                          : Listener(
+                              onPointerDown: (event) {
+                                _lyricsSwipeStart = event.position;
+                                _wasLyricsAtTopOnSwipeStart = true; // Plain lyrics always count as at top
+                              },
+                              onPointerMove: (event) {
+                                if (_lyricsSwipeStart == null) return;
+                                final dy = event.position.dy - _lyricsSwipeStart!.dy;
+                                final dx = (event.position.dx - _lyricsSwipeStart!.dx).abs();
+                                // Only trigger swipe-to-close if swiping down
+                                if (dy > 20 && dy > dx * 1.5 && _wasLyricsAtTopOnSwipeStart && !_isSwipingLyricsContent) {
+                                  _isSwipingLyricsContent = true;
+                                }
+                              },
+                              onPointerUp: (event) {
+                                if (_isSwipingLyricsContent && _lyricsSwipeStart != null) {
+                                  final dy = event.position.dy - _lyricsSwipeStart!.dy;
+                                  if (dy > 50) {
+                                    // Calculate velocity (simplified)
+                                    final velocity = dy / 200; // Approximate velocity
+                                    _closeLyricsPanel(velocity: velocity);
+                                  }
+                                }
+                                _lyricsSwipeStart = null;
+                                _isSwipingLyricsContent = false;
+                              },
+                              onPointerCancel: (_) {
+                                _lyricsSwipeStart = null;
+                                _isSwipingLyricsContent = false;
+                              },
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  _currentLyrics!,
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 16,
+                                    height: 1.8,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                             )
                       : Center(

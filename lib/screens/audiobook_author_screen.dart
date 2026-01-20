@@ -5,15 +5,14 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
-import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
 import '../services/settings_service.dart';
 import '../services/metadata_service.dart';
-import '../services/debug_logger.dart';
 import '../utils/page_transitions.dart';
 import '../constants/hero_tags.dart';
 import '../l10n/app_localizations.dart';
 import 'audiobook_detail_screen.dart';
+import '../widgets/provider_icon.dart';
 
 class AudiobookAuthorScreen extends StatefulWidget {
   final String authorName;
@@ -34,7 +33,6 @@ class AudiobookAuthorScreen extends StatefulWidget {
 }
 
 class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
-  final _logger = DebugLogger();
   late List<Audiobook> _audiobooks;
   ColorScheme? _lightColorScheme;
   ColorScheme? _darkColorScheme;
@@ -406,6 +404,11 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
                       valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
                       minHeight: 3,
                     ),
+                  ),
+                // Provider icon overlay
+                if (book.providerMappings?.isNotEmpty == true)
+                  ProviderIconOverlay(
+                    domain: book.providerMappings!.first.providerDomain,
                   ),
               ],
             ),

@@ -41,9 +41,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Player settings
   bool _preferLocalPlayer = false;
   bool _smartSortPlayers = false;
+  bool _disableAutoSwitch = false;
   bool _volumePrecisionMode = true;
   // Hint settings
   bool _showHints = true;
+  // Display settings
+  bool _showProviderIcons = true;
 
   @override
   void initState() {
@@ -84,10 +87,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Load player settings
     final preferLocal = await SettingsService.getPreferLocalPlayer();
     final smartSort = await SettingsService.getSmartSortPlayers();
+    final disableAutoSwitch = await SettingsService.getDisableAutoSwitch();
     final volumePrecision = await SettingsService.getVolumePrecisionMode();
 
     // Load hint settings
     final showHints = await SettingsService.getShowHints();
+
+    // Load display settings
+    final showProviderIcons = await SettingsService.getShowProviderIcons();
 
     if (mounted) {
       setState(() {
@@ -106,8 +113,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _homeRowOrder = rowOrder;
         _preferLocalPlayer = preferLocal;
         _smartSortPlayers = smartSort;
+        _disableAutoSwitch = disableAutoSwitch;
         _volumePrecisionMode = volumePrecision;
         _showHints = showHints;
+        _showProviderIcons = showProviderIcons;
       });
     }
   }
@@ -754,6 +763,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               child: SwitchListTile(
                 title: Text(
+                  S.of(context)!.disableAutoSwitch,
+                  style: TextStyle(color: colorScheme.onSurface),
+                ),
+                subtitle: Text(
+                  S.of(context)!.disableAutoSwitchDescription,
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                ),
+                value: _disableAutoSwitch,
+                onChanged: (value) {
+                  setState(() => _disableAutoSwitch = value);
+                  SettingsService.setDisableAutoSwitch(value);
+                },
+                activeColor: colorScheme.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceVariant.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SwitchListTile(
+                title: Text(
                   'Volume precision mode',
                   style: TextStyle(color: colorScheme.onSurface),
                 ),
@@ -805,6 +839,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) {
                   setState(() => _showHints = value);
                   SettingsService.setShowHints(value);
+                },
+                activeColor: colorScheme.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Display section
+            Text(
+              S.of(context)!.display,
+              style: textTheme.titleMedium?.copyWith(
+                color: colorScheme.onBackground,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceVariant.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SwitchListTile(
+                title: Text(
+                  S.of(context)!.showProviderIcons,
+                  style: TextStyle(color: colorScheme.onSurface),
+                ),
+                subtitle: Text(
+                  S.of(context)!.showProviderIconsDescription,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+                value: _showProviderIcons,
+                onChanged: (value) {
+                  setState(() => _showProviderIcons = value);
+                  SettingsService.setShowProviderIcons(value);
                 },
                 activeColor: colorScheme.primary,
                 contentPadding: EdgeInsets.zero,

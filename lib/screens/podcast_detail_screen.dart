@@ -5,6 +5,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
+import '../widgets/provider_icon.dart';
 import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
 import '../services/debug_logger.dart';
@@ -478,41 +479,55 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                           // Match audiobook pattern: ClipRRect + CachedNetworkImage for smooth hero
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: Container(
+                            child: SizedBox(
                               width: coverSize,
                               height: coverSize,
-                              color: colorScheme.surfaceContainerHighest,
-                              child: imageUrl != null
-                                  ? CachedNetworkImage(
-                                      imageUrl: imageUrl,
-                                      fit: BoxFit.cover,
-                                      // Match source memCacheWidth for smooth Hero animation
-                                      memCacheWidth: 256,
-                                      memCacheHeight: 256,
-                                      fadeInDuration: Duration.zero,
-                                      fadeOutDuration: Duration.zero,
-                                      placeholder: (_, __) => Center(
-                                        child: Icon(
-                                          MdiIcons.podcast,
-                                          size: coverSize * 0.43,
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                      errorWidget: (_, __, ___) => Center(
-                                        child: Icon(
-                                          MdiIcons.podcast,
-                                          size: coverSize * 0.43,
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    )
-                                  : Center(
-                                      child: Icon(
-                                        MdiIcons.podcast,
-                                        size: coverSize * 0.43,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Container(
+                                    color: colorScheme.surfaceContainerHighest,
+                                    child: imageUrl != null
+                                        ? CachedNetworkImage(
+                                            imageUrl: imageUrl,
+                                            fit: BoxFit.cover,
+                                            // Match source memCacheWidth for smooth Hero animation
+                                            memCacheWidth: 256,
+                                            memCacheHeight: 256,
+                                            fadeInDuration: Duration.zero,
+                                            fadeOutDuration: Duration.zero,
+                                            placeholder: (_, __) => Center(
+                                              child: Icon(
+                                                MdiIcons.podcast,
+                                                size: coverSize * 0.43,
+                                                color: colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                            errorWidget: (_, __, ___) => Center(
+                                              child: Icon(
+                                                MdiIcons.podcast,
+                                                size: coverSize * 0.43,
+                                                color: colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          )
+                                        : Center(
+                                            child: Icon(
+                                              MdiIcons.podcast,
+                                              size: coverSize * 0.43,
+                                              color: colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                  ),
+                                  // Provider icon overlay
+                                  if (widget.podcast.providerMappings?.isNotEmpty == true)
+                                    ProviderIconOverlay(
+                                      domain: widget.podcast.providerMappings!.first.providerDomain,
+                                      size: 24,
+                                      margin: 8,
                                     ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
