@@ -19,12 +19,25 @@ class PlayerRevealOverlay extends StatefulWidget {
   final double miniPlayerHeight;
   final bool showOnboardingHints; // Show additional hints for first-time users
 
+  /// Callback when player is selected for a pending action (e.g., "Play On").
+  /// If null, selecting a player just switches to that player.
+  final void Function(dynamic player)? onPlayerSelected;
+
+  /// Context hint to display instead of default hints (e.g., "Select player to play album").
+  final String? contextHint;
+
+  /// Icon for context hint (default: play_circle_outline).
+  final IconData? contextHintIcon;
+
   const PlayerRevealOverlay({
     super.key,
     required this.onDismiss,
     required this.miniPlayerBottom,
     required this.miniPlayerHeight,
     this.showOnboardingHints = false,
+    this.onPlayerSelected,
+    this.contextHint,
+    this.contextHintIcon,
   });
 
   @override
@@ -383,16 +396,21 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: Material(
                                     type: MaterialType.transparency,
-                                    child: isOnboarding
-                                        ? buildHintRow(Icons.touch_app_outlined, S.of(context)!.selectPlayerHint)
-                                        : Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              buildHintRow(Icons.lightbulb_outline, S.of(context)!.holdToSync),
-                                              const SizedBox(height: 4),
-                                              buildHintRow(Icons.lightbulb_outline, S.of(context)!.swipeToAdjustVolume),
-                                            ],
-                                          ),
+                                    child: widget.contextHint != null
+                                        ? buildHintRow(
+                                            widget.contextHintIcon ?? Icons.play_circle_outline,
+                                            widget.contextHint!,
+                                          )
+                                        : isOnboarding
+                                            ? buildHintRow(Icons.touch_app_outlined, S.of(context)!.selectPlayerHint)
+                                            : Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  buildHintRow(Icons.lightbulb_outline, S.of(context)!.holdToSync),
+                                                  const SizedBox(height: 4),
+                                                  buildHintRow(Icons.lightbulb_outline, S.of(context)!.swipeToAdjustVolume),
+                                                ],
+                                              ),
                                   ),
                                 ),
                               );
@@ -436,7 +454,11 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                       textColor: data.cardTextColor,
                                       onTap: () {
                                         HapticFeedback.mediumImpact();
-                                        maProvider.selectPlayer(data.player);
+                                        if (widget.onPlayerSelected != null) {
+                                          widget.onPlayerSelected!(data.player);
+                                        } else {
+                                          maProvider.selectPlayer(data.player);
+                                        }
                                         dismiss();
                                       },
                                       onLongPress: () {
@@ -489,7 +511,11 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
                                 textColor: data.cardTextColor,
                                 onTap: () {
                                   HapticFeedback.mediumImpact();
-                                  maProvider.selectPlayer(data.player);
+                                  if (widget.onPlayerSelected != null) {
+                                    widget.onPlayerSelected!(data.player);
+                                  } else {
+                                    maProvider.selectPlayer(data.player);
+                                  }
                                   dismiss();
                                 },
                                 onLongPress: () {

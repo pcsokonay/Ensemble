@@ -5,7 +5,6 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
-import '../widgets/player_picker_sheet.dart';
 import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
 import '../services/debug_logger.dart';
@@ -308,22 +307,15 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
   void _showPlayOnMenu(BuildContext context, MediaItem episode) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerForEpisode,
       onPlayerSelected: (player) async {
         maProvider.selectPlayer(player);
         // Set podcast context before playing so player UI shows correct podcast name
         maProvider.setCurrentPodcastName(widget.podcast.name);
         await maProvider.api?.playPodcastEpisode(player.playerId, episode);
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   String _formatDuration(Duration? duration) {

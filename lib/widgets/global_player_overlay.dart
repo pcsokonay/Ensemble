@@ -165,6 +165,21 @@ class GlobalPlayerOverlay extends StatefulWidget {
   /// Check if the player reveal is currently visible
   static bool get isPlayerRevealVisible =>
       _overlayStateKey.currentState?._isRevealVisible ?? false;
+
+  /// Show player selector for a "Play On" action.
+  /// Instead of the default hints, shows a contextual hint like "Select player to play album".
+  /// When a player is tapped, calls onPlayerSelected instead of switching to that player.
+  static void showPlayerSelectorForAction({
+    required String contextHint,
+    required void Function(dynamic player) onPlayerSelected,
+    IconData? hintIcon,
+  }) {
+    _overlayStateKey.currentState?._showPlayerSelectorForAction(
+      contextHint: contextHint,
+      onPlayerSelected: onPlayerSelected,
+      hintIcon: hintIcon,
+    );
+  }
 }
 
 class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
@@ -208,6 +223,11 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
 
   // Key for the reveal overlay
   final _revealKey = GlobalKey<PlayerRevealOverlayState>();
+
+  // State for "Play On" action - stored here so it can be passed to PlayerRevealOverlay
+  void Function(dynamic player)? _pendingPlayerAction;
+  String? _pendingContextHint;
+  IconData? _pendingHintIcon;
 
   @override
   void initState() {
@@ -395,6 +415,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   void _hidePlayerReveal() {
     if (!_isRevealVisible) return;
     _bounceOffsetNotifier.value = 0;
+    _clearPendingAction(); // Clear pending action when overlay is dismissed
     setState(() {
       _isRevealVisible = false;
       _isOnboardingReveal = false;
@@ -412,6 +433,29 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   void _triggerBounce() {
     _singleBounceController.reset();
     _singleBounceController.forward();
+  }
+
+  /// Clear pending action state (called when overlay is dismissed)
+  void _clearPendingAction() {
+    _pendingPlayerAction = null;
+    _pendingContextHint = null;
+    _pendingHintIcon = null;
+  }
+
+  /// Show player selector for a "Play On" action.
+  /// Stores the pending action and shows the reveal overlay with context hint.
+  void _showPlayerSelectorForAction({
+    required String contextHint,
+    required void Function(dynamic player) onPlayerSelected,
+    IconData? hintIcon,
+  }) {
+    // Store pending action state
+    _pendingPlayerAction = onPlayerSelected;
+    _pendingContextHint = contextHint;
+    _pendingHintIcon = hintIcon;
+
+    // Show the reveal overlay
+    _showPlayerReveal();
   }
 
   /// End hint mode (called when user taps skip button)
@@ -746,6 +790,10 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
             miniPlayerBottom: BottomSpacing.navBarHeight + MediaQuery.of(context).viewPadding.bottom + 12,
             miniPlayerHeight: 64,
             showOnboardingHints: _isOnboardingReveal,
+            // Pass pending action parameters for "Play On" functionality
+            onPlayerSelected: _pendingPlayerAction,
+            contextHint: _pendingContextHint,
+            contextHintIcon: _pendingHintIcon,
           ),
 
         // Global player overlay - renders ON TOP so cards slide behind it

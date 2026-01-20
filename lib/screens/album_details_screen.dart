@@ -10,7 +10,6 @@ import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
 import '../services/recently_played_service.dart';
 import '../widgets/global_player_overlay.dart';
-import '../widgets/player_picker_sheet.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 import 'artist_details_screen.dart';
@@ -1257,13 +1256,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
   void _showPlayAlbumFromHereMenu(BuildContext context, int startIndex) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerToPlayAlbum,
       onPlayerSelected: (player) async {
         maProvider.selectPlayer(player);
         await maProvider.playTracks(
@@ -1272,48 +1266,32 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
           startIndex: startIndex,
         );
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   void _showPlayRadioMenu(BuildContext context, int trackIndex) {
     final maProvider = context.read<MusicAssistantProvider>();
     final track = _tracks[trackIndex];
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerForRadio,
       onPlayerSelected: (player) async {
         maProvider.selectPlayer(player);
         await maProvider.playRadio(player.playerId, track);
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   void _showPlayOnMenu(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerToPlayAlbum,
       onPlayerSelected: (player) async {
         maProvider.selectPlayer(player);
         await maProvider.playTracks(player.playerId, _tracks);
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   String _formatDuration(Duration duration) {

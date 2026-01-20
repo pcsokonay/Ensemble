@@ -2048,6 +2048,48 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Transfer queue to another player'**
   String get transferQueueToPlayer;
+
+  /// Generic hint for selecting a player in player selector
+  ///
+  /// In en, this message translates to:
+  /// **'Select a player'**
+  String get selectPlayerToPlay;
+
+  /// Hint for selecting player to play album
+  ///
+  /// In en, this message translates to:
+  /// **'Select player to play album'**
+  String get selectPlayerToPlayAlbum;
+
+  /// Hint for selecting player to play playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Select player to play playlist'**
+  String get selectPlayerToPlayPlaylist;
+
+  /// Hint for selecting player to start radio
+  ///
+  /// In en, this message translates to:
+  /// **'Select player for radio'**
+  String get selectPlayerForRadio;
+
+  /// Hint for selecting player to play episode
+  ///
+  /// In en, this message translates to:
+  /// **'Select player for episode'**
+  String get selectPlayerForEpisode;
+
+  /// Hint for selecting player to play audiobook
+  ///
+  /// In en, this message translates to:
+  /// **'Select player for audiobook'**
+  String get selectPlayerForAudiobook;
+
+  /// Hint for selecting player to add to queue
+  ///
+  /// In en, this message translates to:
+  /// **'Select player to add to queue'**
+  String get selectPlayerToAddToQueue;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

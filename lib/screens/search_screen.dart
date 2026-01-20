@@ -8,7 +8,6 @@ import '../models/media_item.dart';
 import '../services/debug_logger.dart';
 import '../services/database_service.dart';
 import '../widgets/global_player_overlay.dart';
-import '../widgets/player_picker_sheet.dart';
 import '../widgets/common/empty_state.dart';
 import '../widgets/common/disconnected_state.dart';
 import '../widgets/artist_avatar.dart';
@@ -2473,13 +2472,8 @@ class SearchScreenState extends State<SearchScreen> {
   void _showRadioOnMenu(Track track) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerForRadio,
       onPlayerSelected: (player) async {
         try {
           maProvider.selectPlayer(player);
@@ -2500,9 +2494,7 @@ class SearchScreenState extends State<SearchScreen> {
           }
         }
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   /// Add track to queue on current player (1 tap)
@@ -2943,13 +2935,8 @@ class SearchScreenState extends State<SearchScreen> {
   void _showAlbumPlayOnMenu(Album album) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerToPlayAlbum,
       onPlayerSelected: (player) async {
         try {
           maProvider.selectPlayer(player);
@@ -2970,9 +2957,7 @@ class SearchScreenState extends State<SearchScreen> {
           }
         }
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   /// Add album to queue
@@ -3122,13 +3107,8 @@ class SearchScreenState extends State<SearchScreen> {
   void _showPlaylistPlayOnMenu(Playlist playlist) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerToPlayPlaylist,
       onPlayerSelected: (player) async {
         try {
           maProvider.selectPlayer(player);
@@ -3149,9 +3129,7 @@ class SearchScreenState extends State<SearchScreen> {
           }
         }
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   /// Play audiobook on current player
@@ -3189,13 +3167,8 @@ class SearchScreenState extends State<SearchScreen> {
   void _showAudiobookPlayOnMenu(Audiobook audiobook) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerForAudiobook,
       onPlayerSelected: (player) async {
         try {
           maProvider.selectPlayer(player);
@@ -3216,9 +3189,7 @@ class SearchScreenState extends State<SearchScreen> {
           }
         }
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   /// Toggle audiobook favorite status
@@ -3306,13 +3277,8 @@ class SearchScreenState extends State<SearchScreen> {
   void _showRadioPlayOnMenu(MediaItem radio) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerForRadio,
       onPlayerSelected: (player) async {
         try {
           maProvider.selectPlayer(player);
@@ -3333,9 +3299,7 @@ class SearchScreenState extends State<SearchScreen> {
           }
         }
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   /// Play podcast (navigate to detail screen where episodes can be played)
@@ -3363,13 +3327,8 @@ class SearchScreenState extends State<SearchScreen> {
   void _showPodcastPlayOnMenu(MediaItem podcast) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerToPlay,
       onPlayerSelected: (player) async {
         // Select the player, then navigate to podcast detail
         maProvider.selectPlayer(player);
@@ -3389,9 +3348,7 @@ class SearchScreenState extends State<SearchScreen> {
           );
         }
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   String _formatDuration(Duration duration) {

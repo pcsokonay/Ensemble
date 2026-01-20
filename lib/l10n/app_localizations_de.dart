@@ -1076,4 +1076,25 @@ class SDe extends S {
 
   @override
   String get transferQueueToPlayer => 'Transfer queue to another player';
+
+  @override
+  String get selectPlayerToPlay => 'Select a player';
+
+  @override
+  String get selectPlayerToPlayAlbum => 'Select player to play album';
+
+  @override
+  String get selectPlayerToPlayPlaylist => 'Select player to play playlist';
+
+  @override
+  String get selectPlayerForRadio => 'Select player for radio';
+
+  @override
+  String get selectPlayerForEpisode => 'Select player for episode';
+
+  @override
+  String get selectPlayerForAudiobook => 'Select player for audiobook';
+
+  @override
+  String get selectPlayerToAddToQueue => 'Select player to add to queue';
 }

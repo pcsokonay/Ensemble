@@ -1593,5 +1593,40 @@
   "transferQueueToPlayer": "Transfer queue to another player",
   "@transferQueueToPlayer": {
     "description": "Tooltip for transfer queue button"
+  },
+
+  "selectPlayerToPlay": "Select a player",
+  "@selectPlayerToPlay": {
+    "description": "Generic hint for selecting a player in player selector"
+  },
+
+  "selectPlayerToPlayAlbum": "Select player to play album",
+  "@selectPlayerToPlayAlbum": {
+    "description": "Hint for selecting player to play album"
+  },
+
+  "selectPlayerToPlayPlaylist": "Select player to play playlist",
+  "@selectPlayerToPlayPlaylist": {
+    "description": "Hint for selecting player to play playlist"
+  },
+
+  "selectPlayerForRadio": "Select player for radio",
+  "@selectPlayerForRadio": {
+    "description": "Hint for selecting player to start radio"
+  },
+
+  "selectPlayerForEpisode": "Select player for episode",
+  "@selectPlayerForEpisode": {
+    "description": "Hint for selecting player to play episode"
+  },
+
+  "selectPlayerForAudiobook": "Select player for audiobook",
+  "@selectPlayerForAudiobook": {
+    "description": "Hint for selecting player to play audiobook"
+  },
+
+  "selectPlayerToAddToQueue": "Select player to add to queue",
+  "@selectPlayerToAddToQueue": {
+    "description": "Hint for selecting player to add to queue"
   }
 }

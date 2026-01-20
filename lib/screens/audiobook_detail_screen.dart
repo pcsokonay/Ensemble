@@ -5,7 +5,6 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
-import '../widgets/player_picker_sheet.dart';
 import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
 import '../services/debug_logger.dart';
@@ -212,13 +211,8 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
   void _showPlayOnMenu(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerForAudiobook,
       onPlayerSelected: (player) async {
         maProvider.selectPlayer(player);
         maProvider.setCurrentAudiobook(_audiobook);
@@ -227,9 +221,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
           widget.audiobook,
         );
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   Future<void> _markAsFinished() async {

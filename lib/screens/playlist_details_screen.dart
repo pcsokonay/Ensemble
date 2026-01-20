@@ -9,7 +9,6 @@ import '../theme/theme_provider.dart';
 import '../services/debug_logger.dart';
 import '../services/recently_played_service.dart';
 import '../widgets/global_player_overlay.dart';
-import '../widgets/player_picker_sheet.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 
@@ -378,20 +377,13 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
   void _showPlayOnMenu(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerToPlayPlaylist,
       onPlayerSelected: (player) async {
         maProvider.selectPlayer(player);
         await maProvider.playTracks(player.playerId, _tracks);
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   void _addPlaylistToQueue() {
@@ -552,20 +544,13 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
     final maProvider = context.read<MusicAssistantProvider>();
     final track = _tracks[trackIndex];
 
-    GlobalPlayerOverlay.hidePlayer();
-
-    showPlayerPickerSheet(
-      context: context,
-      title: S.of(context)!.playOn,
-      players: maProvider.availablePlayers,
-      selectedPlayer: maProvider.selectedPlayer,
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.selectPlayerForRadio,
       onPlayerSelected: (player) async {
         maProvider.selectPlayer(player);
         await maProvider.playRadio(player.playerId, track);
       },
-    ).whenComplete(() {
-      GlobalPlayerOverlay.showPlayer();
-    });
+    );
   }
 
   void _showError(String message) {
