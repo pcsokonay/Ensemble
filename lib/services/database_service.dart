@@ -193,6 +193,13 @@ class DatabaseService {
     return db.markItemsDeleted(itemType, [itemId]);
   }
 
+  /// Batch cache multiple items efficiently
+  /// Uses drift's batch API for much better performance on large datasets.
+  /// Items are automatically chunked into batches of 500.
+  Future<void> batchCacheItems(List<BatchCacheItem> items) {
+    return db.batchCacheItems(items);
+  }
+
   // ============================================
   // Player Cache Convenience Methods
   // ============================================

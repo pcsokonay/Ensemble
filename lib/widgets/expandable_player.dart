@@ -192,6 +192,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   bool _isCurrentTrackFavorite = false;
   String? _lastTrackUri; // Track which track we last checked favorite status for
 
+  // Track active ImageStream listeners for proper cleanup on dispose
+  final Map<ImageStream, ImageStreamListener> _activeImageStreams = {};
+
   // Cached title height to avoid TextPainter.layout() every animation frame
   // Only invalidate when track name changes (screen width doesn't change during animation)
   double? _cachedExpandedTitleHeight;
@@ -409,6 +412,11 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     _volumePrecisionTimer?.cancel();
     _progressNotifier.dispose();
     _seekPositionNotifier.dispose();
+    // Clean up any active ImageStream listeners to prevent memory leaks
+    for (final entry in _activeImageStreams.entries) {
+      entry.key.removeListener(entry.value);
+    }
+    _activeImageStreams.clear();
     super.dispose();
   }
 
@@ -1692,9 +1700,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final imageStream = imageProvider.resolve(const ImageConfiguration());
     late ImageStreamListener listener;
 
+    void cleanupListener() {
+      imageStream.removeListener(listener);
+      _activeImageStreams.remove(imageStream);
+    }
+
     listener = ImageStreamListener(
       (ImageInfo info, bool synchronousCall) {
-        imageStream.removeListener(listener);
+        cleanupListener();
         if (mounted) {
           // Image is now in memory cache - safe to transition
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1703,18 +1716,20 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         }
       },
       onError: (exception, stackTrace) {
-        imageStream.removeListener(listener);
+        cleanupListener();
         // Even on error, complete the transition
         if (mounted) _completeTransition();
       },
     );
 
+    // Track the listener for cleanup on dispose
+    _activeImageStreams[imageStream] = listener;
     imageStream.addListener(listener);
 
     // Safety timeout - don't wait forever
     Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted && _inTransition) {
-        imageStream.removeListener(listener);
+      if (mounted && _inTransition && _activeImageStreams.containsKey(imageStream)) {
+        cleanupListener();
         _completeTransition();
       }
     });
