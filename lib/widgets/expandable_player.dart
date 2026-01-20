@@ -361,6 +361,16 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     }
   }
 
+  @override
+  void didUpdateWidget(ExpandablePlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload precision mode setting when device reveal becomes visible
+    // This ensures the setting is fresh after the user may have changed it
+    if (widget.isDeviceRevealVisible && !oldWidget.isDeviceRevealVisible) {
+      _loadVolumePrecisionModeSetting();
+    }
+  }
+
   void _enterVolumePrecisionMode() {
     if (_inVolumePrecisionMode) return;
     HapticFeedback.mediumImpact(); // Vibrate to indicate precision mode
