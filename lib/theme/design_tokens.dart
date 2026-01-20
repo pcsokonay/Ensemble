@@ -129,12 +129,30 @@ class Durations {
 class ButtonSizes {
   ButtonSizes._();
 
-  // Touch target sizes (Material Design minimum: 48x48)
+  // Touch target sizes
+  // WCAG 2.1 Level AA requires minimum 44x44, Level AAA requires 48x48
+  // Material Design recommends 48x48 minimum
+  // WARNING: sm and md are below WCAG minimum - use only for non-interactive elements
+
+  /// 32x32 - NOT WCAG compliant, use only for decorative/non-interactive elements
+  @Deprecated('Use xl (48x48) for touch targets to meet WCAG accessibility guidelines')
   static const double sm = 32.0;
+
+  /// 36x36 - NOT WCAG compliant, use only for dense layouts where space is critical
+  @Deprecated('Use xl (48x48) for touch targets to meet WCAG accessibility guidelines')
   static const double md = 36.0;
+
+  /// 44x44 - Meets WCAG Level AA minimum
   static const double lg = 44.0;
+
+  /// 48x48 - Meets WCAG Level AAA and Material Design recommended minimum
   static const double xl = 48.0;
+
+  /// 56x56 - Comfortable touch target for primary actions
   static const double xxl = 56.0;
+
+  /// Minimum WCAG-compliant touch target size (48x48)
+  static const double minAccessible = 48.0;
 
   // Icon sizes within buttons
   static const double iconSm = 16.0;

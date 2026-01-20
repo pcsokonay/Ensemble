@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../database/database.dart' show BatchCacheItem;
 import '../models/media_item.dart';
 import 'database_service.dart';
 import 'debug_logger.dart';
@@ -391,114 +392,84 @@ class SyncService with ChangeNotifier {
     }
   }
 
-  /// Save albums to database cache with source provider tracking
+  /// Save albums to database cache with source provider tracking (batched)
   Future<void> _saveAlbumsToCache(List<Album> albums, Map<String, List<String>> sourceProviders) async {
+    final batchItems = <BatchCacheItem>[];
     for (final album in albums) {
-      try {
-        final providers = sourceProviders[album.itemId];
-        // Save with first source provider (merging happens in DB layer)
-        for (final provider in providers ?? <String>[]) {
-          await _db.cacheItem(
-            itemType: 'album',
-            itemId: album.itemId,
-            data: album.toJson(),
-            sourceProvider: provider,
-          );
-        }
-        // If no source providers, still cache the item
-        if (providers == null || providers.isEmpty) {
-          await _db.cacheItem(
-            itemType: 'album',
-            itemId: album.itemId,
-            data: album.toJson(),
-          );
-        }
-      } catch (e) {
-        _logger.log('⚠️ Failed to cache album ${album.name}: $e');
-      }
+      final providers = sourceProviders[album.itemId] ?? <String>[];
+      batchItems.add(BatchCacheItem(
+        itemType: 'album',
+        itemId: album.itemId,
+        data: jsonEncode(album.toJson()),
+        sourceProviders: providers,
+      ));
     }
-    _logger.log('💾 Saved ${albums.length} albums to cache');
+    try {
+      await _db.batchCacheItems(batchItems);
+      _logger.log('💾 Batch saved ${albums.length} albums to cache');
+    } catch (e) {
+      _logger.log('⚠️ Failed to batch cache albums: $e');
+    }
   }
 
-  /// Save artists to database cache with source provider tracking
+  /// Save artists to database cache with source provider tracking (batched)
   Future<void> _saveArtistsToCache(List<Artist> artists, Map<String, List<String>> sourceProviders) async {
+    final batchItems = <BatchCacheItem>[];
     for (final artist in artists) {
-      try {
-        final providers = sourceProviders[artist.itemId];
-        for (final provider in providers ?? <String>[]) {
-          await _db.cacheItem(
-            itemType: 'artist',
-            itemId: artist.itemId,
-            data: artist.toJson(),
-            sourceProvider: provider,
-          );
-        }
-        if (providers == null || providers.isEmpty) {
-          await _db.cacheItem(
-            itemType: 'artist',
-            itemId: artist.itemId,
-            data: artist.toJson(),
-          );
-        }
-      } catch (e) {
-        _logger.log('⚠️ Failed to cache artist ${artist.name}: $e');
-      }
+      final providers = sourceProviders[artist.itemId] ?? <String>[];
+      batchItems.add(BatchCacheItem(
+        itemType: 'artist',
+        itemId: artist.itemId,
+        data: jsonEncode(artist.toJson()),
+        sourceProviders: providers,
+      ));
     }
-    _logger.log('💾 Saved ${artists.length} artists to cache');
+    try {
+      await _db.batchCacheItems(batchItems);
+      _logger.log('💾 Batch saved ${artists.length} artists to cache');
+    } catch (e) {
+      _logger.log('⚠️ Failed to batch cache artists: $e');
+    }
   }
 
-  /// Save audiobooks to database cache with source provider tracking
+  /// Save audiobooks to database cache with source provider tracking (batched)
   Future<void> _saveAudiobooksToCache(List<Audiobook> audiobooks, Map<String, List<String>> sourceProviders) async {
+    final batchItems = <BatchCacheItem>[];
     for (final audiobook in audiobooks) {
-      try {
-        final providers = sourceProviders[audiobook.itemId];
-        for (final provider in providers ?? <String>[]) {
-          await _db.cacheItem(
-            itemType: 'audiobook',
-            itemId: audiobook.itemId,
-            data: audiobook.toJson(),
-            sourceProvider: provider,
-          );
-        }
-        if (providers == null || providers.isEmpty) {
-          await _db.cacheItem(
-            itemType: 'audiobook',
-            itemId: audiobook.itemId,
-            data: audiobook.toJson(),
-          );
-        }
-      } catch (e) {
-        _logger.log('⚠️ Failed to cache audiobook ${audiobook.name}: $e');
-      }
+      final providers = sourceProviders[audiobook.itemId] ?? <String>[];
+      batchItems.add(BatchCacheItem(
+        itemType: 'audiobook',
+        itemId: audiobook.itemId,
+        data: jsonEncode(audiobook.toJson()),
+        sourceProviders: providers,
+      ));
     }
-    _logger.log('💾 Saved ${audiobooks.length} audiobooks to cache');
+    try {
+      await _db.batchCacheItems(batchItems);
+      _logger.log('💾 Batch saved ${audiobooks.length} audiobooks to cache');
+    } catch (e) {
+      _logger.log('⚠️ Failed to batch cache audiobooks: $e');
+    }
   }
 
-  /// Save playlists to database cache with source provider tracking
+  /// Save playlists to database cache with source provider tracking (batched)
   Future<void> _savePlaylistsToCache(List<Playlist> playlists, Map<String, List<String>> sourceProviders) async {
+    final batchItems = <BatchCacheItem>[];
     for (final playlist in playlists) {
-      try {
-        final providers = sourceProviders[playlist.itemId];
-        for (final provider in providers ?? <String>[]) {
-          await _db.cacheItem(
-            itemType: 'playlist',
-            itemId: playlist.itemId,
-            data: playlist.toJson(),
-            sourceProvider: provider,
-          );
-        }
-        if (providers == null || providers.isEmpty) {
-          await _db.cacheItem(
-            itemType: 'playlist',
-            itemId: playlist.itemId,
-            data: playlist.toJson(),
-          );
-        }
-      } catch (e) {
-        _logger.log('⚠️ Failed to cache playlist ${playlist.name}: $e');
-      }
+      final providers = sourceProviders[playlist.itemId] ?? <String>[];
+      batchItems.add(BatchCacheItem(
+        itemType: 'playlist',
+        itemId: playlist.itemId,
+        data: jsonEncode(playlist.toJson()),
+        sourceProviders: providers,
+      ));
     }
-    _logger.log('💾 Saved ${playlists.length} playlists to cache');
+    try {
+      await _db.batchCacheItems(batchItems);
+      _logger.log('💾 Batch saved ${playlists.length} playlists to cache');
+    } catch (e) {
+      _logger.log('⚠️ Failed to batch cache playlists: $e');
+    }
   }
 
   /// Force a fresh sync (for pull-to-refresh)

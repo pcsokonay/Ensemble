@@ -695,4 +695,66 @@ class AppDatabase extends _$AppDatabase {
   Future<void> clearSearchHistory() async {
     await delete(searchHistory).go();
   }
+
+  // ============================================
+  // Batch Cache Operations
+  // ============================================
+
+  /// Batch size for chunked inserts to prevent SQLite limits
+  static const int _batchChunkSize = 500;
+
+  /// Batch cache multiple items efficiently using drift batch API
+  /// This is much faster than individual inserts for large datasets.
+  /// Items are chunked into batches of 500 to prevent SQLite variable limits.
+  ///
+  /// [items] - List of items to cache, each containing:
+  ///   - itemType: 'album', 'artist', 'track', 'playlist', 'audiobook', etc.
+  ///   - itemId: the item's ID
+  ///   - data: JSON string of the item
+  ///   - sourceProviders: list of provider instance IDs
+  Future<void> batchCacheItems(List<BatchCacheItem> items) async {
+    if (items.isEmpty) return;
+
+    // Process in chunks to avoid SQLite variable limits
+    for (var i = 0; i < items.length; i += _batchChunkSize) {
+      final chunk = items.skip(i).take(_batchChunkSize).toList();
+
+      await batch((b) {
+        for (final item in chunk) {
+          final cacheKey = '${item.itemType}_${item.itemId}';
+          final sourceProvidersJson = item.sourceProviders.isEmpty
+              ? '[]'
+              : '[${item.sourceProviders.map((p) => '"$p"').join(',')}]';
+
+          b.insert(
+            libraryCache,
+            LibraryCacheCompanion.insert(
+              cacheKey: cacheKey,
+              itemType: item.itemType,
+              itemId: item.itemId,
+              data: item.data,
+              lastSynced: DateTime.now(),
+              sourceProviders: Value(sourceProvidersJson),
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+      });
+    }
+  }
+}
+
+/// Data class for batch cache operations
+class BatchCacheItem {
+  final String itemType;
+  final String itemId;
+  final String data;
+  final List<String> sourceProviders;
+
+  const BatchCacheItem({
+    required this.itemType,
+    required this.itemId,
+    required this.data,
+    this.sourceProviders = const [],
+  });
 }

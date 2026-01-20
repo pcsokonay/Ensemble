@@ -10,4 +10,7 @@ class NetworkConstants {
 
   /// Default HTTP port
   static const int defaultHttpPort = 80;
+
+  /// Maximum number of pending WebSocket requests to prevent memory leaks
+  static const int maxPendingRequests = 100;
 }

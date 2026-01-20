@@ -80,13 +80,15 @@ class MusicAssistantAPI {
       return;
     }
 
-    // If connection is in progress, wait for it instead of starting another
+    // Atomic check-and-set: create new completer first, then check if one exists
+    // This ensures no async operations happen between check and set
+    final newCompleter = Completer<void>();
     if (_connectionInProgress != null && !_connectionInProgress!.isCompleted) {
       _logger.log('Connection already in progress, waiting...');
       return _connectionInProgress!.future;
     }
-
-    _connectionInProgress = Completer<void>();
+    // Set immediately before any async operations to close the race window
+    _connectionInProgress = newCompleter;
 
     try {
       _updateConnectionState(MAConnectionState.connecting);
@@ -343,6 +345,14 @@ class MusicAssistantAPI {
       if (!allowedStates.contains(_currentState)) {
         throw Exception('Not connected to Music Assistant server');
       }
+    }
+
+    // Prevent memory leaks by limiting pending requests
+    if (_pendingRequests.length >= NetworkConstants.maxPendingRequests) {
+      throw Exception(
+        'Too many pending requests (${_pendingRequests.length}). '
+        'Please wait for existing requests to complete.',
+      );
     }
 
     final messageId = _uuid.v4();
@@ -3594,6 +3604,9 @@ class MusicAssistantAPI {
       _logger.log('Reconnect: Connection already in progress, skipping');
       return;
     }
+
+    // Cancel all pending requests before reconnecting to prevent memory leaks
+    _cancelPendingRequests('Connection lost, reconnecting');
 
     await Future.delayed(Timings.reconnectDelay);
 

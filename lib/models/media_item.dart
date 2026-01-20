@@ -126,6 +126,17 @@ class MediaItem {
       if (duration != null) 'duration': duration!.inSeconds,
     };
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MediaItem &&
+          runtimeType == other.runtimeType &&
+          itemId == other.itemId &&
+          provider == other.provider;
+
+  @override
+  int get hashCode => Object.hash(itemId, provider);
 }
 
 class Artist extends MediaItem {

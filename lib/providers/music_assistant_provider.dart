@@ -4335,6 +4335,10 @@ class MusicAssistantProvider with ChangeNotifier {
   Future<void> _updatePlayerState() async {
     if (_selectedPlayer == null || _api == null) return;
 
+    // Capture player ID at start to detect stale operations
+    // If player changes during async operations, we should abort
+    final operationPlayerId = _selectedPlayer!.playerId;
+
     try {
       bool stateChanged = false;
 
@@ -4353,6 +4357,13 @@ class MusicAssistantProvider with ChangeNotifier {
 
       // Try to refresh from API first for latest state
       final allPlayers = await getPlayers();
+
+      // Check for stale operation - player may have changed during async call
+      if (_selectedPlayer?.playerId != operationPlayerId) {
+        _logger.log('⚠️ _updatePlayerState: Player changed during operation, aborting');
+        return;
+      }
+
       Player? rawPlayer = allPlayers.firstWhere(
         (p) => p.playerId == selectedId ||
                (translatedSendspinId != null && p.playerId == translatedSendspinId) ||
@@ -4462,6 +4473,12 @@ class MusicAssistantProvider with ChangeNotifier {
       }
 
       final queue = await getQueue(_selectedPlayer!.playerId);
+
+      // Check for stale operation - player may have changed during async call
+      if (_selectedPlayer?.playerId != operationPlayerId) {
+        _logger.log('⚠️ _updatePlayerState: Player changed during getQueue, aborting');
+        return;
+      }
 
       if (queue != null && queue.currentItem != null) {
         final queueTrack = queue.currentItem!.track;

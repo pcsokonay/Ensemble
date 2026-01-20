@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/timings.dart';
+import '../utils/duration_formatter.dart';
 import '../providers/music_assistant_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../models/player.dart';
@@ -192,6 +193,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   bool _isCurrentTrackFavorite = false;
   String? _lastTrackUri; // Track which track we last checked favorite status for
 
+  // Track active ImageStream listeners for proper cleanup on dispose
+  final Map<ImageStream, ImageStreamListener> _activeImageStreams = {};
+
   // Cached title height to avoid TextPainter.layout() every animation frame
   // Only invalidate when track name changes (screen width doesn't change during animation)
   double? _cachedExpandedTitleHeight;
@@ -357,6 +361,16 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     }
   }
 
+  @override
+  void didUpdateWidget(ExpandablePlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload precision mode setting when device reveal becomes visible
+    // This ensures the setting is fresh after the user may have changed it
+    if (widget.isDeviceRevealVisible && !oldWidget.isDeviceRevealVisible) {
+      _loadVolumePrecisionModeSetting();
+    }
+  }
+
   void _enterVolumePrecisionMode() {
     if (_inVolumePrecisionMode) return;
     HapticFeedback.mediumImpact(); // Vibrate to indicate precision mode
@@ -395,6 +409,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
   @override
   void dispose() {
+    // Explicitly remove listeners before disposing controllers
+    // (Controllers remove listeners on dispose, but explicit removal is clearer)
+    _controller.removeListener(_notifyExpansionProgress);
+    _controller.removeListener(_recordAnimationFrame);
+    _lyricsScrollController.removeListener(_onLyricsScroll);
+
     _controller.dispose();
     _queuePanelController.dispose();
     _sleepTimerPanelController.dispose();
@@ -409,6 +429,11 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     _volumePrecisionTimer?.cancel();
     _progressNotifier.dispose();
     _seekPositionNotifier.dispose();
+    // Clean up any active ImageStream listeners to prevent memory leaks
+    for (final entry in _activeImageStreams.entries) {
+      entry.key.removeListener(entry.value);
+    }
+    _activeImageStreams.clear();
     super.dispose();
   }
 
@@ -791,19 +816,6 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final maProvider = context.read<MusicAssistantProvider>();
     await maProvider.setRepeatMode(_queue!.playerId, nextMode);
     await _loadQueue();
-  }
-
-  String _formatDuration(int seconds) {
-    final duration = Duration(seconds: seconds);
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes % 60;
-    final secs = duration.inSeconds % 60;
-
-    // For audiobooks and long content (>= 1 hour), show hours
-    if (hours > 0) {
-      return '${hours}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
-    }
-    return '${minutes.toString().padLeft(1, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   void _toggleQueuePanel() {
@@ -1692,9 +1704,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final imageStream = imageProvider.resolve(const ImageConfiguration());
     late ImageStreamListener listener;
 
+    void cleanupListener() {
+      imageStream.removeListener(listener);
+      _activeImageStreams.remove(imageStream);
+    }
+
     listener = ImageStreamListener(
       (ImageInfo info, bool synchronousCall) {
-        imageStream.removeListener(listener);
+        cleanupListener();
         if (mounted) {
           // Image is now in memory cache - safe to transition
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1703,18 +1720,20 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         }
       },
       onError: (exception, stackTrace) {
-        imageStream.removeListener(listener);
+        cleanupListener();
         // Even on error, complete the transition
         if (mounted) _completeTransition();
       },
     );
 
+    // Track the listener for cleanup on dispose
+    _activeImageStreams[imageStream] = listener;
     imageStream.addListener(listener);
 
     // Safety timeout - don't wait forever
     Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted && _inTransition) {
-        imageStream.removeListener(listener);
+      if (mounted && _inTransition && _activeImageStreams.containsKey(imageStream)) {
+        cleanupListener();
         _completeTransition();
       }
     });
@@ -2863,7 +2882,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          _formatDuration(currentProgress.toInt()),
+                                          formatDurationSeconds(currentProgress.toInt()),
                                           style: TextStyle(
                                             color: textColor50, // PERF: Use cached color
                                             fontSize: 13, // Increased from 11 to 13
@@ -2872,7 +2891,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                                           ),
                                         ),
                                         Text(
-                                          _formatDuration(currentTrack.duration!.inSeconds),
+                                          formatDurationSeconds(currentTrack.duration!.inSeconds),
                                           style: TextStyle(
                                             color: textColor50, // PERF: Use cached color
                                             fontSize: 13, // Increased from 11 to 13
