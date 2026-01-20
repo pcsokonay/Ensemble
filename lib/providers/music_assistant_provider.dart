@@ -79,6 +79,10 @@ class MusicAssistantProvider with ChangeNotifier {
   int? _sleepTimerMinutes; // null = off, -1 = end of track, positive = minutes
   Timer? _sleepTimerDisplayTimer; // Updates remaining time display every second
 
+  // Idle service timeout - stops foreground service after 30 min of no playback
+  Timer? _idleServiceTimer;
+  static const _idleServiceTimeout = Duration(minutes: 30);
+
   // Local player state
   bool _isLocalPlayerPowered = true;
   int _localPlayerVolume = 100; // Tracked MA volume for builtin player (0-100)
@@ -2363,6 +2367,7 @@ class MusicAssistantProvider with ChangeNotifier {
     );
 
     // Initialize notification with position 0
+    _cancelIdleServiceTimer();
     audioHandler.setRemotePlaybackState(
       item: mediaItem,
       playing: true,
@@ -2403,6 +2408,7 @@ class MusicAssistantProvider with ChangeNotifier {
     );
 
     // Show paused state with preserved position
+    _cancelIdleServiceTimer();
     audioHandler.setRemotePlaybackState(
       item: mediaItem,
       playing: false,
@@ -3973,6 +3979,7 @@ class MusicAssistantProvider with ChangeNotifier {
       } else {
         // Builtin player is idle - clear notification (fixes issue #42)
         audioHandler.clearRemotePlaybackState();
+        _startIdleServiceTimer();
       }
     } else {
       // For remote players, immediately show notification if we have cached track info
@@ -3994,6 +4001,7 @@ class MusicAssistantProvider with ChangeNotifier {
         );
         // Use position tracker for consistent position
         final position = _positionTracker.currentPosition;
+        _cancelIdleServiceTimer();
         audioHandler.setRemotePlaybackState(
           item: mediaItem,
           playing: player.state == 'playing',
@@ -4009,6 +4017,7 @@ class MusicAssistantProvider with ChangeNotifier {
           artist: 'Loading...',
         );
         final position = _positionTracker.currentPosition;
+        _cancelIdleServiceTimer();
         audioHandler.setRemotePlaybackState(
           item: mediaItem,
           playing: player.state == 'playing',
@@ -4019,6 +4028,7 @@ class MusicAssistantProvider with ChangeNotifier {
         // Player is idle - clear the notification to prevent stale metadata
         // from previous player showing (fixes issue #42)
         audioHandler.clearRemotePlaybackState();
+        _startIdleServiceTimer();
       }
     }
 
@@ -4172,6 +4182,7 @@ class MusicAssistantProvider with ChangeNotifier {
       artUri: artworkUrl != null ? Uri.tryParse(artworkUrl) : null,
     );
 
+    _cancelIdleServiceTimer();
     audioHandler.setRemotePlaybackState(
       item: mediaItem,
       playing: isPlaying,
@@ -4356,6 +4367,26 @@ class MusicAssistantProvider with ChangeNotifier {
     _updatePlayerState();
   }
 
+  /// Start the idle service timer - stops foreground service after 30 min of no playback
+  /// Called when playback stops (player state becomes idle)
+  void _startIdleServiceTimer() {
+    _idleServiceTimer?.cancel();
+    _logger.log('⏱️ Starting idle service timer (${_idleServiceTimeout.inMinutes} min)');
+    _idleServiceTimer = Timer(_idleServiceTimeout, () {
+      _logger.log('⏱️ Idle service timeout reached - stopping foreground service');
+      audioHandler.stopService();
+    });
+  }
+
+  /// Cancel the idle service timer - called when playback starts
+  void _cancelIdleServiceTimer() {
+    if (_idleServiceTimer?.isActive == true) {
+      _logger.log('⏱️ Cancelling idle service timer (playback resumed)');
+      _idleServiceTimer?.cancel();
+      _idleServiceTimer = null;
+    }
+  }
+
   Future<void> _updatePlayerState() async {
     if (_selectedPlayer == null || _api == null) return;
 
@@ -4444,6 +4475,7 @@ class MusicAssistantProvider with ChangeNotifier {
         }
         // Clear notification for external source
         audioHandler.clearRemotePlaybackState();
+        _startIdleServiceTimer();
         if (stateChanged) {
           notifyListeners();
         }
@@ -4630,6 +4662,7 @@ class MusicAssistantProvider with ChangeNotifier {
           );
           // Use position tracker for consistent position (single source of truth)
           final position = _positionTracker.currentPosition;
+          _cancelIdleServiceTimer();
           audioHandler.setRemotePlaybackState(
             item: mediaItem,
             playing: _selectedPlayer!.state == 'playing',
@@ -4664,6 +4697,7 @@ class MusicAssistantProvider with ChangeNotifier {
             );
           } else {
             final position = _positionTracker.currentPosition;
+            _cancelIdleServiceTimer();
             audioHandler.setRemotePlaybackState(
               item: mediaItem,
               playing: _selectedPlayer!.state == 'playing',
@@ -4673,6 +4707,7 @@ class MusicAssistantProvider with ChangeNotifier {
           }
         } else {
           audioHandler.clearRemotePlaybackState();
+          _startIdleServiceTimer();
           _positionTracker.clear();
         }
       }
@@ -5877,6 +5912,7 @@ class MusicAssistantProvider with ChangeNotifier {
     _localPlayerStateReportTimer?.cancel();
     _sleepTimer?.cancel();
     _sleepTimerDisplayTimer?.cancel();
+    _idleServiceTimer?.cancel();
     _connectionStateSubscription?.cancel();
     _localPlayerEventSubscription?.cancel();
     _playerUpdatedEventSubscription?.cancel();

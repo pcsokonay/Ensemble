@@ -157,6 +157,17 @@ class MassivAudioHandler extends BaseAudioHandler with SeekHandler {
     // Note: We don't actually stop playback - this button is repurposed for player switching
   }
 
+  /// Fully stop the foreground service and release resources
+  /// Called after idle timeout to save battery
+  Future<void> stopService() async {
+    _logger.log('MassivAudioHandler: Stopping foreground service (idle timeout)');
+    _isRemoteMode = false;
+    _currentMediaItem = null;
+    await _player.stop();
+    // Call the base stop() to properly stop the foreground service
+    await super.stop();
+  }
+
   @override
   Future<void> seek(Duration position) => _player.seek(position);
 
