@@ -223,8 +223,9 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
     }
 
     // Then check expanded player
+    // No haptic - Android back gesture provides its own
     if (GlobalPlayerOverlay.isPlayerExpanded) {
-      GlobalPlayerOverlay.collapsePlayer();
+      GlobalPlayerOverlay.collapsePlayer(withHaptic: false);
       return true; // We handled it, don't let Navigator process it
     }
 

@@ -1084,6 +1084,51 @@ class MusicAssistantAPI {
     }
   }
 
+  /// Get lyrics for a track
+  /// Returns the lyrics text if available, null otherwise
+  /// Uses the dedicated metadata/get_track_lyrics endpoint
+  Future<String?> getTrackLyrics(Map<String, dynamic> track) async {
+    try {
+      _logger.log('🎤 Getting lyrics for track: ${track['name']}');
+
+      // Use the dedicated lyrics endpoint
+      final response = await _sendCommand(
+        'metadata/get_track_lyrics',
+        args: {
+          'track': track,
+        },
+      );
+
+      if (response.containsKey('error_code')) {
+        _logger.log('🎤 Error getting lyrics: ${response['error_code']}');
+        return null;
+      }
+
+      // Result is a tuple: [plain_lyrics, synced_lyrics]
+      // We prefer synced lyrics if available, otherwise plain
+      final result = response['result'];
+      if (result is List && result.length >= 2) {
+        final plainLyrics = result[0] as String?;
+        final syncedLyrics = result[1] as String?;
+
+        if (syncedLyrics != null && syncedLyrics.isNotEmpty) {
+          _logger.log('🎤 Found synced lyrics: ${syncedLyrics.length} chars');
+          return syncedLyrics;
+        }
+        if (plainLyrics != null && plainLyrics.isNotEmpty) {
+          _logger.log('🎤 Found plain lyrics: ${plainLyrics.length} chars');
+          return plainLyrics;
+        }
+      }
+
+      _logger.log('🎤 No lyrics found in result: $result');
+      return null;
+    } catch (e) {
+      _logger.log('🎤 Error getting lyrics: $e');
+      return null;
+    }
+  }
+
   /// Browse Music Assistant content by path
   /// Returns a list of browse items (folders or media items)
   Future<List<dynamic>> browse(String? path) async {

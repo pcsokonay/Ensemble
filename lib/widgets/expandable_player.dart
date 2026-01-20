@@ -15,6 +15,8 @@ import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../services/settings_service.dart';
+import '../services/metadata_service.dart';
+import '../services/debug_logger.dart';
 import '../screens/artist_details_screen.dart';
 import '../screens/album_details_screen.dart';
 import '../utils/page_transitions.dart';
@@ -62,6 +64,8 @@ class ExpandablePlayer extends StatefulWidget {
 
 class ExpandablePlayerState extends State<ExpandablePlayer>
     with TickerProviderStateMixin {
+  final DebugLogger _logger = DebugLogger();
+
   late AnimationController _controller;
   late Animation<double> _expandAnimation;
 
@@ -82,6 +86,32 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   bool _isLoadingQueue = false;
   bool _isQueueDragging = false; // True while queue item is being dragged
   bool _queuePanelTargetOpen = false; // Target state for queue panel (separate from animation value)
+
+  // Sleep timer panel animation
+  late AnimationController _sleepTimerPanelController;
+  late Animation<Offset> _sleepTimerSlideAnimation;
+  bool _sleepTimerPanelVisible = false; // Track visibility state explicitly
+  bool _sleepTimerPanelTargetOpen = false; // Target state for back gesture handling
+  bool _isClosingSleepTimerPanel = false; // Guard against double back gesture
+
+  // Lyrics panel animation
+  late AnimationController _lyricsPanelController;
+  late Animation<Offset> _lyricsSlideAnimation;
+  bool _lyricsPanelVisible = false;
+  bool _lyricsPanelTargetOpen = false; // Target state for back gesture handling
+  bool _isClosingLyricsPanel = false; // Guard against double back gesture
+  String? _currentLyrics; // Cached lyrics for current track
+  bool _isLoadingLyrics = false;
+  String? _lyricsTrackId; // Track ID for which lyrics were fetched
+  List<_LyricLine>? _parsedLyrics; // Parsed synced lyrics with timestamps
+  int _currentLyricIndex = -1; // Currently active lyric line
+  final ScrollController _lyricsScrollController = ScrollController();
+  StreamSubscription<Duration>? _lyricsPositionSubscription;
+  bool _userScrollingLyrics = false; // True when user is manually scrolling
+  bool _isLyricsAtTop = true; // Track scroll position for swipe-to-close
+  bool _wasLyricsAtTopOnSwipeStart = true; // Capture scroll position when swipe starts
+  Offset? _lyricsSwipeStart; // Starting position of swipe gesture
+  bool _isSwipingLyricsContent = false; // True during active swipe-to-close gesture
 
   // Progress tracking - uses PositionTracker stream as single source of truth
   StreamSubscription<Duration>? _positionSubscription;
@@ -114,6 +144,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
   // Track horizontal drag start position
   double? _horizontalDragStartX;
+
+  // Track vertical drag start position (for bottom dead zone - Android app switcher)
+  double? _verticalDragStartY;
+  static const _bottomDeadZone = 80.0; // Dead zone for Android nav gestures
 
   // Slide animation for device switching - now supports finger-following
   late AnimationController _slideController;
@@ -200,6 +234,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   @override
   void initState() {
     super.initState();
+
+    // Reset expansion notifier to match initial controller state (0.0)
+    // This fixes a bug where stale progress values from a previous widget instance
+    // caused the nav bar to be invisible on app restart/widget recreation
+    playerExpansionNotifier.value = PlayerExpansionState(0.0, null, null);
+
     _controller = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -236,10 +276,41 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Use controller directly - spring physics provide the easing
     _queuePanelAnimation = _queuePanelController;
     // Cache the slide animation to avoid recreating Tween.animate() every frame
+    // Queue slides up from bottom (0, 1) instead of from right (1, 0)
     _queueSlideAnimation = Tween<Offset>(
-      begin: const Offset(1, 0),
+      begin: const Offset(0, 1),
       end: Offset.zero,
     ).animate(_queuePanelController);
+
+    // Sleep timer panel animation - uses same spring physics as queue panel
+    _sleepTimerPanelController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    // Ensure value is exactly 0 when dismissed (spring may not settle exactly)
+    _sleepTimerPanelController.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed && _sleepTimerPanelController.value != 0) {
+        _sleepTimerPanelController.value = 0;
+      }
+    });
+    // Use controller directly - spring physics provide the easing (same as queue)
+    _sleepTimerSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(_sleepTimerPanelController);
+
+    // Lyrics panel animation - same mechanics as sleep timer and queue
+    _lyricsPanelController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _lyricsSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(_lyricsPanelController);
+
+    // Track lyrics scroll position for swipe-to-close (only allowed at top)
+    _lyricsScrollController.addListener(_onLyricsScroll);
 
     // Slide animation for device switching - used for snap/spring animations
     _slideController = AnimationController(
@@ -326,10 +397,14 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   void dispose() {
     _controller.dispose();
     _queuePanelController.dispose();
+    _sleepTimerPanelController.dispose();
+    _lyricsPanelController.dispose();
     _slideController.dispose();
     _slideOffsetNotifier.dispose();
     _positionSubscription?.cancel();
     _queueItemsSubscription?.cancel();
+    _lyricsPositionSubscription?.cancel();
+    _lyricsScrollController.dispose();
     _queueRefreshTimer?.cancel();
     _volumePrecisionTimer?.cancel();
     _progressNotifier.dispose();
@@ -360,6 +435,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
   void expand() {
     if (_isVerticalDragging) return;
+    HapticFeedback.lightImpact();
     AnimationDebugger.startSession('playerExpand');
     _controller.duration = _expandDuration;
     _controller.forward().then((_) {
@@ -367,13 +443,28 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     });
   }
 
-  void collapse() {
+  void collapse({bool withHaptic = true}) {
+    _logger.log('🔙 collapse() called with withHaptic=$withHaptic');
     if (_isVerticalDragging) return;
-    // If queue panel is open, close it first instead of collapsing player
-    // This prevents both from closing on a single back press
-    if (isQueuePanelOpen) {
-      closeQueuePanel();
+    // If any panel is still animating closed, don't collapse yet
+    // This prevents double back gesture from closing both panel and player
+    // Uses animation value (not boolean flag) because animation lags behind flag
+    // Note: withHaptic: false prevents double haptic when back gesture is used rapidly
+    if (_lyricsPanelController.value > 0.1) {
+      _closeLyricsPanel(withHaptic: false);
       return;
+    }
+    if (_sleepTimerPanelController.value > 0.1) {
+      _closeSleepTimerPanel(withHaptic: false);
+      return;
+    }
+    if (isQueuePanelOpen) {
+      closeQueuePanel(withHaptic: false);
+      return;
+    }
+    if (withHaptic) {
+      _logger.log('🔙 collapse() triggering haptic');
+      HapticFeedback.lightImpact();
     }
     AnimationDebugger.startSession('playerCollapse');
     // Instantly hide queue panel when collapsing to avoid visual glitches
@@ -443,6 +534,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Animate to target with appropriate duration
     if (shouldExpand) {
       if (currentValue < 1.0) {
+        HapticFeedback.lightImpact();
         AnimationDebugger.startSession('playerExpand');
         _controller.duration = _expandDuration;
         _controller.forward().then((_) {
@@ -451,9 +543,23 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
       }
     } else {
       if (currentValue > 0.0) {
+        HapticFeedback.lightImpact();
         AnimationDebugger.startSession('playerCollapse');
         _queuePanelController.value = 0;
         _queuePanelTargetOpen = false;
+        // Close sleep timer panel when collapsing
+        if (_sleepTimerPanelVisible) {
+          _sleepTimerPanelVisible = false;
+          _sleepTimerPanelTargetOpen = false;
+          _sleepTimerPanelController.value = 0;
+        }
+        // Close lyrics panel when collapsing
+        if (_lyricsPanelVisible) {
+          _stopLyricsSync();
+          _lyricsPanelVisible = false;
+          _lyricsPanelTargetOpen = false;
+          _lyricsPanelController.value = 0;
+        }
         _controller.duration = _collapseDuration;
         _controller.reverse().then((_) {
           AnimationDebugger.endSession();
@@ -489,12 +595,15 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   }
 
   void _subscribeToPositionTracker() {
+    _logger.log('📊 _subscribeToPositionTracker called, existing subscription=${_positionSubscription != null}');
     _positionSubscription?.cancel();
     // Subscribe to position tracker stream - single source of truth
     // This eliminates race conditions between multiple timers
     final maProvider = context.read<MusicAssistantProvider>();
+    _logger.log('📊 Subscribing to positionStream for progress bar');
     _positionSubscription = maProvider.positionTracker.positionStream.listen((position) {
       if (!mounted) return;
+      _logger.log('📊 Progress received position: ${position.inSeconds}s');
       _progressNotifier.value = position.inSeconds;
     });
   }
@@ -700,6 +809,19 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   /// Open queue panel with spring physics for natural feel
   void _openQueuePanelWithSpring() {
     HapticFeedback.lightImpact();
+    // Close sleep timer panel instantly if open
+    if (_sleepTimerPanelVisible) {
+      _sleepTimerPanelVisible = false;
+      _sleepTimerPanelTargetOpen = false;
+      _sleepTimerPanelController.value = 0;
+    }
+    // Close lyrics panel instantly if open
+    if (_lyricsPanelVisible) {
+      _stopLyricsSync();
+      _lyricsPanelVisible = false;
+      _lyricsPanelTargetOpen = false;
+      _lyricsPanelController.value = 0;
+    }
     // setState ensures PopScope rebuilds with correct canPop value
     setState(() {
       _queuePanelTargetOpen = true;
@@ -746,6 +868,363 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   /// Whether queue panel is intended to be open (target state, not animation value)
   /// Use this for back gesture handling to avoid timing issues during animations
   bool get isQueuePanelTargetOpen => _queuePanelTargetOpen;
+
+  // Sleep timer panel controls
+  bool get isSleepTimerPanelOpen => _sleepTimerPanelVisible;
+
+  void _toggleSleepTimerPanel() {
+    // Don't check isAnimating - allow toggle even during animation
+    // The state variable tracks intent, animation will catch up
+    if (!_sleepTimerPanelVisible) {
+      _openSleepTimerPanel();
+    } else {
+      _closeSleepTimerPanel();
+    }
+  }
+
+  void _openSleepTimerPanel() {
+    HapticFeedback.lightImpact();
+    // Close queue panel instantly if open
+    if (_queuePanelTargetOpen) {
+      _queuePanelTargetOpen = false;
+      _queuePanelController.value = 0;
+    }
+    // Close lyrics panel instantly if open
+    if (_lyricsPanelTargetOpen) {
+      _stopLyricsSync();
+      _lyricsPanelTargetOpen = false;
+      _lyricsPanelVisible = false;
+      _lyricsPanelController.value = 0;
+    }
+    setState(() {
+      _sleepTimerPanelVisible = true;
+      _sleepTimerPanelTargetOpen = true;
+    });
+    // Use same spring physics as queue panel
+    final simulation = SpringSimulation(
+      _queueSpring,
+      _sleepTimerPanelController.value,
+      1.0,
+      0.0,
+    );
+    _sleepTimerPanelController.animateWith(simulation);
+  }
+
+  void _closeSleepTimerPanel({double velocity = 0.0, bool withHaptic = true}) {
+    // Set guard flag immediately to prevent double back gesture
+    _isClosingSleepTimerPanel = true;
+    setState(() {
+      _sleepTimerPanelVisible = false;
+      _sleepTimerPanelTargetOpen = false;
+    });
+    if (withHaptic) {
+      HapticFeedback.lightImpact();
+    }
+    // Use same spring physics as queue panel close
+    const closeSpring = SpringDescription(
+      mass: 1.0,
+      stiffness: 600.0,
+      damping: 52.0,
+    );
+    final simulation = SpringSimulation(
+      closeSpring,
+      _sleepTimerPanelController.value,
+      0.0,
+      velocity,
+    );
+    _sleepTimerPanelController.animateWith(simulation);
+    // Clear guard flag when animation completes
+    void onStatus(AnimationStatus status) {
+      if (status == AnimationStatus.dismissed) {
+        _isClosingSleepTimerPanel = false;
+        _sleepTimerPanelController.removeStatusListener(onStatus);
+      }
+    }
+    _sleepTimerPanelController.addStatusListener(onStatus);
+  }
+
+  // Lyrics panel controls
+  bool get isLyricsPanelOpen => _lyricsPanelVisible;
+
+  void _toggleLyricsPanel() {
+    if (!_lyricsPanelVisible) {
+      _openLyricsPanel();
+    } else {
+      _closeLyricsPanel();
+    }
+  }
+
+  void _openLyricsPanel() {
+    HapticFeedback.lightImpact();
+    // Close queue panel instantly if open
+    if (_queuePanelTargetOpen) {
+      _queuePanelTargetOpen = false;
+      _queuePanelController.value = 0;
+    }
+    // Close sleep timer panel if open
+    if (_sleepTimerPanelTargetOpen) {
+      _sleepTimerPanelTargetOpen = false;
+      _sleepTimerPanelVisible = false;
+      _sleepTimerPanelController.value = 0;
+    }
+    setState(() {
+      _lyricsPanelVisible = true;
+      _lyricsPanelTargetOpen = true;
+    });
+    // Fetch lyrics for current track if not already loaded
+    _fetchLyricsIfNeeded();
+    // Start sync if lyrics are already loaded
+    if (_hasSyncedLyrics) {
+      _startLyricsSync();
+    }
+    // Use same spring physics as queue panel
+    final simulation = SpringSimulation(
+      _queueSpring,
+      _lyricsPanelController.value,
+      1.0,
+      0.0,
+    );
+    _lyricsPanelController.animateWith(simulation);
+  }
+
+  void _closeLyricsPanel({double velocity = 0.0, bool withHaptic = true}) {
+    // Set guard flag immediately to prevent double back gesture
+    _isClosingLyricsPanel = true;
+    // Stop lyrics sync
+    _stopLyricsSync();
+    setState(() {
+      _lyricsPanelVisible = false;
+      _lyricsPanelTargetOpen = false;
+    });
+    if (withHaptic) {
+      HapticFeedback.lightImpact();
+    }
+    const closeSpring = SpringDescription(
+      mass: 1.0,
+      stiffness: 600.0,
+      damping: 52.0,
+    );
+    final simulation = SpringSimulation(
+      closeSpring,
+      _lyricsPanelController.value,
+      0.0,
+      velocity,
+    );
+    _lyricsPanelController.animateWith(simulation);
+    // Clear guard flag when animation completes
+    void onStatus(AnimationStatus status) {
+      if (status == AnimationStatus.dismissed) {
+        _isClosingLyricsPanel = false;
+        _lyricsPanelController.removeStatusListener(onStatus);
+      }
+    }
+    _lyricsPanelController.addStatusListener(onStatus);
+  }
+
+  Future<void> _fetchLyricsIfNeeded() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final currentTrack = maProvider.currentTrack;
+    if (currentTrack == null) return;
+
+    final trackId = currentTrack.uri ?? currentTrack.itemId;
+
+    // Skip if already loaded for this track
+    if (_lyricsTrackId == trackId && _currentLyrics != null) return;
+
+    setState(() {
+      _isLoadingLyrics = true;
+      _currentLyrics = null;
+      _parsedLyrics = null;
+      _currentLyricIndex = -1;
+    });
+
+    try {
+      // Try to fetch lyrics via Music Assistant API first
+      String? lyrics = await maProvider.api?.getTrackLyrics(
+        currentTrack.toJson(),
+      );
+
+      // If MA didn't return lyrics, try LRCLIB as fallback
+      if (lyrics == null || lyrics.isEmpty) {
+        final artistName = currentTrack.artists?.firstOrNull?.name ?? '';
+        final albumName = currentTrack.album?.name;
+        final durationSeconds = currentTrack.duration?.inSeconds;
+
+        if (artistName.isNotEmpty) {
+          final lrclibResult = await MetadataService.getTrackLyrics(
+            trackName: currentTrack.name,
+            artistName: artistName,
+            albumName: albumName,
+            durationSeconds: durationSeconds,
+          );
+
+          if (lrclibResult != null) {
+            // Prefer synced lyrics, fall back to plain
+            final (plainLyrics, syncedLyrics) = lrclibResult;
+            lyrics = syncedLyrics ?? plainLyrics;
+          }
+        }
+      }
+
+      if (mounted) {
+        final parsed = lyrics != null ? _parseLyrics(lyrics) : null;
+        setState(() {
+          _currentLyrics = lyrics;
+          _parsedLyrics = parsed;
+          _lyricsTrackId = trackId;
+          _isLoadingLyrics = false;
+          _currentLyricIndex = -1;
+        });
+        // Start syncing if we have synced lyrics
+        if (parsed != null) {
+          _startLyricsSync();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _currentLyrics = null;
+          _parsedLyrics = null;
+          _lyricsTrackId = trackId;
+          _isLoadingLyrics = false;
+        });
+      }
+    }
+  }
+
+  /// Parse LRC formatted lyrics into structured data with timestamps
+  /// Returns null if lyrics are not in synced LRC format
+  List<_LyricLine>? _parseLyrics(String lyrics) {
+    final timestampPattern = RegExp(r'^\[(\d{2}):(\d{2})\.(\d{2,3})\]\s*(.*)$');
+    final lines = lyrics.split('\n');
+    final parsed = <_LyricLine>[];
+
+    for (final line in lines) {
+      final match = timestampPattern.firstMatch(line.trim());
+      if (match != null) {
+        final minutes = int.parse(match.group(1)!);
+        final seconds = int.parse(match.group(2)!);
+        final millisStr = match.group(3)!;
+        // Handle both 2-digit (centiseconds) and 3-digit (milliseconds) formats
+        final millis = millisStr.length == 2
+            ? int.parse(millisStr) * 10
+            : int.parse(millisStr);
+        final text = match.group(4)!.trim();
+
+        // Skip empty lines (instrumental breaks)
+        if (text.isNotEmpty) {
+          parsed.add(_LyricLine(
+            timestamp: Duration(minutes: minutes, seconds: seconds, milliseconds: millis),
+            text: text,
+          ));
+        }
+      }
+    }
+
+    // Return null if no synced lines found (plain lyrics)
+    return parsed.isEmpty ? null : parsed;
+  }
+
+  /// Check if lyrics have sync data
+  bool get _hasSyncedLyrics => _parsedLyrics != null && _parsedLyrics!.isNotEmpty;
+
+  /// Start listening to playback position for lyrics sync
+  void _startLyricsSync() {
+    _logger.log('🎤 _startLyricsSync called, _hasSyncedLyrics=$_hasSyncedLyrics');
+    if (!_hasSyncedLyrics) return;
+    _stopLyricsSync(); // Clean up any existing subscription
+
+    final maProvider = context.read<MusicAssistantProvider>();
+    _logger.log('🎤 Subscribing to positionStream for lyrics');
+    _lyricsPositionSubscription = maProvider.positionTracker.positionStream.listen((position) {
+      _logger.log('🎤 Lyrics received position: ${position.inSeconds}s, mounted=$mounted, panelVisible=$_lyricsPanelVisible');
+      if (!mounted || !_lyricsPanelVisible || _parsedLyrics == null) return;
+      _updateCurrentLyricLine(position);
+    });
+
+    // Also update immediately with current position
+    final currentPos = maProvider.positionTracker.currentPosition;
+    _logger.log('🎤 Lyrics initial position: ${currentPos.inSeconds}s');
+    _updateCurrentLyricLine(currentPos);
+  }
+
+  /// Stop lyrics sync subscription
+  void _stopLyricsSync() {
+    _logger.log('🎤 _stopLyricsSync called, subscription was ${_lyricsPositionSubscription != null ? "active" : "null"}');
+    _lyricsPositionSubscription?.cancel();
+    _lyricsPositionSubscription = null;
+  }
+
+  /// Track lyrics scroll position for swipe-to-close gesture
+  void _onLyricsScroll() {
+    final atTop = !_lyricsScrollController.hasClients || _lyricsScrollController.offset <= 0;
+    if (atTop != _isLyricsAtTop) {
+      setState(() {
+        _isLyricsAtTop = atTop;
+      });
+    }
+  }
+
+  /// Check if lyrics panel swipe-to-close should be allowed
+  /// Returns true when: no lyrics content, plain lyrics (no scroll tracking), or synced lyrics at top
+  bool get _canSwipeCloseLyrics {
+    // No lyrics - allow swipe
+    if (_currentLyrics == null) return true;
+    // Plain lyrics (SingleChildScrollView) - always allow (starts at top)
+    if (!_hasSyncedLyrics) return true;
+    // Synced lyrics (ListView) - only when at top
+    return _isLyricsAtTop;
+  }
+
+  /// Find and highlight the current lyric line based on playback position
+  void _updateCurrentLyricLine(Duration position) {
+    if (_parsedLyrics == null || _parsedLyrics!.isEmpty) {
+      _logger.log('🎤 _updateCurrentLyricLine: No parsed lyrics (null=${_parsedLyrics == null})');
+      return;
+    }
+
+    // Find the last line whose timestamp is <= current position
+    int newIndex = -1;
+    for (int i = 0; i < _parsedLyrics!.length; i++) {
+      if (_parsedLyrics![i].timestamp <= position) {
+        newIndex = i;
+      } else {
+        break; // Lines are sorted by timestamp
+      }
+    }
+
+    if (newIndex != _currentLyricIndex) {
+      _logger.log('🎤 Lyrics index changed: $_currentLyricIndex -> $newIndex at ${position.inSeconds}s');
+      setState(() {
+        _currentLyricIndex = newIndex;
+      });
+
+      // Auto-scroll to current line if not user scrolling
+      if (!_userScrollingLyrics && newIndex >= 0 && _lyricsScrollController.hasClients) {
+        _scrollToLyricLine(newIndex);
+      }
+    }
+  }
+
+  /// Scroll to center the given lyric line
+  void _scrollToLyricLine(int index) {
+    if (!_lyricsScrollController.hasClients) return;
+
+    // Each line is approximately 48 pixels (fontSize 18 + padding)
+    const lineHeight = 52.0;
+    final targetOffset = index * lineHeight;
+
+    // Get the viewport height to center the line
+    final viewportHeight = _lyricsScrollController.position.viewportDimension;
+    final centeredOffset = (targetOffset - viewportHeight / 2 + lineHeight / 2)
+        .clamp(0.0, _lyricsScrollController.position.maxScrollExtent);
+
+    _lyricsScrollController.animateTo(
+      centeredOffset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   /// Close queue panel if open (for external access via GlobalPlayerOverlay)
   /// [withHaptic]: Set to false for Android back gesture (system provides haptic)
@@ -1323,13 +1802,23 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
           });
         }
 
-        // Handle Android back button - close queue panel first, then collapse player
-        // Use _queuePanelTargetOpen (intent) instead of animation value for reliable back handling
-        // This prevents race conditions where animation value crosses threshold during gesture
+        // Handle Android back button - close panels first, then collapse player
+        // Priority: queue panel > lyrics panel > sleep timer panel > collapse player
+        // Use target states (intent) instead of animation values for reliable back handling
+        // This prevents race conditions where state changes during gesture processing
         return PopScope(
-          canPop: !_queuePanelTargetOpen && !isExpanded,
+          canPop: !_queuePanelTargetOpen && !_lyricsPanelTargetOpen && !_sleepTimerPanelTargetOpen && !isExpanded,
           onPopInvokedWithResult: (didPop, result) {
+            _logger.log('🔙 PopScope onPopInvokedWithResult: didPop=$didPop, isExpanded=$isExpanded, isAnimating=${_controller.isAnimating}');
             if (!didPop) {
+              // Ignore back events while a panel is closing
+              // Guard flags are set immediately when close starts, before animation
+              // This prevents double back gesture from closing both panel and player
+              if (_isClosingLyricsPanel || _isClosingSleepTimerPanel) {
+                _logger.log('🔙 PopScope: Ignoring - panel is closing');
+                return;
+              }
+
               if (_queuePanelTargetOpen) {
                 // Always close queue panel on back, even if animating
                 // Stop any existing animation and start close
@@ -1338,10 +1827,17 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                 }
                 // No haptic - Android back gesture provides its own haptic feedback
                 _closeQueuePanelWithSpring(withHaptic: false);
+              } else if (_lyricsPanelTargetOpen) {
+                // Close lyrics panel (no haptic - Android provides its own)
+                _closeLyricsPanel(withHaptic: false);
+              } else if (_sleepTimerPanelTargetOpen) {
+                // Close sleep timer panel (no haptic - Android provides its own)
+                _closeSleepTimerPanel(withHaptic: false);
               } else if (isExpanded) {
                 // Only collapse if not already animating
+                // No haptic - Android back gesture provides its own
                 if (!_controller.isAnimating) {
-                  collapse();
+                  collapse(withHaptic: false);
                 }
               }
             }
@@ -1506,6 +2002,23 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // When expanded, transition to the normal background
     final backgroundColor = Color.lerp(t < 0.5 ? collapsedBgUnplayed : collapsedBg, expandedBg, t)!;
 
+    // Update system nav bar to match player background when expanding
+    // Use post-frame callback to avoid setting state during build
+    if (t > 0.5) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final iconBrightness = backgroundColor.computeLuminance() > 0.5
+            ? Brightness.dark
+            : Brightness.light;
+        SystemChrome.setSystemUIOverlayStyle(
+          SystemUiOverlayStyle(
+            systemNavigationBarColor: backgroundColor,
+            systemNavigationBarIconBrightness: iconBrightness,
+          ),
+        );
+      });
+    }
+
     final collapsedTextColor = themeProvider.adaptiveTheme && adaptiveScheme != null
         ? adaptiveScheme.onPrimaryContainer
         : colorScheme.onPrimaryContainer;
@@ -1530,12 +2043,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final textAlignment = Alignment.lerp(Alignment.centerLeft, Alignment.center, t)!;
     final titleFontWeight = FontWeight.lerp(MiniPlayerLayout.primaryFontWeight, FontWeight.w600, t);
 
-    // Always position above bottom nav bar
-    // Overlap by 2px when expanded to eliminate any subpixel rendering gaps
+    // Collapsed: position above bottom nav bar
+    // Expanded: extend to very bottom (behind system nav bar) for seamless edge-to-edge
     final bottomNavSpace = _bottomNavHeight + bottomPadding;
     final collapsedBottomOffset = bottomNavSpace + _collapsedMargin;
-    final expandedBottomOffset = bottomNavSpace - 2;
-    final expandedHeight = screenSize.height - bottomNavSpace + 2;
+    final expandedBottomOffset = 0.0; // Extend behind system nav bar
+    final expandedHeight = screenSize.height; // Full screen height for edge-to-edge
 
     // Apply slide offset to hide mini player (slides down off-screen)
     // Apply bounce offset for reveal animation (small downward movement)
@@ -1694,6 +2207,9 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Volume - anchored near bottom with breathing room
     final volumeTop = expandedControlsTop + 88;
 
+    // Utility buttons - below volume control
+    final utilityButtonsTop = volumeTop + 56;
+
     // Check if we have multiple players for swipe gesture
     final availablePlayers = _getAvailablePlayersSorted(maProvider);
     final hasMultiplePlayers = availablePlayers.length > 1;
@@ -1713,6 +2229,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         // Handle tap: when device list is visible, dismiss it; when collapsed, expand
         onTap: isExpanded ? null : (widget.isDeviceRevealVisible ? GlobalPlayerOverlay.dismissPlayerReveal : expand),
         onVerticalDragStart: (details) {
+          // Track start position for bottom dead zone detection
+          _verticalDragStartY = details.globalPosition.dy;
           // Ignore while queue item is being dragged
           if (_isQueueDragging) return;
           // For expanded player or queue panel: start tracking immediately
@@ -1757,12 +2275,28 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         onVerticalDragEnd: (details) {
           // Ignore while queue item is being dragged
           if (_isQueueDragging) return;
+
+          // Check if swipe started in bottom dead zone (Android app switcher gesture area)
+          final screenHeight = MediaQuery.of(context).size.height;
+          final startedInBottomDeadZone = _verticalDragStartY != null &&
+              _verticalDragStartY! > screenHeight - _bottomDeadZone;
+          _verticalDragStartY = null;
+
+          // Expanded mode: swipe UP to open queue (but not from bottom dead zone)
+          if (isExpanded && !isQueuePanelOpen && !startedInBottomDeadZone && details.primaryVelocity != null) {
+            if (details.primaryVelocity! < -300) {
+              _toggleQueuePanel();
+              return;
+            }
+          }
+
           // Finish gesture-driven expansion
           _handleVerticalDragEnd(details);
         },
         onVerticalDragCancel: () {
           // Reset state if gesture is cancelled (e.g., system takes over)
           _isVerticalDragging = false;
+          _verticalDragStartY = null;
         },
         onHorizontalDragStart: (details) {
           _horizontalDragStartX = details.globalPosition.dx;
@@ -1886,16 +2420,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
           if (startedInDeadZone) return;
 
-          if (isExpanded) {
-            // Expanded mode: swipe LEFT to open queue (swipe right to close is handled by QueuePanel's Listener)
-            if (details.primaryVelocity != null) {
-              if (details.primaryVelocity! < -300 && !isQueuePanelOpen) {
-                _toggleQueuePanel();
-              }
-              // NOTE: Swipe right to close is NOT handled here - QueuePanel's Listener
-              // handles its own swipe-to-close via onSwipeEnd callback to avoid double-trigger
-            }
-          } else if (hasMultiplePlayers) {
+          if (!isExpanded && hasMultiplePlayers) {
             // Collapsed mode: use finger-following handler
             _handleHorizontalDragEnd(details, maProvider);
           }
@@ -2245,7 +2770,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                   Positioned(
                     left: contentPadding,
                     right: contentPadding,
-                    top: expandedAlbumTop + (maProvider.isPlayingAudiobook ? 24 : (currentTrack.album != null ? 24 : 0)),
+                    top: expandedAlbumTop + (maProvider.isPlayingAudiobook ? 24 : (currentTrack.album != null ? 32 : 0)),
                     child: FadeTransition(
                       // PERF Phase 5: Use cached animation instead of creating new Tween every frame
                       opacity: _fadeIn50to100,
@@ -2578,6 +3103,147 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                     ),
                   ),
 
+                // Utility row - positioned from top like volume, rises with player expansion
+                // Contains favourite, lyrics, queue, sleep buttons (alphabetical order)
+                if (t > 0.5)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: utilityButtonsTop,
+                    child: Opacity(
+                      opacity: expandedElementsOpacity,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          // Favourite button
+                          _buildUtilityButton(
+                            icon: _isCurrentTrackFavorite
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            label: 'Favourite',
+                            isActive: _isCurrentTrackFavorite,
+                            activeColor: Colors.red,
+                            textColor: textColor,
+                            onPressed: () => _toggleCurrentTrackFavorite(currentTrack),
+                          ),
+                          // Lyrics button
+                          _buildUtilityButton(
+                            icon: Icons.lyrics_outlined,
+                            label: 'Lyrics',
+                            isActive: isLyricsPanelOpen,
+                            activeColor: primaryColor,
+                            textColor: textColor,
+                            onPressed: _toggleLyricsPanel,
+                          ),
+                          // Queue button
+                          _buildUtilityButton(
+                            icon: Icons.queue_music_rounded,
+                            label: 'Queue',
+                            isActive: isQueuePanelOpen,
+                            activeColor: primaryColor,
+                            textColor: textColor,
+                            onPressed: _toggleQueuePanel,
+                          ),
+                          // Sleep timer button
+                          _buildUtilityButton(
+                            icon: maProvider.sleepTimerActive ? Icons.timer : Icons.timer_outlined,
+                            label: 'Sleep',
+                            isActive: maProvider.sleepTimerActive || isSleepTimerPanelOpen,
+                            activeColor: primaryColor,
+                            textColor: textColor,
+                            onPressed: _toggleSleepTimerPanel,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Sleep timer panel - slides up from bottom (same mechanics as queue)
+                if (t > 0.5)
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _sleepTimerPanelController,
+                      builder: (context, child) {
+                        final progress = _sleepTimerPanelController.value;
+                        // Use state variable for IgnorePointer (immediate response)
+                        // Use animation value for Offstage (visual during animation)
+                        return IgnorePointer(
+                          ignoring: !_sleepTimerPanelVisible,
+                          child: Offstage(
+                            offstage: progress < 0.01 && !_sleepTimerPanelVisible,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: GestureDetector(
+                        onTap: _closeSleepTimerPanel, // Tap outside to close
+                        behavior: HitTestBehavior.opaque,
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: GestureDetector(
+                            onTap: () {}, // Prevent tap from closing when tapping panel
+                            onVerticalDragEnd: (details) {
+                              // Swipe down to close (same logic as queue)
+                              final velocity = details.primaryVelocity ?? 0;
+                              if (velocity > 150) {
+                                _closeSleepTimerPanel(velocity: velocity / 1000);
+                              }
+                            },
+                            child: RepaintBoundary(
+                              child: SlideTransition(
+                                position: _sleepTimerSlideAnimation,
+                                child: _buildSleepTimerPanel(maProvider, primaryColor, textColor, expandedBg, topPadding),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Lyrics panel - slides up from bottom (same mechanics as queue/sleep timer)
+                if (t > 0.5)
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _lyricsPanelController,
+                      builder: (context, child) {
+                        final progress = _lyricsPanelController.value;
+                        return IgnorePointer(
+                          ignoring: !_lyricsPanelVisible,
+                          child: Offstage(
+                            offstage: progress < 0.01 && !_lyricsPanelVisible,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: GestureDetector(
+                        onTap: _closeLyricsPanel, // Tap outside to close
+                        behavior: HitTestBehavior.opaque,
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: GestureDetector(
+                            onTap: () {}, // Prevent tap from closing when tapping panel
+                            behavior: HitTestBehavior.opaque, // Capture all touches in panel area
+                            // Swipe down to close from header/non-scrollable areas
+                            // Content area swipes are handled by Listener in _buildLyricsPanel
+                            onVerticalDragEnd: (details) {
+                              final velocity = details.primaryVelocity ?? 0;
+                              if (velocity > 150) {
+                                _closeLyricsPanel(velocity: velocity / 1000);
+                              }
+                            },
+                            child: RepaintBoundary(
+                              child: SlideTransition(
+                                position: _lyricsSlideAnimation,
+                                child: _buildLyricsPanel(maProvider, primaryColor, textColor, expandedBg, topPadding),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
                 // Collapse button (expanded only)
                 // GPU PERF: Use icon color alpha instead of Opacity
                 if (t > 0.3)
@@ -2593,63 +3259,6 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                       onPressed: collapse,
                       padding: const EdgeInsets.all(12),
                     ),
-                  ),
-
-                // Favorite + Queue buttons (expanded only) - fade when queue panel opens
-                // PERF: Own AnimatedBuilder - only rebuilds these 2 buttons on queue animation
-                if (t > 0.3)
-                  AnimatedBuilder(
-                    animation: _queuePanelAnimation,
-                    builder: (context, _) {
-                      final queueFade = _queuePanelAnimation.value;
-                      // Hide completely when queue > 0.5
-                      if (queueFade >= 0.5) return const SizedBox.shrink();
-                      final fadeOpacity = (1 - queueFade * 2).clamp(0.0, 1.0);
-                      final expandOpacity = ((t - 0.3) / 0.7).clamp(0.0, 1.0);
-                      return Stack(
-                        children: [
-                          // Favorite button
-                          Positioned(
-                            top: topPadding + 4,
-                            right: 52,
-                            child: TweenAnimationBuilder<double>(
-                              key: ValueKey(_isCurrentTrackFavorite),
-                              tween: Tween(begin: 1.3, end: 1.0),
-                              duration: const Duration(milliseconds: 200),
-                              curve: Curves.easeOutBack,
-                              builder: (context, scale, child) => Transform.scale(
-                                scale: scale,
-                                child: child,
-                              ),
-                              child: IconButton(
-                                icon: Icon(
-                                  _isCurrentTrackFavorite ? Icons.favorite : Icons.favorite_border,
-                                  color: (_isCurrentTrackFavorite ? Colors.red : textColor)
-                                      .withOpacity(expandOpacity * fadeOpacity),
-                                  size: 24,
-                                ),
-                                onPressed: () => _toggleCurrentTrackFavorite(currentTrack),
-                                padding: const EdgeInsets.all(12),
-                              ),
-                            ),
-                          ),
-                          // Queue button
-                          Positioned(
-                            top: topPadding + 4,
-                            right: 4,
-                            child: IconButton(
-                              icon: Icon(
-                                Icons.queue_music_rounded,
-                                color: textColor.withOpacity(expandOpacity * fadeOpacity),
-                                size: 24,
-                              ),
-                              onPressed: _toggleQueuePanel,
-                              padding: const EdgeInsets.all(12),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
                   ),
 
                 // Player name (expanded only)
@@ -2727,11 +3336,11 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
                                     // No finger tracking - just wait for swipe end
                                     // This avoids jank from direct value manipulation
                                   },
-                                  onSwipeEnd: (velocity, totalDx) {
-                                    // Decide based on velocity and total displacement
-                                    final screenWidth = MediaQuery.of(context).size.width;
-                                    final swipeProgress = totalDx / screenWidth;
-                                    final shouldClose = velocity > 150 || swipeProgress > 0.25;
+                                  onSwipeEnd: (velocity, totalDy) {
+                                    // Decide based on velocity and total vertical displacement
+                                    final screenHeight = MediaQuery.of(context).size.height;
+                                    final swipeProgress = totalDy / screenHeight;
+                                    final shouldClose = velocity > 150 || swipeProgress > 0.15;
 
                                     if (shouldClose) {
                                       _closeQueuePanelWithSpring();
@@ -3118,4 +3727,375 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   double _lerpDouble(double a, double b, double t) {
     return a + (b - a) * t;
   }
+
+  Widget _buildUtilityButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color activeColor,
+    required Color textColor,
+    required VoidCallback onPressed,
+  }) {
+    final color = isActive ? activeColor : textColor.withOpacity(0.7);
+    return GestureDetector(
+      onTap: onPressed,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSleepTimerPanel(MusicAssistantProvider maProvider, Color primaryColor, Color textColor, Color backgroundColor, double topPadding) {
+    final remaining = maProvider.sleepTimerRemaining;
+    final currentMinutes = maProvider.sleepTimerMinutes;
+
+    // Format remaining time
+    String? remainingText;
+    if (remaining != null && currentMinutes != -1) {
+      final mins = remaining.inMinutes;
+      final secs = remaining.inSeconds % 60;
+      if (mins > 0) {
+        remainingText = '$mins:${secs.toString().padLeft(2, '0')} remaining';
+      } else {
+        remainingText = '$secs sec remaining';
+      }
+    } else if (currentMinutes == -1) {
+      remainingText = 'Will stop after this track';
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with handle and close button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor, size: 28),
+                    onPressed: _closeSleepTimerPanel,
+                    padding: const EdgeInsets.all(8),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Sleep Timer',
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (remainingText != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        remainingText,
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 16),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Timer options as list tiles
+            _buildTimerOption(maProvider, 'Off', null, primaryColor, textColor),
+            _buildTimerOption(maProvider, '15 minutes', 15, primaryColor, textColor),
+            _buildTimerOption(maProvider, '30 minutes', 30, primaryColor, textColor),
+            _buildTimerOption(maProvider, '45 minutes', 45, primaryColor, textColor),
+            _buildTimerOption(maProvider, '1 hour', 60, primaryColor, textColor),
+            _buildTimerOption(maProvider, '2 hours', 120, primaryColor, textColor),
+            _buildTimerOption(maProvider, 'End of track', -1, primaryColor, textColor),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimerOption(MusicAssistantProvider maProvider, String label, int? minutes, Color primaryColor, Color textColor) {
+    final currentMinutes = maProvider.sleepTimerMinutes;
+    final isSelected = currentMinutes == minutes;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? primaryColor : textColor,
+          fontSize: 16,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_rounded, color: primaryColor, size: 24)
+          : null,
+      onTap: () {
+        maProvider.setSleepTimer(minutes);
+        _closeSleepTimerPanel();
+      },
+    );
+  }
+
+  Widget _buildLyricsPanel(MusicAssistantProvider maProvider, Color primaryColor, Color textColor, Color backgroundColor, double topPadding) {
+    final currentTrack = maProvider.currentTrack;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Container(
+      height: screenHeight * 0.7, // 70% of screen height
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // Drag handle area (visual only - swipe-to-close handled by outer wrapper)
+            Column(
+              children: [
+                // Drag handle
+                Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: textColor.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.keyboard_arrow_down_rounded, color: textColor, size: 28),
+                          onPressed: _closeLyricsPanel,
+                          padding: const EdgeInsets.all(8),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Lyrics',
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (currentTrack != null)
+                                Text(
+                                  '${currentTrack.name} • ${currentTrack.artistsString}',
+                                  style: TextStyle(
+                                    color: textColor.withOpacity(0.6),
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 8),
+            Divider(color: textColor.withOpacity(0.1), height: 1),
+            // Lyrics content
+            Expanded(
+              child: _isLoadingLyrics
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        color: primaryColor,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : _currentLyrics != null
+                      ? _hasSyncedLyrics
+                          // Synced lyrics - show as list with highlighting
+                          // Wrapped with Listener for swipe-to-close when scrolled to top
+                          ? Listener(
+                              onPointerDown: (event) {
+                                _lyricsSwipeStart = event.position;
+                                _wasLyricsAtTopOnSwipeStart = _isLyricsAtTop;
+                              },
+                              onPointerMove: (event) {
+                                if (_lyricsSwipeStart == null) return;
+                                final dy = event.position.dy - _lyricsSwipeStart!.dy;
+                                final dx = (event.position.dx - _lyricsSwipeStart!.dx).abs();
+                                // Only trigger swipe-to-close if at top when started and swiping down
+                                if (dy > 20 && dy > dx * 1.5 && _wasLyricsAtTopOnSwipeStart && !_isSwipingLyricsContent) {
+                                  _isSwipingLyricsContent = true;
+                                }
+                              },
+                              onPointerUp: (event) {
+                                if (_isSwipingLyricsContent && _lyricsSwipeStart != null) {
+                                  final dy = event.position.dy - _lyricsSwipeStart!.dy;
+                                  if (dy > 50) {
+                                    // Calculate velocity (simplified)
+                                    final velocity = dy / 200; // Approximate velocity
+                                    _closeLyricsPanel(velocity: velocity);
+                                  }
+                                }
+                                _lyricsSwipeStart = null;
+                                _isSwipingLyricsContent = false;
+                              },
+                              onPointerCancel: (_) {
+                                _lyricsSwipeStart = null;
+                                _isSwipingLyricsContent = false;
+                              },
+                              child: NotificationListener<ScrollNotification>(
+                                onNotification: (notification) {
+                                  // Detect user scrolling to pause auto-scroll
+                                  if (notification is ScrollStartNotification &&
+                                      notification.dragDetails != null) {
+                                    _userScrollingLyrics = true;
+                                  } else if (notification is ScrollEndNotification) {
+                                    // Resume auto-scroll after a delay
+                                    Future.delayed(const Duration(seconds: 3), () {
+                                      if (mounted) _userScrollingLyrics = false;
+                                    });
+                                  }
+                                  return false;
+                                },
+                                child: ListView.builder(
+                                  controller: _lyricsScrollController,
+                                  padding: const EdgeInsets.only(top: 16, bottom: 100, left: 24, right: 24),
+                                  itemCount: _parsedLyrics!.length,
+                                  itemBuilder: (context, index) {
+                                    final line = _parsedLyrics![index];
+                                    final isActive = index == _currentLyricIndex;
+                                    final isPast = index < _currentLyricIndex;
+
+                                    return GestureDetector(
+                                      onTap: () {
+                                        // Tap to seek to this line
+                                        final maProvider = context.read<MusicAssistantProvider>();
+                                        final player = maProvider.selectedPlayer;
+                                        if (player != null) {
+                                          maProvider.api?.seek(player.playerId, line.timestamp.inSeconds);
+                                        }
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        child: Text(
+                                          line.text,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: isActive
+                                                ? primaryColor
+                                                : isPast
+                                                    ? textColor.withOpacity(0.4)
+                                                    : textColor.withOpacity(0.7),
+                                            fontSize: isActive ? 20 : 18,
+                                            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            )
+                          // Plain lyrics - show as scrollable text
+                          : SingleChildScrollView(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                _currentLyrics!,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 16,
+                                  height: 1.8,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                      : Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.lyrics_outlined,
+                                  color: textColor.withOpacity(0.3),
+                                  size: 64,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No lyrics available',
+                                  style: TextStyle(
+                                    color: textColor.withOpacity(0.5),
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Lyrics may not be available for this track',
+                                  style: TextStyle(
+                                    color: textColor.withOpacity(0.3),
+                                    fontSize: 14,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Represents a single line of synced lyrics with timestamp
+class _LyricLine {
+  final Duration timestamp;
+  final String text;
+
+  const _LyricLine({required this.timestamp, required this.text});
 }

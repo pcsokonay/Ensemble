@@ -100,6 +100,7 @@ class PositionTracker {
     Duration? duration,
     double? serverTimestamp,
   }) {
+    _logger.log('⏱️ PositionTracker.updateFromServer: pos=${position.toStringAsFixed(1)}s, isPlaying=$isPlaying, playerId=$playerId');
     final bool playerChanged = _playerId != playerId;
     final bool playStateChanged = _isPlaying != isPlaying;
     final bool durationChanged = duration != null && _duration != duration;
@@ -155,17 +156,34 @@ class PositionTracker {
     // 3. Position jumped significantly (seek or track change) - BUT NOT if it's a suspicious reset
     //    AND NOT if the timestamp is stale (stale data shouldn't override interpolated position)
     // 4. We're not playing (paused state should reflect server position)
+    // 5. Anchor is getting stale (> 20 seconds old) - prevents position freezing at _maxAnchorAge cap
     //
     // Key insight: When timestamp is stale, the raw position from server is likely outdated.
     // Our interpolated position is probably more accurate, so don't let stale data override it.
+    // HOWEVER, if our anchor itself is getting old, we need to refresh it to prevent freezing.
+    final anchorAge = DateTime.now().difference(_anchorTime);
+    final anchorIsGettingStale = anchorAge.inSeconds > 20;
+    // When anchor is stale, always refresh it - the suspicious reset check should
+    // only prevent us from trusting the SERVER's position, not from refreshing
+    // our own interpolated anchor. The newAnchorPos logic below handles using
+    // interpolated position for stale anchors with suspicious server data.
     final shouldUpdateAnchor = playerChanged
         || playStateChanged
         || (positionDiff > 2 && !isSuspiciousReset && !hasStaleTimestamp)
-        || !isPlaying;
+        || !isPlaying
+        || anchorIsGettingStale;
 
     if (shouldUpdateAnchor) {
-      _anchorPosition = anchorPos;
+      // When refreshing due to stale anchor (not player/state change), use interpolated position
+      // to avoid backward jumps from outdated server data
+      final newAnchorPos = anchorIsGettingStale && !playerChanged && !playStateChanged && isPlaying
+          ? currentInterpolated  // Keep our interpolated position, just refresh the anchor time
+          : anchorPos;           // Use server position for other cases
+      _logger.log('⏱️ PositionTracker: Anchor updated ${_anchorPosition.toStringAsFixed(1)}s -> ${newAnchorPos.toStringAsFixed(1)}s (playerChanged=$playerChanged, playStateChanged=$playStateChanged, positionDiff=${positionDiff.toStringAsFixed(1)}, suspiciousReset=$isSuspiciousReset, anchorStale=$anchorIsGettingStale)');
+      _anchorPosition = newAnchorPos;
       _anchorTime = DateTime.now();
+    } else if (positionDiff > 2) {
+      _logger.log('⏱️ PositionTracker: Anchor NOT updated (suspiciousReset=$isSuspiciousReset, staleTimestamp=$hasStaleTimestamp, interpolated=${currentInterpolated.toStringAsFixed(1)}s)');
     }
 
     _isPlaying = isPlaying;
@@ -209,6 +227,7 @@ class PositionTracker {
 
   /// Clear tracker state (e.g., when disconnecting)
   void clear() {
+    _logger.log('⏱️ PositionTracker.clear() called');
     _stopInterpolationTimer();
     _playerId = null;
     _isPlaying = false;
@@ -218,9 +237,20 @@ class PositionTracker {
   }
 
   void _startInterpolationTimer() {
-    if (_interpolationTimer != null) return;
+    if (_interpolationTimer != null) {
+      _logger.log('⏱️ PositionTracker: Timer already running, skipping start');
+      return;
+    }
 
-    _interpolationTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+    _logger.log('⏱️ PositionTracker: Starting interpolation timer (anchor=${_anchorPosition.toStringAsFixed(1)}s)');
+    _interpolationTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+      // Log every 4 ticks (1 second) if no emission happened
+      if (timer.tick % 4 == 0) {
+        final pos = currentPosition;
+        if (pos.inSeconds == _lastEmittedSeconds) {
+          _logger.log('⏱️ PositionTracker: Timer tick ${timer.tick}, pos=${pos.inSeconds}s unchanged');
+        }
+      }
       _emitPosition();
     });
 
@@ -229,6 +259,7 @@ class PositionTracker {
   }
 
   void _stopInterpolationTimer() {
+    _logger.log('⏱️ PositionTracker: Stopping interpolation timer (was ${_interpolationTimer != null ? "running" : "null"})');
     _interpolationTimer?.cancel();
     _interpolationTimer = null;
   }
@@ -240,6 +271,7 @@ class PositionTracker {
     // Only emit if second changed (reduces unnecessary updates)
     if (seconds != _lastEmittedSeconds) {
       _lastEmittedSeconds = seconds;
+      _logger.log('⏱️ PositionTracker: Emitting position ${seconds}s (anchor=${_anchorPosition.toStringAsFixed(1)}s, playing=$_isPlaying)');
       _positionController.add(pos);
     }
   }

@@ -27,8 +27,8 @@ class QueuePanel extends StatefulWidget {
   final VoidCallback onRefresh;
   final ValueChanged<bool>? onDraggingChanged;
   final VoidCallback? onSwipeStart;
-  final ValueChanged<double>? onSwipeUpdate; // dx delta from start
-  final void Function(double velocity, double totalDx)? onSwipeEnd; // velocity and total displacement
+  final ValueChanged<double>? onSwipeUpdate; // dy delta from start (vertical swipe)
+  final void Function(double velocity, double totalDy)? onSwipeEnd; // velocity and total displacement (vertical)
 
   const QueuePanel({
     super.key,
@@ -54,6 +54,11 @@ class QueuePanel extends StatefulWidget {
 class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateMixin {
   List<QueueItem> _items = [];
   final GlobalKey _stackKey = GlobalKey();
+
+  // Scroll controller to track list position (for swipe-to-close only at top)
+  final ScrollController _scrollController = ScrollController();
+  bool _isAtTop = true;
+  bool _wasAtTopOnSwipeStart = true; // Capture at gesture start
 
   // Transfer dropdown animation
   late AnimationController _dropdownController;
@@ -100,6 +105,17 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    // Track scroll position for swipe-to-close (only allowed at top)
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final atTop = _scrollController.offset <= 0;
+    if (atTop != _isAtTop) {
+      setState(() {
+        _isAtTop = atTop;
+      });
+    }
   }
 
   @override
@@ -135,6 +151,8 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _dropdownController.dispose();
     _pendingReorderTimer?.cancel();
     super.dispose();
@@ -427,6 +445,29 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
     return totalWeight > 0 ? totalVelocity / totalWeight : 0.0;
   }
 
+  double _calculateAverageVelocityVertical() {
+    if (_velocitySamples.length < 2) return 0.0;
+
+    // Use weighted average of recent samples (more recent = higher weight)
+    double totalVelocity = 0.0;
+    double totalWeight = 0.0;
+
+    for (int i = 1; i < _velocitySamples.length; i++) {
+      final prev = _velocitySamples[i - 1];
+      final curr = _velocitySamples[i];
+      final dt = curr.timeMs - prev.timeMs;
+      if (dt > 0 && dt < 100) { // Only use samples within 100ms
+        final dy = curr.position.dy - prev.position.dy;
+        final velocity = (dy / dt) * 1000; // px/s
+        final weight = i.toDouble(); // Later samples get higher weight
+        totalVelocity += velocity * weight;
+        totalWeight += weight;
+      }
+    }
+
+    return totalWeight > 0 ? totalVelocity / totalWeight : 0.0;
+  }
+
   void _startDrag(int index, BuildContext itemContext, Offset globalPosition) {
     if (_dragIndex != null) return;
 
@@ -600,6 +641,64 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
     }
   }
 
+  void _handleMoveToPlayNext(QueueItem item, int index, bool isCurrentItem) async {
+    if (isCurrentItem) return;
+
+    final playerId = widget.queue?.playerId;
+    if (playerId == null) return;
+
+    // Get current index (where the currently playing track is)
+    final currentIndex = _optimisticCurrentIndex ?? widget.queue!.currentIndex ?? 0;
+
+    // Target position is right after the current track
+    final targetIndex = currentIndex + 1;
+
+    // If already at target position, nothing to do
+    if (index == targetIndex) {
+      // Haptic to confirm it's already in position
+      HapticFeedback.lightImpact();
+      return;
+    }
+
+    // Calculate the position shift for the API
+    final posShift = targetIndex - index;
+
+    // Cancel any existing timer to prevent stacking
+    _pendingReorderTimer?.cancel();
+
+    // Optimistic update - move item in local list
+    setState(() {
+      final movedItem = _items.removeAt(index);
+      _items.insert(targetIndex > index ? targetIndex - 1 : targetIndex, movedItem);
+      _pendingReorder = true;
+    });
+
+    // Haptic feedback
+    HapticFeedback.mediumImpact();
+
+    // Call API
+    try {
+      await widget.maProvider.api?.queueCommandMoveItem(playerId, item.queueItemId, posShift);
+      // Allow updates again after a delay for server state to propagate
+      _pendingReorderTimer = Timer(const Duration(milliseconds: 2000), () {
+        if (mounted) {
+          setState(() {
+            _pendingReorder = false;
+          });
+        }
+      });
+    } catch (e) {
+      // Clear pending state immediately on error
+      if (mounted) {
+        setState(() {
+          _pendingReorder = false;
+        });
+      }
+      // Refresh queue from server to get correct state
+      widget.onRefresh();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Use Listener for raw pointer events to bypass gesture arena
@@ -623,17 +722,19 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
           _swipeLocked = false;
           _velocitySamples.clear();
           _addVelocitySample(event.position, _swipeLastTime!);
+          // Capture scroll position at gesture start - only allow close if already at top
+          _wasAtTopOnSwipeStart = _isAtTop;
         } else if (startedInEdgeZone) {
           // Clear swipe state for edge touches
           _swipeStart = null;
         }
       },
       onPointerMove: (event) {
-        // Ignore swipes from edge zone (let Android back gesture handle it)
+        // Ignore swipes while dragging a queue item
         if (_swipeStart == null || _dragIndex != null) return;
 
-        final dx = event.position.dx - _swipeStart!.dx;
-        final dy = (event.position.dy - _swipeStart!.dy).abs();
+        final dx = (event.position.dx - _swipeStart!.dx).abs();
+        final dy = event.position.dy - _swipeStart!.dy;
         final now = DateTime.now().millisecondsSinceEpoch;
 
         // Track all move events for velocity calculation
@@ -643,31 +744,31 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
 
         // Once direction is locked, maintain it (prevents accidental cancellation)
         if (_swipeLocked && _isSwiping) {
-          widget.onSwipeUpdate?.call(dx.clamp(0.0, double.infinity));
+          widget.onSwipeUpdate?.call(dy.clamp(0.0, double.infinity));
           return;
         }
 
-        // Check if this is a horizontal swipe (reduced tolerance: dx > dy * 1.2)
-        final isHorizontal = dx.abs() > _swipeMinDistance && dx.abs() > dy * 1.2;
+        // Check if this is a vertical swipe (dy > dx * 1.2)
+        final isVertical = dy.abs() > _swipeMinDistance && dy.abs() > dx * 1.2;
 
-        if (isHorizontal && dx > 0) {
-          // Horizontal swipe right - close gesture
+        if (isVertical && dy > 0 && _wasAtTopOnSwipeStart) {
+          // Vertical swipe down - close gesture (only when was at top when gesture started)
           if (!_isSwiping) {
             _isSwiping = true;
             _swipeLocked = true; // Lock direction once swipe starts
             widget.onSwipeStart?.call();
           }
-          widget.onSwipeUpdate?.call(dx);
-        } else if (!_swipeLocked && dx.abs() > _swipeMinDistance) {
-          // Direction established as vertical - don't start swipe
+          widget.onSwipeUpdate?.call(dy);
+        } else if (!_swipeLocked && dy.abs() > _swipeMinDistance) {
+          // Direction established as horizontal - don't start swipe
           _swipeLocked = true; // Lock as non-swipe
         }
       },
       onPointerUp: (event) {
         if (_isSwiping && _swipeStart != null) {
-          final velocity = _calculateAverageVelocity();
-          final totalDx = event.position.dx - _swipeStart!.dx;
-          widget.onSwipeEnd?.call(velocity, totalDx);
+          final velocity = _calculateAverageVelocityVertical();
+          final totalDy = event.position.dy - _swipeStart!.dy;
+          widget.onSwipeEnd?.call(velocity, totalDy);
         }
         _resetSwipeState();
       },
@@ -690,7 +791,7 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
                   child: Row(
                     children: [
                       IconButton(
-                        icon: Icon(Icons.arrow_back_rounded, color: widget.textColor, size: IconSizes.md),
+                        icon: Icon(Icons.keyboard_arrow_down_rounded, color: widget.textColor, size: IconSizes.lg),
                         onPressed: _showingTransferDropdown ? _closeTransferDropdown : widget.onClose,
                         padding: Spacing.paddingAll12,
                       ),
@@ -827,6 +928,7 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
 
     return ListView.builder(
       key: const PageStorageKey('queue_list'),
+      controller: _scrollController,
       padding: Spacing.paddingH8,
       // Disable scrolling while dragging to prevent gesture conflict
       physics: _dragIndex != null
@@ -850,8 +952,19 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
   Widget _buildDismissibleItem(QueueItem item, int index, bool isCurrentItem, bool isPastItem) {
     return Dismissible(
       key: ValueKey(item.queueItemId),
-      direction: DismissDirection.endToStart,
+      direction: isCurrentItem ? DismissDirection.none : DismissDirection.horizontal,
+      // Swipe right (startToEnd) = move to play next
       background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        decoration: BoxDecoration(
+          color: widget.primaryColor,
+          borderRadius: BorderRadius.zero,
+        ),
+        child: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 28),
+      ),
+      // Swipe left (endToStart) = delete
+      secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
@@ -863,8 +976,15 @@ class _QueuePanelState extends State<QueuePanel> with SingleTickerProviderStateM
       confirmDismiss: (direction) async {
         // Block dismissal if swipe started from screen edge (Android back gesture)
         if (lastTouchWasInEdgeZone) return false;
-        // Don't allow dismissing the currently playing item
-        return !isCurrentItem;
+
+        if (direction == DismissDirection.startToEnd) {
+          // Swipe right = move to play next position
+          _handleMoveToPlayNext(item, index, isCurrentItem);
+          return false; // Don't dismiss - item stays in queue (just moved)
+        } else {
+          // Swipe left = delete
+          return true;
+        }
       },
       onDismissed: (direction) => _handleDelete(item, index),
       child: _buildQueueItemWithDragHandle(item, index, isCurrentItem, isPastItem),

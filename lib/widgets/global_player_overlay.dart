@@ -93,8 +93,9 @@ class GlobalPlayerOverlay extends StatefulWidget {
   State<GlobalPlayerOverlay> createState() => _GlobalPlayerOverlayState();
 
   /// Collapse the player if it's expanded
-  static void collapsePlayer() {
-    globalPlayerKey.currentState?.collapse();
+  /// [withHaptic]: Set to false for Android back gesture (system provides haptic)
+  static void collapsePlayer({bool withHaptic = true}) {
+    globalPlayerKey.currentState?.collapse(withHaptic: withHaptic);
   }
 
   /// Force collapse player to mini state, instantly closing queue panel if open.
@@ -536,62 +537,76 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                       }
                       final navSelectedColor = _cachedNavColor.getAdjustedColor(sourceColor, isDark);
 
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: navBgColor,
-                          boxShadow: expansionState.progress < 0.5
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, -2),
+                      // Fade out and slide down nav bar as player expands
+                      // Use IgnorePointer when faded to prevent accidental taps
+                      final navOpacity = (1.0 - expansionState.progress * 2).clamp(0.0, 1.0);
+                      final navSlideDown = expansionState.progress * 20; // Slide down 20px as it fades
+
+                      return IgnorePointer(
+                        ignoring: navOpacity < 0.1,
+                        child: Transform.translate(
+                          offset: Offset(0, navSlideDown),
+                          child: Opacity(
+                            opacity: navOpacity,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: navBgColor,
+                                boxShadow: expansionState.progress < 0.5
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, -2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: BottomNavigationBar(
+                                currentIndex: navigationProvider.selectedIndex,
+                                onTap: (index) {
+                                  if (GlobalPlayerOverlay.isPlayerExpanded) {
+                                    GlobalPlayerOverlay.collapsePlayer();
+                                  }
+                                  navigationProvider.navigatorKey.currentState?.popUntil((route) => route.isFirst);
+                                  if (index == 3) {
+                                    GlobalPlayerOverlay.hidePlayer();
+                                  } else if (navigationProvider.selectedIndex == 3) {
+                                    GlobalPlayerOverlay.showPlayer();
+                                  }
+                                  navigationProvider.setSelectedIndex(index);
+                                },
+                                backgroundColor: Colors.transparent,
+                                selectedItemColor: navSelectedColor,
+                                unselectedItemColor: colorScheme.onSurface.withOpacity(0.54),
+                                elevation: 0,
+                                type: BottomNavigationBarType.fixed,
+                                selectedFontSize: 12,
+                                unselectedFontSize: 12,
+                                items: [
+                                  BottomNavigationBarItem(
+                                    icon: const Icon(Icons.home_outlined),
+                                    activeIcon: const Icon(Icons.home_rounded),
+                                    label: S.of(context)!.home,
                                   ),
-                                ]
-                              : null,
-                        ),
-                        child: BottomNavigationBar(
-                          currentIndex: navigationProvider.selectedIndex,
-                          onTap: (index) {
-                            if (GlobalPlayerOverlay.isPlayerExpanded) {
-                              GlobalPlayerOverlay.collapsePlayer();
-                            }
-                            navigationProvider.navigatorKey.currentState?.popUntil((route) => route.isFirst);
-                            if (index == 3) {
-                              GlobalPlayerOverlay.hidePlayer();
-                            } else if (navigationProvider.selectedIndex == 3) {
-                              GlobalPlayerOverlay.showPlayer();
-                            }
-                            navigationProvider.setSelectedIndex(index);
-                          },
-                          backgroundColor: Colors.transparent,
-                          selectedItemColor: navSelectedColor,
-                          unselectedItemColor: colorScheme.onSurface.withOpacity(0.54),
-                          elevation: 0,
-                          type: BottomNavigationBarType.fixed,
-                          selectedFontSize: 12,
-                          unselectedFontSize: 12,
-                          items: [
-                            BottomNavigationBarItem(
-                              icon: const Icon(Icons.home_outlined),
-                              activeIcon: const Icon(Icons.home_rounded),
-                              label: S.of(context)!.home,
+                                  BottomNavigationBarItem(
+                                    icon: const Icon(Icons.library_music_outlined),
+                                    activeIcon: const Icon(Icons.library_music_rounded),
+                                    label: S.of(context)!.library,
+                                  ),
+                                  BottomNavigationBarItem(
+                                    icon: const Icon(Icons.search_rounded),
+                                    activeIcon: const Icon(Icons.search_rounded),
+                                    label: S.of(context)!.search,
+                                  ),
+                                  BottomNavigationBarItem(
+                                    icon: const Icon(Icons.settings_outlined),
+                                    activeIcon: const Icon(Icons.settings_rounded),
+                                    label: S.of(context)!.settings,
+                                  ),
+                                ],
+                              ),
                             ),
-                            BottomNavigationBarItem(
-                              icon: const Icon(Icons.library_music_outlined),
-                              activeIcon: const Icon(Icons.library_music_rounded),
-                              label: S.of(context)!.library,
-                            ),
-                            BottomNavigationBarItem(
-                              icon: const Icon(Icons.search_rounded),
-                              activeIcon: const Icon(Icons.search_rounded),
-                              label: S.of(context)!.search,
-                            ),
-                            BottomNavigationBarItem(
-                              icon: const Icon(Icons.settings_outlined),
-                              activeIcon: const Icon(Icons.settings_rounded),
-                              label: S.of(context)!.settings,
-                            ),
-                          ],
+                          ),
                         ),
                       );
                     },

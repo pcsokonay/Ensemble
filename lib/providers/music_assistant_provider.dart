@@ -70,6 +70,12 @@ class MusicAssistantProvider with ChangeNotifier {
   Timer? _playerStateTimer;
   Timer? _notificationPositionTimer; // Updates notification position every second for remote players
 
+  // Sleep timer state
+  Timer? _sleepTimer;
+  DateTime? _sleepTimerEndTime;
+  int? _sleepTimerMinutes; // null = off, -1 = end of track, positive = minutes
+  Timer? _sleepTimerDisplayTimer; // Updates remaining time display every second
+
   // Local player state
   bool _isLocalPlayerPowered = true;
   int _localPlayerVolume = 100; // Tracked MA volume for builtin player (0-100)
@@ -509,6 +515,15 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   Track? get currentTrack => _currentTrack;
+
+  // Sleep timer getters
+  bool get sleepTimerActive => _sleepTimerMinutes != null;
+  int? get sleepTimerMinutes => _sleepTimerMinutes;
+  Duration? get sleepTimerRemaining {
+    if (_sleepTimerEndTime == null) return null;
+    final remaining = _sleepTimerEndTime!.difference(DateTime.now());
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
 
   /// Whether we have cached players available (for instant UI display on app resume)
   bool get hasCachedPlayers => _cacheService.hasCachedPlayers;
@@ -4455,6 +4470,11 @@ class MusicAssistantProvider with ChangeNotifier {
             _currentTrack!.name != queueTrack.name;
 
         if (trackChanged) {
+          // Check "end of track" sleep timer - previous track just ended
+          if (_currentTrack != null) {
+            checkEndOfTrackSleepTimer();
+          }
+
           // Check if cached track has better metadata (images, proper artist info)
           // This prevents losing album art and artist data when resuming the app
           // For grouped child players, this gets the leader's cached track
@@ -5293,6 +5313,94 @@ class MusicAssistantProvider with ChangeNotifier {
     }
   }
 
+  // ============================================================================
+  // SLEEP TIMER
+  // ============================================================================
+
+  /// Set sleep timer. Pass null to turn off, -1 for end of track, or minutes.
+  void setSleepTimer(int? minutes) {
+    // Cancel any existing timer
+    _cancelSleepTimerInternal();
+
+    _sleepTimerMinutes = minutes;
+
+    if (minutes == null) {
+      // Timer off
+      _logger.log('😴 Sleep timer: OFF');
+      notifyListeners();
+      return;
+    }
+
+    if (minutes == -1) {
+      // End of track - handled in player state updates
+      _sleepTimerEndTime = null; // No fixed end time
+      _logger.log('😴 Sleep timer: End of track');
+      notifyListeners();
+      return;
+    }
+
+    // Set timer for specified minutes
+    _sleepTimerEndTime = DateTime.now().add(Duration(minutes: minutes));
+    _logger.log('😴 Sleep timer: $minutes minutes (until $_sleepTimerEndTime)');
+
+    // Create the actual timer
+    _sleepTimer = Timer(Duration(minutes: minutes), _onSleepTimerExpired);
+
+    // Start display update timer (every second for countdown)
+    _sleepTimerDisplayTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      notifyListeners(); // Update UI with remaining time
+    });
+
+    notifyListeners();
+  }
+
+  /// Cancel sleep timer
+  void cancelSleepTimer() {
+    _cancelSleepTimerInternal();
+    _sleepTimerMinutes = null;
+    _sleepTimerEndTime = null;
+    _logger.log('😴 Sleep timer: Cancelled');
+    notifyListeners();
+  }
+
+  void _cancelSleepTimerInternal() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerDisplayTimer?.cancel();
+    _sleepTimerDisplayTimer = null;
+  }
+
+  void _onSleepTimerExpired() {
+    _logger.log('😴 Sleep timer expired - pausing playback');
+    _cancelSleepTimerInternal();
+    _sleepTimerMinutes = null;
+    _sleepTimerEndTime = null;
+
+    // Pause the current player
+    final playerId = _selectedPlayer?.playerId;
+    if (playerId != null) {
+      pausePlayer(playerId);
+    }
+
+    notifyListeners();
+  }
+
+  /// Called when track ends - checks if "end of track" sleep timer is active
+  void checkEndOfTrackSleepTimer() {
+    if (_sleepTimerMinutes == -1) {
+      _logger.log('😴 End of track sleep timer triggered');
+      _sleepTimerMinutes = null;
+
+      // Pause the current player
+      final playerId = _selectedPlayer?.playerId;
+      if (playerId != null) {
+        pausePlayer(playerId);
+      }
+
+      notifyListeners();
+    }
+  }
+
   /// Sync a player to the currently selected player (temporary group)
   /// The target player will play the same audio as the selected player
   Future<void> syncPlayerToSelected(String targetPlayerId) async {
@@ -5723,6 +5831,8 @@ class MusicAssistantProvider with ChangeNotifier {
     _playerStateTimer?.cancel();
     _notificationPositionTimer?.cancel();
     _localPlayerStateReportTimer?.cancel();
+    _sleepTimer?.cancel();
+    _sleepTimerDisplayTimer?.cancel();
     _connectionStateSubscription?.cancel();
     _localPlayerEventSubscription?.cancel();
     _playerUpdatedEventSubscription?.cancel();

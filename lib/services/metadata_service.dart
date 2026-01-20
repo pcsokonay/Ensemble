@@ -740,11 +740,79 @@ class MetadataService {
     return null;
   }
 
+  // Cache for lyrics
+  static final Map<String, (String?, String?)?> _lyricsCache = {};
+
+  /// Fetches lyrics from LRCLIB (free, no API key required)
+  /// Returns a tuple of (plainLyrics, syncedLyrics) or null if not found
+  /// LRCLIB provides both synced (LRC format) and plain lyrics
+  static Future<(String?, String?)?> getTrackLyrics({
+    required String trackName,
+    required String artistName,
+    String? albumName,
+    int? durationSeconds,
+  }) async {
+    // Build cache key
+    final cacheKey = 'lyrics:$artistName:$trackName';
+    if (_lyricsCache.containsKey(cacheKey)) {
+      return _lyricsCache[cacheKey];
+    }
+
+    // Try LRCLIB API
+    try {
+      final params = <String, String>{
+        'track_name': trackName,
+        'artist_name': artistName,
+      };
+      if (albumName != null && albumName.isNotEmpty) {
+        params['album_name'] = albumName;
+      }
+      if (durationSeconds != null && durationSeconds > 0) {
+        params['duration'] = durationSeconds.toString();
+      }
+
+      final uri = Uri.https('lrclib.net', '/api/get', params);
+      _logger.log('🎤 Fetching lyrics from LRCLIB: $trackName by $artistName');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'User-Agent': 'Ensemble Music Player (https://github.com/ensemble-app)',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final plainLyrics = data['plainLyrics'] as String?;
+        final syncedLyrics = data['syncedLyrics'] as String?;
+
+        if ((plainLyrics != null && plainLyrics.isNotEmpty) ||
+            (syncedLyrics != null && syncedLyrics.isNotEmpty)) {
+          _logger.log('🎤 LRCLIB found lyrics: plain=${plainLyrics?.length ?? 0} chars, synced=${syncedLyrics?.length ?? 0} chars');
+          final result = (plainLyrics, syncedLyrics);
+          _lyricsCache[cacheKey] = result;
+          return result;
+        }
+      } else if (response.statusCode == 404) {
+        _logger.log('🎤 LRCLIB: No lyrics found for $trackName');
+      } else {
+        _logger.log('🎤 LRCLIB error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _logger.warning('LRCLIB API error: $e', context: 'Metadata');
+    }
+
+    // Cache the null result to avoid repeated failed lookups
+    _lyricsCache[cacheKey] = null;
+    return null;
+  }
+
   /// Clears the metadata cache
   static void clearCache() {
     _cache.clear();
     _artistImageCache.clear();
     _albumImageCache.clear();
     _authorImageCache.clear();
+    _lyricsCache.clear();
   }
 }
