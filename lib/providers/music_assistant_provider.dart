@@ -2002,24 +2002,21 @@ class MusicAssistantProvider with ChangeNotifier {
     return beta >= 20;
   }
 
-  /// Check if server version is >= 2.8.0 (has built-in /sendspin proxy endpoint)
-  /// The /sendspin proxy was added in MA 2.8.0 (PR #2840)
-  /// MA 2.7.x does NOT have this proxy - users must expose port 8927 directly
-  /// or manually configure reverse proxy routing to port 8927
+  /// Check if server has built-in Sendspin proxy (added in MA 2.7.1)
   bool _serverHasSendspinProxy() {
     final version = _parseServerVersion();
     if (version == null) return false;
 
     final (:major, :minor, :patch, :beta) = version;
 
-    // Compare with 2.8.0
+    // Compare with 2.7.1
     if (major > 2) return true;
     if (major < 2) return false;
     // major == 2
-    if (minor > 8) return true;
-    if (minor < 8) return false;
-    // minor == 8, any 2.8.x version has the proxy
-    return true;
+    if (minor > 7) return true;
+    if (minor < 7) return false;
+    // minor == 7, need patch >= 1
+    return patch >= 1;
   }
 
   /// Get the server version string for logging
@@ -2132,7 +2129,7 @@ class MusicAssistantProvider with ChangeNotifier {
   /// This is the replacement for builtin_player when that API is not available.
   ///
   /// Connection strategy depends on MA version and network:
-  /// - MA 2.8.0+: Has built-in /sendspin proxy, works with any reverse proxy setup
+  /// - MA 2.7.1+: Has built-in /sendspin proxy, works with any reverse proxy setup
   /// - MA 2.7.x: NO proxy, must either:
   ///   - Use local IP with port 8927 exposed, OR
   ///   - Manually configure reverse proxy to route /sendspin to port 8927
@@ -2148,7 +2145,7 @@ class MusicAssistantProvider with ChangeNotifier {
       _sendspinService?.dispose();
       _sendspinService = SendspinService(_serverUrl!);
 
-      // Set auth token for proxy authentication (MA 2.8.0+ or manually configured proxy)
+      // Set auth token for proxy authentication (MA 2.7.1+ or manually configured proxy)
       final authToken = await SettingsService.getMaAuthToken();
       if (authToken != null) {
         _sendspinService!.setAuthToken(authToken);
@@ -2199,10 +2196,10 @@ class MusicAssistantProvider with ChangeNotifier {
         }
         _logger.log('⚠️ Sendspin: Local connection to port 8927 failed');
 
-        // For local IPs, also try the proxy path in case user has a local reverse proxy
+        // For local IPs, also try the proxy path (MA 2.7.1+ has built-in /sendspin proxy)
         _logger.log('Sendspin: Trying local proxy fallback...');
         final localProxyUrl = 'ws://${serverUri.host}:${serverUri.hasPort ? serverUri.port : 8095}/sendspin';
-        final proxyConnected = await _sendspinService!.connectWithUrl(localProxyUrl);
+        final proxyConnected = await _sendspinService!.connectWithUrl(localProxyUrl, useProxyAuth: true);
         if (proxyConnected) {
           _sendspinConnected = true;
           _logger.log('✅ Sendspin: Connected via local proxy');
@@ -2213,7 +2210,7 @@ class MusicAssistantProvider with ChangeNotifier {
       // Strategy 2: For external/HTTPS servers, use the proxy at /sendspin
       if (isHttps || !isLocalIp) {
         if (hasProxy) {
-          _logger.log('Sendspin: MA 2.8.0+ detected, using built-in /sendspin proxy');
+          _logger.log('Sendspin: MA 2.7.1+ detected, using built-in /sendspin proxy');
         } else {
           _logger.log('Sendspin: MA 2.7.x detected, trying /sendspin (requires manual proxy config)');
         }
@@ -2254,7 +2251,7 @@ class MusicAssistantProvider with ChangeNotifier {
       _logger.log('   Traefik: PathPrefix(`/sendspin`) → service port 8927');
       _logger.log('   Nginx: location /sendspin { proxy_pass http://ma:8927; }');
     } else {
-      // MA 2.8.0+ but still failing
+      // MA 2.7.1+ but still failing
       _logger.log('ℹ️ MA $serverVersion should have /sendspin proxy');
       _logger.log('ℹ️ Check that your reverse proxy forwards WebSocket connections');
       _logger.log('   Ensure Upgrade and Connection headers are passed through');

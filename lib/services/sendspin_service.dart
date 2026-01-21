@@ -154,7 +154,8 @@ class SendspinService {
   }
 
   /// Connect with a specific WebSocket URL (called by provider with local_ws_url)
-  Future<bool> connectWithUrl(String wsUrl) async {
+  /// If useProxyAuth is true, will authenticate with MA token (needed for proxy connections)
+  Future<bool> connectWithUrl(String wsUrl, {bool useProxyAuth = false}) async {
     if (_isDisposed) return false;
     if (_state == SendspinConnectionState.connected) return true;
 
@@ -173,7 +174,7 @@ class SendspinService {
 
       _logger.log('Sendspin: Connecting with URL: $wsUrl');
 
-      final connected = await _tryConnect(wsUrl, timeout: const Duration(seconds: 5));
+      final connected = await _tryConnect(wsUrl, timeout: const Duration(seconds: 5), useProxyAuth: useProxyAuth);
 
       if (!connected) {
         _updateState(SendspinConnectionState.error);
