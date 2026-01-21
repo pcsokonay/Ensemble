@@ -440,9 +440,20 @@ class Audiobook extends MediaItem {
   factory Audiobook.fromJson(Map<String, dynamic> json) {
     final item = MediaItem.fromJson(json);
 
-    // Parse year
+    // Parse year - check top level first, then metadata.release_date (ABS format)
     int? year;
-    final yearValue = json['year'];
+    final metadata = json['metadata'] as Map<String, dynamic>?;
+    dynamic yearValue = json['year'];
+    if (yearValue == null && metadata != null) {
+      // ABS stores year in metadata.release_date (can be "2024" or "2024-01-15")
+      final releaseDate = metadata['release_date'];
+      if (releaseDate is String && releaseDate.isNotEmpty) {
+        // Extract year from date string (handles both "2024" and "2024-01-15" formats)
+        yearValue = releaseDate.split('-').first;
+      } else if (releaseDate is int) {
+        yearValue = releaseDate;
+      }
+    }
     if (yearValue is int) {
       year = yearValue;
     } else if (yearValue is String) {
@@ -472,8 +483,6 @@ class Audiobook extends MediaItem {
 
     // Parse chapters - check top level first, then metadata
     List<Chapter>? chapters;
-    final metadata = json['metadata'] as Map<String, dynamic>?;
-
     dynamic chaptersData = json['chapters'];
     if (chaptersData == null && metadata != null) {
       chaptersData = metadata['chapters'];

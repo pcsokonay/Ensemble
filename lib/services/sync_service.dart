@@ -505,13 +505,11 @@ class SyncService with ChangeNotifier {
   /// Empty enabledProviderIds = all providers enabled, show everything
   /// Items without source tracking are HIDDEN (strict mode) to ensure accurate filtering
   List<Album> getAlbumsFilteredByProviders(Set<String> enabledProviderIds) {
-    // Empty set = all providers enabled, show everything
     if (enabledProviderIds.isEmpty) {
       return _cachedAlbums;
     }
     return _cachedAlbums.where((album) {
       final sources = _albumSourceProviders[album.itemId];
-      // STRICT MODE: Hide items without tracking to ensure accurate filtering
       if (sources == null || sources.isEmpty) return false;
       return sources.any((s) => enabledProviderIds.contains(s));
     }).toList();
@@ -524,7 +522,6 @@ class SyncService with ChangeNotifier {
     }
     return _cachedArtists.where((artist) {
       final sources = _artistSourceProviders[artist.itemId];
-      // STRICT MODE: Hide items without tracking
       if (sources == null || sources.isEmpty) return false;
       return sources.any((s) => enabledProviderIds.contains(s));
     }).toList();
@@ -578,4 +575,25 @@ class SyncService with ChangeNotifier {
   /// Check if we have data available (from cache or sync)
   bool get hasData => _cachedAlbums.isNotEmpty || _cachedArtists.isNotEmpty ||
                       _cachedAudiobooks.isNotEmpty || _cachedPlaylists.isNotEmpty;
+
+  /// Update cached albums with sorted data from provider
+  /// Used when sort order changes - preserves source provider tracking
+  void updateCachedAlbums(List<Album> albums) {
+    _cachedAlbums = albums;
+    notifyListeners();
+  }
+
+  /// Update cached artists with sorted data from provider
+  /// Used when sort order changes - preserves source provider tracking
+  void updateCachedArtists(List<Artist> artists) {
+    _cachedArtists = artists;
+    notifyListeners();
+  }
+
+  /// Update cached playlists with sorted data from provider
+  /// Used when sort order changes - preserves source provider tracking
+  void updateCachedPlaylists(List<Playlist> playlists) {
+    _cachedPlaylists = playlists;
+    notifyListeners();
+  }
 }

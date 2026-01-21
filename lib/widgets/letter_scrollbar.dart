@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
 
-/// A scrollbar that shows a letter popup when dragging, for fast navigation
-/// through alphabetically sorted lists.
+/// Display mode for the scrollbar popup indicator
+enum ScrollbarDisplayMode {
+  /// Show first letter of item name (A, B, C, #)
+  letter,
+  /// Show year (2024, 2023, etc.)
+  year,
+  /// Show count number
+  count,
+  /// Hide the popup (just show scrollbar thumb)
+  none,
+}
+
+/// A scrollbar that shows a contextual popup when dragging, for fast navigation
+/// through sorted lists.
 ///
-/// Scrolls PROPORTIONALLY (like a normal scrollbar) and shows which letter
-/// section you're currently in via a popup indicator.
+/// Scrolls PROPORTIONALLY (like a normal scrollbar) and shows contextual info
+/// about the current position via a popup indicator. The popup content adapts
+/// based on the display mode (letters for alphabetical, years for date sorts,
+/// counts for play count sorts).
 class LetterScrollbar extends StatefulWidget {
   /// The scrollable child widget (ListView, GridView, etc.)
   final Widget child;
@@ -15,6 +29,14 @@ class LetterScrollbar extends StatefulWidget {
   /// List of strings to extract letters from (should match visual sort order).
   /// Each item's first character is used to determine the letter shown in the popup.
   final List<String> items;
+
+  /// Display mode for the popup indicator
+  final ScrollbarDisplayMode displayMode;
+
+  /// Custom display labels for each item (optional).
+  /// When provided, these are shown in the popup instead of extracting letters.
+  /// Length must match [items] if provided.
+  final List<String>? displayLabels;
 
   /// Callback when user taps/drags to a specific index.
   final void Function(int index)? onScrollToIndex;
@@ -45,6 +67,8 @@ class LetterScrollbar extends StatefulWidget {
     required this.child,
     required this.controller,
     required this.items,
+    this.displayMode = ScrollbarDisplayMode.letter,
+    this.displayLabels,
     this.onScrollToIndex,
     this.onDragStateChanged,
     this.itemExtent,
@@ -85,7 +109,7 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
         if ((newFraction - _scrollFraction).abs() > 0.01) {
           setState(() {
             _scrollFraction = newFraction;
-            _currentLetter = _getLetterAtFraction(newFraction);
+            _currentLetter = _getLabelAtFraction(newFraction);
           });
         }
       }
@@ -102,15 +126,32 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
     return '#';
   }
 
-  /// Get the letter at a given scroll fraction (0.0 to 1.0)
-  String _getLetterAtFraction(double fraction) {
+  /// Get the display label at a given scroll fraction (0.0 to 1.0)
+  String _getLabelAtFraction(double fraction) {
     if (widget.items.isEmpty) return '';
 
     final index = (fraction * (widget.items.length - 1)).round().clamp(0, widget.items.length - 1);
+
+    // Use custom display labels if provided
+    if (widget.displayLabels != null && index < widget.displayLabels!.length) {
+      return widget.displayLabels![index];
+    }
+
+    // Otherwise extract from items based on display mode
     if (index < widget.items.length) {
       final item = widget.items[index];
       if (item.isNotEmpty) {
-        return _normalizeToLetter(item[0]);
+        switch (widget.displayMode) {
+          case ScrollbarDisplayMode.letter:
+            return _normalizeToLetter(item[0]);
+          case ScrollbarDisplayMode.year:
+          case ScrollbarDisplayMode.count:
+            // For year/count modes, the item itself should be the display value
+            return item;
+          case ScrollbarDisplayMode.none:
+            // No popup shown, return empty
+            return '';
+        }
       }
     }
     return '';
@@ -154,7 +195,7 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
     final fraction = clampedPosition / effectiveHeight;
 
     // Get letter for display
-    final letter = _getLetterAtFraction(fraction);
+    final letter = _getLabelAtFraction(fraction);
 
     // Scroll proportionally
     final maxScroll = widget.controller.position.maxScrollExtent;
@@ -168,6 +209,54 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
     });
 
     widget.controller.jumpTo(targetScroll);
+  }
+
+  /// Build the popup bubble with appropriate size and styling based on display mode
+  Widget _buildPopupBubble(ColorScheme colorScheme) {
+    // Determine size and font based on content length and display mode
+    final double width;
+    final double height;
+    final double fontSize;
+
+    switch (widget.displayMode) {
+      case ScrollbarDisplayMode.letter:
+      case ScrollbarDisplayMode.none: // Fallback (none won't actually reach here)
+        width = 56;
+        height = 56;
+        fontSize = 28;
+        break;
+      case ScrollbarDisplayMode.year:
+        width = 72;
+        height = 48;
+        fontSize = 22;
+        break;
+      case ScrollbarDisplayMode.count:
+        // Dynamic width based on count length
+        final labelLength = _currentLetter.length;
+        width = labelLength <= 2 ? 56 : (labelLength <= 4 ? 72 : 88);
+        height = 48;
+        fontSize = labelLength <= 3 ? 22 : 18;
+        break;
+    }
+
+    return Material(
+      elevation: 4,
+      color: colorScheme.primaryContainer,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: width,
+        height: height,
+        alignment: Alignment.center,
+        child: Text(
+          _currentLetter,
+          style: TextStyle(
+            color: colorScheme.onPrimaryContainer,
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -236,32 +325,15 @@ class _LetterScrollbarState extends State<LetterScrollbar> {
           ),
         ),
 
-        // The letter popup bubble
-        if (_isDragging && _currentLetter.isNotEmpty)
+        // The popup bubble (letter, year, or count) - hidden when displayMode is none
+        if (_isDragging && _currentLetter.isNotEmpty && widget.displayMode != ScrollbarDisplayMode.none)
           Positioned(
             right: 48,
             top: (_dragPosition - 28).clamp(
               0.0,
               (context.findRenderObject() as RenderBox?)?.size.height ?? 500 - 56 - widget.bottomPadding,
             ),
-            child: Material(
-              elevation: 4,
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 56,
-                height: 56,
-                alignment: Alignment.center,
-                child: Text(
-                  _currentLetter,
-                  style: TextStyle(
-                    color: colorScheme.onPrimaryContainer,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
+            child: _buildPopupBubble(colorScheme),
           ),
       ],
     );

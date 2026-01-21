@@ -431,15 +431,28 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   /// Sort audiobooks based on current sort order
   void _sortAudiobooks() {
     final sorted = List<Audiobook>.from(_audiobooks);
-    if (_audiobooksSortOrder == 'year') {
-      sorted.sort((a, b) {
-        if (a.year == null && b.year == null) return a.name.compareTo(b.name);
-        if (a.year == null) return 1;
-        if (b.year == null) return -1;
-        return a.year!.compareTo(b.year!);
-      });
-    } else {
-      sorted.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    switch (_audiobooksSortOrder) {
+      case 'year':
+        sorted.sort((a, b) {
+          if (a.year == null && b.year == null) return a.name.compareTo(b.name);
+          if (a.year == null) return 1;
+          if (b.year == null) return -1;
+          return a.year!.compareTo(b.year!);
+        });
+        break;
+      case 'year_desc':
+        sorted.sort((a, b) {
+          if (a.year == null && b.year == null) return a.name.compareTo(b.name);
+          if (a.year == null) return 1;
+          if (b.year == null) return -1;
+          return b.year!.compareTo(a.year!);
+        });
+        break;
+      case 'alpha_desc':
+        sorted.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        break;
+      default: // 'alpha' or any other
+        sorted.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     }
     _sortedAudiobooks = sorted;
     _audiobookNames = sorted.map((a) => a.name).toList();
@@ -480,9 +493,24 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       case 'artist_name_desc':
         sortedAlbums.sort((a, b) => (b.artistsString).toLowerCase().compareTo((a.artistsString).toLowerCase()));
         break;
-      default:
-        // Default: name ascending
+      case 'name':
+        // Explicit name ascending
         sortedAlbums.sort((a, b) => (a.sortName ?? a.name ?? '').toLowerCase().compareTo((b.sortName ?? b.name ?? '').toLowerCase()));
+        break;
+      // Server-handled sort orders - preserve server order, don't re-sort
+      case 'timestamp_added':
+      case 'timestamp_added_desc':
+      case 'timestamp_modified':
+      case 'timestamp_modified_desc':
+      case 'last_played':
+      case 'last_played_desc':
+      case 'play_count':
+      case 'play_count_desc':
+        // Server already sorted, keep the order
+        break;
+      default:
+        // Unknown sort order - preserve server order
+        break;
     }
 
     _albumsCacheKey = cacheKey;
@@ -499,11 +527,27 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     }
 
     final sortedArtists = List<Artist>.from(artists);
-    if (_artistsSortOrder == 'name_desc') {
-      sortedArtists.sort((a, b) => (b.sortName ?? b.name ?? '').toLowerCase().compareTo((a.sortName ?? a.name ?? '').toLowerCase()));
-    } else {
-      // Default: name ascending
-      sortedArtists.sort((a, b) => (a.sortName ?? a.name ?? '').toLowerCase().compareTo((b.sortName ?? b.name ?? '').toLowerCase()));
+    switch (_artistsSortOrder) {
+      case 'name':
+        sortedArtists.sort((a, b) => (a.sortName ?? a.name ?? '').toLowerCase().compareTo((b.sortName ?? b.name ?? '').toLowerCase()));
+        break;
+      case 'name_desc':
+        sortedArtists.sort((a, b) => (b.sortName ?? b.name ?? '').toLowerCase().compareTo((a.sortName ?? a.name ?? '').toLowerCase()));
+        break;
+      // Server-handled sort orders - preserve server order, don't re-sort
+      case 'timestamp_added':
+      case 'timestamp_added_desc':
+      case 'timestamp_modified':
+      case 'timestamp_modified_desc':
+      case 'last_played':
+      case 'last_played_desc':
+      case 'play_count':
+      case 'play_count_desc':
+        // Server already sorted, keep the order
+        break;
+      default:
+        // Unknown sort order - preserve server order
+        break;
     }
 
     _artistsCacheKey = cacheKey;
@@ -829,6 +873,41 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     return false;
   }
 
+  /// Map sort order to scrollbar display mode
+  ScrollbarDisplayMode _getScrollbarDisplayMode(String sortOrder) {
+    switch (sortOrder) {
+      // Alphabetical sorts -> show letter
+      case 'name':
+      case 'name_desc':
+      case 'sort_name':
+      case 'sort_name_desc':
+      case 'artist_name':
+      case 'artist_name_desc':
+      case 'alpha':
+      case 'alpha_desc':
+      case 'books': // Series sorted by book count - show letter as fallback
+        return ScrollbarDisplayMode.letter;
+      // Year sorts -> show year
+      case 'year':
+      case 'year_desc':
+        return ScrollbarDisplayMode.year;
+      // Sorts without displayable values -> hide popup
+      case 'timestamp_added':
+      case 'timestamp_added_desc':
+      case 'timestamp_modified':
+      case 'timestamp_modified_desc':
+      case 'last_played':
+      case 'last_played_desc':
+      case 'play_count':
+      case 'play_count_desc':
+      case 'duration':
+      case 'duration_desc':
+        return ScrollbarDisplayMode.none;
+      default:
+        return ScrollbarDisplayMode.letter;
+    }
+  }
+
   void _onLetterScrollbarDragChanged(bool isDragging) {
     setState(() {
       _isLetterScrollbarDragging = isDragging;
@@ -880,19 +959,32 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final syncService = SyncService.instance;
     final enabledProviders = maProvider.enabledProviderIds.toSet();
 
-    // Use SyncService's client-side filtering for instant updates with source tracking
+    // Fetch playlists with sort order from server
+    final serverPlaylists = await maProvider.getPlaylists(
+      favoriteOnly: favoriteOnly,
+      orderBy: _playlistsSortOrder,
+    );
+
+    // Update SyncService cache with sorted data
+    if (serverPlaylists.isNotEmpty) {
+      syncService.updateCachedPlaylists(serverPlaylists);
+    }
+
+    // Apply provider filtering client-side
     List<Playlist> playlists;
-    if (enabledProviders.isNotEmpty) {
-      // Client-side filtering using source tracking (instant, differentiates same-type providers)
-      playlists = syncService.getPlaylistsFilteredByProviders(enabledProviders);
-      // Apply favorite filter client-side
-      if (favoriteOnly == true) {
-        playlists = playlists.where((p) => p.favorite == true).toList();
-      }
+    if (enabledProviders.isNotEmpty && serverPlaylists.isNotEmpty) {
+      playlists = serverPlaylists.where((p) {
+        final sources = syncService.playlistSourceProviders[p.itemId];
+        if (sources == null || sources.isEmpty) return true; // Show if no tracking
+        return sources.any((s) => enabledProviders.contains(s));
+      }).toList();
+    } else if (serverPlaylists.isNotEmpty) {
+      playlists = serverPlaylists;
     } else {
-      // No provider filter active - use cached playlists
-      playlists = syncService.cachedPlaylists;
-      // Apply favorite filter client-side
+      // Fallback to cached data if server returned nothing
+      playlists = enabledProviders.isNotEmpty
+          ? syncService.getPlaylistsFilteredByProviders(enabledProviders)
+          : syncService.cachedPlaylists;
       if (favoriteOnly == true) {
         playlists = playlists.where((p) => p.favorite == true).toList();
       }
@@ -901,7 +993,6 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     if (mounted) {
       setState(() {
         _playlists = playlists;
-        // Server returns pre-sorted data, but keep client sort for fallback
         _sortPlaylists();
         _isLoadingPlaylists = false;
       });
@@ -2294,6 +2385,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           child: LetterScrollbar(
             controller: _authorsScrollController,
             items: sortedAuthorNames,
+            displayMode: _getScrollbarDisplayMode(_authorsSortOrder),
             onDragStateChanged: _onLetterScrollbarDragChanged,
             bottomPadding: BottomSpacing.withMiniPlayer,
             child: _authorsViewMode == 'list'
@@ -2606,23 +2698,36 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         // Client-side filtering using SyncService source tracking for instant updates
         var audiobooks = enabledProviders.isNotEmpty
             ? syncService.getAudiobooksFilteredByProviders(enabledProviders)
-            : syncService.cachedAudiobooks;
+            : List<Audiobook>.from(syncService.cachedAudiobooks);
 
         // Filter by favorites if enabled
         if (_showFavoritesOnly) {
           audiobooks = audiobooks.where((a) => a.favorite == true).toList();
         }
 
-        // Apply sort order
-        if (_audiobooksSortOrder == 'year') {
-          audiobooks.sort((a, b) {
-            if (a.year == null && b.year == null) return a.name.compareTo(b.name);
-            if (a.year == null) return 1;
-            if (b.year == null) return -1;
-            return a.year!.compareTo(b.year!);
-          });
-        } else {
-          audiobooks.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        // Apply sort order (client-side for audiobooks)
+        switch (_audiobooksSortOrder) {
+          case 'year':
+            audiobooks.sort((a, b) {
+              if (a.year == null && b.year == null) return a.name.compareTo(b.name);
+              if (a.year == null) return 1;
+              if (b.year == null) return -1;
+              return a.year!.compareTo(b.year!);
+            });
+            break;
+          case 'year_desc':
+            audiobooks.sort((a, b) {
+              if (a.year == null && b.year == null) return a.name.compareTo(b.name);
+              if (a.year == null) return 1;
+              if (b.year == null) return -1;
+              return b.year!.compareTo(a.year!);
+            });
+            break;
+          case 'alpha_desc':
+            audiobooks.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+            break;
+          default: // 'alpha' or any other
+            audiobooks.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
         }
 
         if (audiobooks.isEmpty) {
@@ -2644,6 +2749,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         }
 
         final audiobookNames = audiobooks.map((a) => a.name).toList();
+        // Generate year labels for year sort mode
+        final audiobookYears = (_audiobooksSortOrder == 'year' || _audiobooksSortOrder == 'year_desc')
+            ? audiobooks.map((a) => a.year?.toString() ?? '?').toList()
+            : null;
 
         // Match music albums tab layout - no header, direct list/grid
         return RefreshIndicator(
@@ -2653,12 +2762,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           child: LetterScrollbar(
             controller: _audiobooksScrollController,
             items: audiobookNames,
+            displayMode: _getScrollbarDisplayMode(_audiobooksSortOrder),
+            displayLabels: audiobookYears,
             onDragStateChanged: _onLetterScrollbarDragChanged,
             bottomPadding: BottomSpacing.withMiniPlayer,
             child: _audiobooksViewMode == 'list'
                 ? ListView.builder(
                     controller: _audiobooksScrollController,
-                    key: PageStorageKey<String>('all_books_list_${_showFavoritesOnly ? 'fav' : 'all'}_${enabledProviders.length}'),
+                    key: PageStorageKey<String>('all_books_list_${_showFavoritesOnly ? 'fav' : 'all'}_${enabledProviders.length}_$_audiobooksSortOrder'),
                     cacheExtent: 1000,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: false,
@@ -2670,7 +2781,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                   )
                 : GridView.builder(
                     controller: _audiobooksScrollController,
-                    key: PageStorageKey<String>('all_books_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_audiobooksViewMode\_${enabledProviders.length}'),
+                    key: PageStorageKey<String>('all_books_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_audiobooksViewMode\_${enabledProviders.length}_$_audiobooksSortOrder'),
                     cacheExtent: 1000,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: false,
@@ -2904,6 +3015,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: LetterScrollbar(
         controller: _seriesScrollController,
         items: seriesNames,
+        displayMode: _getScrollbarDisplayMode(_seriesSortOrder),
         onDragStateChanged: _onLetterScrollbarDragChanged,
         bottomPadding: BottomSpacing.withMiniPlayer,
         child: _seriesViewMode == 'list'
@@ -3333,6 +3445,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: LetterScrollbar(
         controller: _podcastsScrollController,
         items: podcastNames,
+        displayMode: _getScrollbarDisplayMode(_podcastsSortOrder),
         onDragStateChanged: _onLetterScrollbarDragChanged,
         bottomPadding: BottomSpacing.withMiniPlayer,
         child: _podcastsViewMode == 'list'
@@ -3603,6 +3716,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: LetterScrollbar(
         controller: _radioScrollController,
         items: radioNames,
+        displayMode: _getScrollbarDisplayMode(_radioSortOrder),
         onDragStateChanged: _onLetterScrollbarDragChanged,
         bottomPadding: BottomSpacing.withMiniPlayer,
         child: _radioViewMode == 'list'
@@ -3761,98 +3875,97 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   // ============ ARTISTS TAB ============
   Widget _buildArtistsTab(BuildContext context, S l10n) {
-    // Use Selector for targeted rebuilds - only rebuild when loading state or providers change
-    // Always use SyncService data for consistency (it has the complete library)
-    return Selector<MusicAssistantProvider, (bool, Set<String>)>(
-      selector: (_, provider) => (provider.isLoading, provider.enabledProviderIds.toSet()),
-      builder: (context, data, _) {
-            final (isLoading, enabledProviders) = data;
-            final colorScheme = Theme.of(context).colorScheme;
-            final syncService = SyncService.instance;
+    // Note: We don't use Selector here because we need to react to both
+    // MusicAssistantProvider changes AND SyncService changes (source tracking).
+    // The parent's _onSyncServiceChanged listener triggers setState() for SyncService updates.
+    final maProvider = context.watch<MusicAssistantProvider>();
+    final isLoading = maProvider.isLoading;
+    final enabledProviders = maProvider.enabledProviderIds.toSet();
+    final colorScheme = Theme.of(context).colorScheme;
+    final syncService = SyncService.instance;
 
-            // Show loading only if actually loading AND no cached data available
-            if (isLoading && syncService.cachedArtists.isEmpty) {
-              return Center(child: CircularProgressIndicator(color: colorScheme.primary));
-            }
+    // Show loading only if actually loading AND no cached data available
+    if (isLoading && syncService.cachedArtists.isEmpty) {
+      return Center(child: CircularProgressIndicator(color: colorScheme.primary));
+    }
 
-            // Always use SyncService data - it has the complete library with source tracking
-            final filteredArtists = enabledProviders.isNotEmpty
-                ? syncService.getArtistsFilteredByProviders(enabledProviders)
-                : syncService.cachedArtists;
+    // Always use SyncService data - it has the complete library with source tracking
+    final filteredArtists = enabledProviders.isNotEmpty
+        ? syncService.getArtistsFilteredByProviders(enabledProviders)
+        : syncService.cachedArtists;
 
-            // Filter by favorites if enabled
-            final artists = _showFavoritesOnly
-                ? filteredArtists.where((a) => a.favorite == true).toList()
-                : filteredArtists;
+    // Filter by favorites if enabled
+    final artists = _showFavoritesOnly
+        ? filteredArtists.where((a) => a.favorite == true).toList()
+        : filteredArtists;
 
-            if (artists.isEmpty) {
-              if (_showFavoritesOnly) {
-                return EmptyState.custom(
-                  context: context,
-                  icon: Icons.favorite_border,
-                  title: l10n.noFavoriteArtists,
-                  subtitle: l10n.tapHeartArtist,
-                );
-              }
-              return EmptyState.artists(
-                context: context,
-                onRefresh: () => context.read<MusicAssistantProvider>().loadLibrary(),
-              );
-            }
+    if (artists.isEmpty) {
+      if (_showFavoritesOnly) {
+        return EmptyState.custom(
+          context: context,
+          icon: Icons.favorite_border,
+          title: l10n.noFavoriteArtists,
+          subtitle: l10n.tapHeartArtist,
+        );
+      }
+      return EmptyState.artists(
+        context: context,
+        onRefresh: () => context.read<MusicAssistantProvider>().loadLibrary(),
+      );
+    }
 
-            // PERF: Use cached sorting - only re-sorts when data or sort order changes
-            final sortedArtists = _getSortedArtists(artists);
-            final artistNames = _cachedArtistNames;
+    // PERF: Use cached sorting - only re-sorts when data or sort order changes
+    final sortedArtists = _getSortedArtists(artists);
+    final artistNames = _cachedArtistNames;
 
-            return RefreshIndicator(
-              color: colorScheme.primary,
-              backgroundColor: colorScheme.background,
-              onRefresh: () async => context.read<MusicAssistantProvider>().loadLibrary(),
-              child: LetterScrollbar(
+    return RefreshIndicator(
+      color: colorScheme.primary,
+      backgroundColor: colorScheme.background,
+      onRefresh: () async => context.read<MusicAssistantProvider>().loadLibrary(),
+      child: LetterScrollbar(
+        controller: _artistsScrollController,
+        items: artistNames,
+        displayMode: _getScrollbarDisplayMode(_artistsSortOrder),
+        onDragStateChanged: _onLetterScrollbarDragChanged,
+        bottomPadding: BottomSpacing.withMiniPlayer,
+        child: _artistsViewMode == 'list'
+            ? ListView.builder(
                 controller: _artistsScrollController,
-                items: artistNames,
-                onDragStateChanged: _onLetterScrollbarDragChanged,
-                bottomPadding: BottomSpacing.withMiniPlayer,
-                child: _artistsViewMode == 'list'
-                    ? ListView.builder(
-                        controller: _artistsScrollController,
-                        key: PageStorageKey<String>('library_artists_list_${_showFavoritesOnly ? 'fav' : 'all'}_$_artistsViewMode'),
-                        cacheExtent: 1000,
-                        addAutomaticKeepAlives: false,
-                        addRepaintBoundaries: false,
-                        itemCount: sortedArtists.length,
-                        padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
-                        itemBuilder: (context, index) {
-                          final artist = sortedArtists[index];
-                          return _buildArtistTile(
-                            context,
-                            artist,
-                            key: ValueKey(artist.uri ?? artist.itemId),
-                          );
-                        },
-                      )
-                    : GridView.builder(
-                        controller: _artistsScrollController,
-                        key: PageStorageKey<String>('library_artists_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_artistsViewMode'),
-                        cacheExtent: 1000,
-                        addAutomaticKeepAlives: false,
-                        addRepaintBoundaries: false,
-                        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: _artistsViewMode == 'grid3' ? 3 : 2,
-                          childAspectRatio: _artistsViewMode == 'grid3' ? 0.75 : 0.80,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                        ),
-                        itemCount: sortedArtists.length,
-                        itemBuilder: (context, index) {
-                          final artist = sortedArtists[index];
-                          return _buildArtistGridCard(context, artist);
-                        },
-                      ),
+                key: PageStorageKey<String>('library_artists_list_${_showFavoritesOnly ? 'fav' : 'all'}_$_artistsViewMode'),
+                cacheExtent: 1000,
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: false,
+                itemCount: sortedArtists.length,
+                padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
+                itemBuilder: (context, index) {
+                  final artist = sortedArtists[index];
+                  return _buildArtistTile(
+                    context,
+                    artist,
+                    key: ValueKey(artist.uri ?? artist.itemId),
+                  );
+                },
+              )
+            : GridView.builder(
+                controller: _artistsScrollController,
+                key: PageStorageKey<String>('library_artists_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_artistsViewMode'),
+                cacheExtent: 1000,
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: false,
+                padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: _artistsViewMode == 'grid3' ? 3 : 2,
+                  childAspectRatio: _artistsViewMode == 'grid3' ? 0.75 : 0.80,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: sortedArtists.length,
+                itemBuilder: (context, index) {
+                  final artist = sortedArtists[index];
+                  return _buildArtistGridCard(context, artist);
+                },
               ),
-            );
-          },
+      ),
     );
   }
 
@@ -3971,100 +4084,104 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   // ============ ALBUMS TAB ============
   Widget _buildAlbumsTab(BuildContext context, S l10n) {
-    // Use Selector for targeted rebuilds - only rebuild when loading state or providers change
-    // Always use SyncService data for consistency (it has the complete library)
-    return Selector<MusicAssistantProvider, (bool, Set<String>)>(
-      selector: (_, provider) => (provider.isLoading, provider.enabledProviderIds.toSet()),
-      builder: (context, data, _) {
-        final (isLoading, enabledProviders) = data;
-        final colorScheme = Theme.of(context).colorScheme;
-        final syncService = SyncService.instance;
+    // Note: We don't use Selector here because we need to react to both
+    // MusicAssistantProvider changes AND SyncService changes (source tracking).
+    // The parent's _onSyncServiceChanged listener triggers setState() for SyncService updates.
+    final maProvider = context.watch<MusicAssistantProvider>();
+    final isLoading = maProvider.isLoading;
+    final enabledProviders = maProvider.enabledProviderIds.toSet();
+    final colorScheme = Theme.of(context).colorScheme;
+    final syncService = SyncService.instance;
 
-        // Show loading only if actually loading AND no cached data available
-        if (isLoading && syncService.cachedAlbums.isEmpty) {
-          return Center(child: CircularProgressIndicator(color: colorScheme.primary));
-        }
+    // Show loading only if actually loading AND no cached data available
+    if (isLoading && syncService.cachedAlbums.isEmpty) {
+      return Center(child: CircularProgressIndicator(color: colorScheme.primary));
+    }
 
-        // Always use SyncService data - it has the complete library with source tracking
-        final filteredAlbums = enabledProviders.isNotEmpty
-            ? syncService.getAlbumsFilteredByProviders(enabledProviders)
-            : syncService.cachedAlbums;
+    // Always use SyncService data - it has the complete library with source tracking
+    final filteredAlbums = enabledProviders.isNotEmpty
+        ? syncService.getAlbumsFilteredByProviders(enabledProviders)
+        : syncService.cachedAlbums;
 
-        // Filter by favorites if enabled
-        final albums = _showFavoritesOnly
-            ? filteredAlbums.where((a) => a.favorite == true).toList()
-            : filteredAlbums;
+    // Filter by favorites if enabled
+    final albums = _showFavoritesOnly
+        ? filteredAlbums.where((a) => a.favorite == true).toList()
+        : filteredAlbums;
 
-        if (albums.isEmpty) {
-          if (_showFavoritesOnly) {
-            return EmptyState.custom(
-              context: context,
-              icon: Icons.favorite_border,
-              title: l10n.noFavoriteAlbums,
-              subtitle: l10n.tapHeartAlbum,
-            );
-          }
-          return EmptyState.albums(
-            context: context,
-            onRefresh: () => context.read<MusicAssistantProvider>().loadLibrary(),
-          );
-        }
-
-        // PERF: Use cached sorting - only re-sorts when data or sort order changes
-        final sortedAlbums = _getSortedAlbums(albums);
-        final albumNames = _cachedAlbumNames;
-
-        return RefreshIndicator(
-          color: colorScheme.primary,
-          backgroundColor: colorScheme.background,
-          onRefresh: () async => context.read<MusicAssistantProvider>().loadLibrary(),
-          child: LetterScrollbar(
-            controller: _albumsScrollController,
-            items: albumNames,
-            onDragStateChanged: _onLetterScrollbarDragChanged,
-            bottomPadding: BottomSpacing.withMiniPlayer,
-            child: _albumsViewMode == 'list'
-                ? ListView.builder(
-                    controller: _albumsScrollController,
-                    key: PageStorageKey<String>('library_albums_list_${_showFavoritesOnly ? 'fav' : 'all'}_$_albumsViewMode'),
-                    cacheExtent: 1000,
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: false,
-                    padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
-                    itemCount: sortedAlbums.length,
-                    itemBuilder: (context, index) {
-                      final album = sortedAlbums[index];
-                      return _buildAlbumListTile(context, album);
-                    },
-                  )
-                : GridView.builder(
-                    controller: _albumsScrollController,
-                    key: PageStorageKey<String>('library_albums_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_albumsViewMode'),
-                    cacheExtent: 1000,
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: false,
-                    padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: _albumsViewMode == 'grid3' ? 3 : 2,
-                      childAspectRatio: _albumsViewMode == 'grid3' ? 0.70 : 0.75,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                    ),
-                    itemCount: sortedAlbums.length,
-                    itemBuilder: (context, index) {
-                      final album = sortedAlbums[index];
-                      return AlbumCard(
-                        key: ValueKey(album.uri ?? album.itemId),
-                        album: album,
-                        heroTagSuffix: 'library_grid',
-                        // Use 256 to match detail screen for smooth Hero animation
-                        imageCacheSize: 256,
-                      );
-                    },
-                  ),
-          ),
+    if (albums.isEmpty) {
+      if (_showFavoritesOnly) {
+        return EmptyState.custom(
+          context: context,
+          icon: Icons.favorite_border,
+          title: l10n.noFavoriteAlbums,
+          subtitle: l10n.tapHeartAlbum,
         );
-      },
+      }
+      return EmptyState.albums(
+        context: context,
+        onRefresh: () => context.read<MusicAssistantProvider>().loadLibrary(),
+      );
+    }
+
+    // PERF: Use cached sorting - only re-sorts when data or sort order changes
+    final sortedAlbums = _getSortedAlbums(albums);
+    final albumNames = _cachedAlbumNames;
+    // Generate year labels for year sort mode
+    final albumYears = (_albumsSortOrder == 'year' || _albumsSortOrder == 'year_desc')
+        ? sortedAlbums.map((a) => a.year?.toString() ?? '?').toList()
+        : null;
+
+    return RefreshIndicator(
+      color: colorScheme.primary,
+      backgroundColor: colorScheme.background,
+      onRefresh: () async => context.read<MusicAssistantProvider>().loadLibrary(),
+      child: LetterScrollbar(
+        controller: _albumsScrollController,
+        items: albumNames,
+        displayMode: _getScrollbarDisplayMode(_albumsSortOrder),
+        displayLabels: albumYears,
+        onDragStateChanged: _onLetterScrollbarDragChanged,
+        bottomPadding: BottomSpacing.withMiniPlayer,
+        child: _albumsViewMode == 'list'
+            ? ListView.builder(
+                controller: _albumsScrollController,
+                key: PageStorageKey<String>('library_albums_list_${_showFavoritesOnly ? 'fav' : 'all'}_$_albumsViewMode'),
+                cacheExtent: 1000,
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: false,
+                padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
+                itemCount: sortedAlbums.length,
+                itemBuilder: (context, index) {
+                  final album = sortedAlbums[index];
+                  return _buildAlbumListTile(context, album);
+                },
+              )
+            : GridView.builder(
+                controller: _albumsScrollController,
+                key: PageStorageKey<String>('library_albums_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_albumsViewMode'),
+                cacheExtent: 1000,
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: false,
+                padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: BottomSpacing.withMiniPlayer),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: _albumsViewMode == 'grid3' ? 3 : 2,
+                  childAspectRatio: _albumsViewMode == 'grid3' ? 0.70 : 0.75,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: sortedAlbums.length,
+                itemBuilder: (context, index) {
+                  final album = sortedAlbums[index];
+                  return AlbumCard(
+                    key: ValueKey(album.uri ?? album.itemId),
+                    album: album,
+                    heroTagSuffix: 'library_grid',
+                    // Use 256 to match detail screen for smooth Hero animation
+                    imageCacheSize: 256,
+                  );
+                },
+              ),
+      ),
     );
   }
 
@@ -4161,12 +4278,13 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: LetterScrollbar(
         controller: _playlistsScrollController,
         items: _playlistNames,
+        displayMode: _getScrollbarDisplayMode(_playlistsSortOrder),
         onDragStateChanged: _onLetterScrollbarDragChanged,
         bottomPadding: BottomSpacing.withMiniPlayer,
         child: _playlistsViewMode == 'list'
             ? ListView.builder(
                 controller: _playlistsScrollController,
-                key: PageStorageKey<String>('library_playlists_list_${_showFavoritesOnly ? 'fav' : 'all'}_$_playlistsViewMode'),
+                key: PageStorageKey<String>('library_playlists_list_${_showFavoritesOnly ? 'fav' : 'all'}_$_playlistsViewMode\_$_playlistsSortOrder'),
                 cacheExtent: 1000,
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
@@ -4179,7 +4297,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               )
             : GridView.builder(
                 controller: _playlistsScrollController,
-                key: PageStorageKey<String>('library_playlists_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_playlistsViewMode'),
+                key: PageStorageKey<String>('library_playlists_grid_${_showFavoritesOnly ? 'fav' : 'all'}_$_playlistsViewMode\_$_playlistsSortOrder'),
                 cacheExtent: 1000,
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
@@ -4449,6 +4567,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       child: LetterScrollbar(
         controller: _tracksScrollController,
         items: trackSortKeys,
+        displayMode: _getScrollbarDisplayMode(_tracksSortOrder),
         onDragStateChanged: _onLetterScrollbarDragChanged,
         bottomPadding: BottomSpacing.withMiniPlayer,
         child: ListView.builder(
@@ -4661,7 +4780,8 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
   late String _currentViewMode;
   late bool _showFavoritesOnly;
   late bool _showOnlyArtistsWithAlbums;
-  late Set<String> _localEnabledProviders;
+  // Note: We don't use local state for enabledProviders anymore - the Selector
+  // watches the Provider directly and rebuilds when it changes
   late Map<String, bool> _localAbsLibraryEnabled;
   late AnimationController _animController;
   late Animation<double> _scaleAnimation;
@@ -4674,7 +4794,6 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
     _currentViewMode = widget.currentViewMode;
     _showFavoritesOnly = widget.showFavoritesOnly;
     _showOnlyArtistsWithAlbums = widget.showOnlyArtistsWithAlbums;
-    _localEnabledProviders = Set.from(widget.enabledProviderIds);
     _localAbsLibraryEnabled = Map.from(widget.absLibraryEnabled);
 
     _animController = AnimationController(
@@ -4702,6 +4821,8 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
     if (oldWidget.currentSort != widget.currentSort) {
       _currentSort = widget.currentSort;
     }
+    // Note: We don't sync enabledProviders here anymore - the Selector watches
+    // the Provider directly and handles rebuilds when the state changes
   }
 
   void _handleSortTap(String baseField, bool defaultDesc) {
@@ -4744,40 +4865,19 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
   }
 
   void _handleProviderTap(String providerId) {
-    final isCurrentlyEnabled = _localEnabledProviders.isEmpty ||
-                                _localEnabledProviders.contains(providerId);
+    // Read directly from Provider to get current state (not stale props)
+    final maProvider = context.read<MusicAssistantProvider>();
+    final currentEnabled = maProvider.enabledProviderIds;
+    final isCurrentlyEnabled = currentEnabled.isEmpty || currentEnabled.contains(providerId);
 
     // Don't allow disabling the last provider
-    if (isCurrentlyEnabled) {
-      // If all are enabled (empty set), we're switching to selective mode
-      if (_localEnabledProviders.isEmpty) {
-        // Enable all except this one
-        final allIds = widget.relevantProviders.map((p) => p.$1.instanceId).toSet();
-        if (allIds.length <= 1) return; // Can't disable the only provider
-        _localEnabledProviders = allIds..remove(providerId);
-      } else {
-        // Already in selective mode - disable this one
-        if (_localEnabledProviders.length <= 1) return; // Can't disable the last one
-        _localEnabledProviders.remove(providerId);
-      }
-    } else {
-      // Enable this provider
-      _localEnabledProviders.add(providerId);
-      // If all providers are now enabled, clear the set (means "all")
-      final allIds = widget.relevantProviders.map((p) => p.$1.instanceId).toSet();
-      if (_localEnabledProviders.containsAll(allIds)) {
-        _localEnabledProviders.clear();
-      }
+    if (isCurrentlyEnabled && currentEnabled.isNotEmpty && currentEnabled.length <= 1) {
+      return; // Can't disable the last one
     }
 
-    setState(() {});
+    // Let the callback handle the actual toggle - no local state needed
+    // The Provider will notifyListeners and trigger a rebuild
     widget.onProviderToggled(providerId, !isCurrentlyEnabled);
-  }
-
-  bool _isProviderEnabled(String providerId) {
-    // Empty set means all are enabled
-    if (_localEnabledProviders.isEmpty) return true;
-    return _localEnabledProviders.contains(providerId);
   }
 
   void _handleAbsLibraryTap(String libraryPath) {
@@ -5010,82 +5110,93 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
 
                     // Providers section - only shown if multiple providers support this category
                     // relevantProviders is pre-filtered by capability (e.g., radio providers won't appear in Artists)
-                    if (widget.relevantProviders.length > 1) ...[
-                      const Divider(height: 1),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4),
-                        child: Text(
-                          'Providers',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurface.withOpacity(0.5),
-                          ),
-                        ),
-                      ),
-                      // Show all providers that support this category (allows toggling any on/off)
-                      ...widget.relevantProviders.map((providerData) {
-                        final (provider, itemCount) = providerData;
-                        final isEnabled = _isProviderEnabled(provider.instanceId);
+                    // Use Consumer to rebuild when provider changes (Selector had issues with List equality)
+                    if (widget.relevantProviders.length > 1)
+                      Consumer<MusicAssistantProvider>(
+                        builder: (context, maProvider, _) {
+                          final enabledSet = maProvider.enabledProviderIds.toSet();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Divider(height: 1),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4),
+                                child: Text(
+                                  'Providers',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: colorScheme.onSurface.withOpacity(0.5),
+                                  ),
+                                ),
+                              ),
+                              // Show all providers that support this category (allows toggling any on/off)
+                              ...widget.relevantProviders.map((providerData) {
+                                final (provider, itemCount) = providerData;
+                                // Empty set means all enabled
+                                final isEnabled = enabledSet.isEmpty || enabledSet.contains(provider.instanceId);
 
-                        return InkWell(
-                          onTap: () => _handleProviderTap(provider.instanceId),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            child: Row(
-                              children: [
-                                // Checkmark on left - fixed width
-                                SizedBox(
-                                  width: 24,
-                                  child: isEnabled
-                                      ? Icon(Icons.check, size: 18, color: colorScheme.primary)
-                                      : null,
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  isEnabled ? Icons.cloud : Icons.cloud_outlined,
-                                  size: 18,
-                                  color: isEnabled
-                                      ? colorScheme.primary
-                                      : colorScheme.onSurface.withOpacity(0.7),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    provider.name,
-                                    style: TextStyle(
-                                      color: isEnabled ? colorScheme.primary : null,
-                                      fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
+                                return InkWell(
+                                  onTap: () => _handleProviderTap(provider.instanceId),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    child: Row(
+                                      children: [
+                                        // Checkmark on left - fixed width
+                                        SizedBox(
+                                          width: 24,
+                                          child: isEnabled
+                                              ? Icon(Icons.check, size: 18, color: colorScheme.primary)
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Icon(
+                                          isEnabled ? Icons.cloud : Icons.cloud_outlined,
+                                          size: 18,
+                                          color: isEnabled
+                                              ? colorScheme.primary
+                                              : colorScheme.onSurface.withOpacity(0.7),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            provider.name,
+                                            style: TextStyle(
+                                              color: isEnabled ? colorScheme.primary : null,
+                                              fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        // Item count badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isEnabled
+                                                ? colorScheme.primary.withOpacity(0.1)
+                                                : colorScheme.surfaceVariant.withOpacity(0.5),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            itemCount.toString(),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: isEnabled
+                                                  ? colorScheme.primary
+                                                  : colorScheme.onSurface.withOpacity(0.5),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                                // Item count badge
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: isEnabled
-                                        ? colorScheme.primary.withOpacity(0.1)
-                                        : colorScheme.surfaceVariant.withOpacity(0.5),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    itemCount.toString(),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: isEnabled
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurface.withOpacity(0.5),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
+                                );
+                              }),
+                            ],
+                          );
+                        },
+                      ),
 
                     // ABS Libraries section - only for Books tab with multiple libraries
                     if (widget.selectedMediaType == LibraryMediaType.books &&

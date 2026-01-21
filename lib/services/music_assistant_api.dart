@@ -809,6 +809,15 @@ class MusicAssistantAPI {
             }
           }
           _logger.log('📚 Got ${browseBooks.length} audiobooks from ABS browse API');
+
+          // If browse returned nothing, the saved library paths may be stale
+          // (e.g., after provider was removed and re-added with new instance ID)
+          // Clear the stale settings so we fall back to library_items API
+          if (browseBooks.isEmpty) {
+            _logger.log('📚 Browse returned 0 books - clearing stale library settings');
+            await SettingsService.clearEnabledAbsLibraries();
+            await SettingsService.setDiscoveredAbsLibraries([]);
+          }
         }
       }
 
@@ -826,11 +835,13 @@ class MusicAssistantAPI {
 
       // Only call library_items API if:
       // 1. No ABS libraries configured (traditional mode), OR
-      // 2. We have specific non-ABS providers to query
+      // 2. We have specific non-ABS providers to query, OR
+      // 3. ABS browse returned 0 items (stale paths were cleared above)
       // NOTE: Do NOT call when ABS filtering is active but no non-ABS providers exist,
       // as library_items API would return all audiobooks bypassing the library filter
       final shouldFetchFromApi = enabledLibraries == null ||
                                   enabledLibraries.isEmpty ||
+                                  allAudiobooks.isEmpty ||  // Fall back if browse got nothing
                                   (nonAbsProviders != null && nonAbsProviders.isNotEmpty);
 
       if (shouldFetchFromApi) {

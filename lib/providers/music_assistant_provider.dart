@@ -375,22 +375,40 @@ class MusicAssistantProvider with ChangeNotifier {
 
     // Build list of providers that support this category, with their item counts
     // Only include providers that have at least 1 item (hides providers not synced to library)
+    // Multiple instances of the same domain are allowed (e.g., two Spotify accounts)
+    // but we dedupe if names match exactly (same account re-added with new instance ID)
     final result = <(ProviderInstance, int)>[];
     final addedInstanceIds = <String>{};
+    final addedNames = <String, int>{}; // Track name -> count to dedupe same-name providers
 
     for (final provider in _availableMusicProviders) {
       // Only include providers that support this content type AND have items
       if (provider.supportsContentType(category)) {
         final count = counts[provider.instanceId] ?? 0;
         if (count > 0) {
-          result.add((provider, count));
-          addedInstanceIds.add(provider.instanceId);
+          final existingCount = addedNames[provider.name];
+          if (existingCount == null) {
+            // First provider with this name
+            result.add((provider, count));
+            addedInstanceIds.add(provider.instanceId);
+            addedNames[provider.name] = count;
+          } else if (count > existingCount) {
+            // Same name but more items - likely same account re-added, keep better one
+            result.removeWhere((r) => r.$1.name == provider.name);
+            result.add((provider, count));
+            addedInstanceIds.add(provider.instanceId);
+            addedNames[provider.name] = count;
+          }
         }
       }
     }
 
     // Also include providers that have items but aren't in _availableMusicProviders
-    // (e.g., search-only providers like iTunes)
+    // (e.g., search-only providers like iTunes, or orphaned items from removed providers)
+    // For these synthetic providers, dedupe by domain since we don't have account-specific names
+    final addedRealDomains = result.map((r) => r.$1.domain).toSet();
+    final addedSyntheticDomains = <String>{};
+
     for (final entry in counts.entries) {
       if (!addedInstanceIds.contains(entry.key) && entry.value > 0) {
         // Create a synthetic ProviderInstance from the instance ID
@@ -399,6 +417,11 @@ class MusicAssistantProvider with ChangeNotifier {
         final domain = instanceId.contains('--')
             ? instanceId.split('--').first
             : instanceId;
+
+        // Skip if this domain is already represented by a real provider or synthetic
+        if (addedRealDomains.contains(domain)) continue;
+        if (addedSyntheticDomains.contains(domain)) continue;
+
         // Only add if this domain supports the category
         final capabilities = ProviderInstance.providerCapabilities[domain];
         if (capabilities != null && capabilities.contains(category)) {
@@ -411,6 +434,7 @@ class MusicAssistantProvider with ChangeNotifier {
             ),
             entry.value,
           ));
+          addedSyntheticDomains.add(domain);
         }
       }
     }
@@ -1256,11 +1280,23 @@ class MusicAssistantProvider with ChangeNotifier {
       return false;
     }
 
-    await SettingsService.toggleMusicProvider(instanceId, enabled, allIds);
+    // Update local state directly for immediate UI response
+    // If currently "all enabled" (empty list) and disabling one, need to switch to explicit mode
+    if (_enabledProviderIds.isEmpty && !enabled) {
+      // Initialize with all providers except the one being disabled
+      _enabledProviderIds = allIds.where((id) => id != instanceId).toList();
+    } else if (enabled) {
+      // Add to list if not present
+      if (!_enabledProviderIds.contains(instanceId)) {
+        _enabledProviderIds = [..._enabledProviderIds, instanceId];
+      }
+    } else {
+      // Remove from list
+      _enabledProviderIds = _enabledProviderIds.where((id) => id != instanceId).toList();
+    }
 
-    // Reload the enabled providers
-    final savedEnabled = await SettingsService.getEnabledMusicProviders();
-    _enabledProviderIds = savedEnabled ?? [];
+    // Persist to settings (async, but don't wait for UI update)
+    SettingsService.toggleMusicProvider(instanceId, enabled, allIds);
 
     _logger.log('🔄 Provider filter updated: ${_enabledProviderIds.isEmpty ? "all enabled" : "${_enabledProviderIds.length} enabled"}');
 
@@ -4935,6 +4971,9 @@ class MusicAssistantProvider with ChangeNotifier {
         orderBy: orderBy,
       );
 
+      // Update SyncService cache with sorted data so UI sees the new order
+      SyncService.instance.updateCachedArtists(_artists);
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -4966,6 +5005,9 @@ class MusicAssistantProvider with ChangeNotifier {
         artistId: artistId,
         orderBy: orderBy,
       );
+
+      // Update SyncService cache with sorted data so UI sees the new order
+      SyncService.instance.updateCachedAlbums(_albums);
 
       _isLoading = false;
       notifyListeners();
