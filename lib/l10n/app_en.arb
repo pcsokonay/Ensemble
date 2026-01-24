@@ -51,7 +51,7 @@
     "description": "Hint for port field"
   },
 
-  "portDescription": "Leave blank for reverse proxy or standard ports. Enter 8095 for direct connection.",
+  "portDescription": "Leave blank unless using a custom port",
   "@portDescription": {
     "description": "Description for port field"
   },

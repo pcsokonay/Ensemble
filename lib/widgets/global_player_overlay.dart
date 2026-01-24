@@ -611,6 +611,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                                     GlobalPlayerOverlay.collapsePlayer();
                                   }
                                   navigationProvider.navigatorKey.currentState?.popUntil((route) => route.isFirst);
+                                  // Clear adaptive colors when switching tabs (detail screen colors shouldn't persist)
+                                  themeProvider.clearAdaptiveColors();
                                   if (index == 3) {
                                     GlobalPlayerOverlay.hidePlayer();
                                   } else if (navigationProvider.selectedIndex == 3) {

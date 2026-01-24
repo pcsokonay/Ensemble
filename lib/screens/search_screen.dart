@@ -749,6 +749,7 @@ class SearchScreenState extends State<SearchScreen> {
               child: SingleChildScrollView(
                 controller: _filterScrollController,
                 scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
                 child: _buildFilterSelector(colorScheme),
               ),
             ),
@@ -765,8 +766,8 @@ class SearchScreenState extends State<SearchScreen> {
                   controller: _pageController,
                   onPageChanged: _onPageChanged,
                   itemCount: _getAvailableFilters().length,
-                  // Faster settling so vertical scroll works sooner after swipe
-                  physics: const _FastPageScrollPhysics(),
+                  // Use default physics - custom physics may cause issues with Flutter 3.38
+                  physics: const PageScrollPhysics(),
                   itemBuilder: (context, pageIndex) {
                     final filters = _getAvailableFilters();
                     final filterForPage = filters[pageIndex];

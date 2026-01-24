@@ -39,8 +39,7 @@ class SEn extends S {
   String get portHint => 'e.g., 8095 or leave blank';
 
   @override
-  String get portDescription =>
-      'Leave blank for reverse proxy or standard ports. Enter 8095 for direct connection.';
+  String get portDescription => 'Leave blank unless using a custom port';
 
   @override
   String get username => 'Username';

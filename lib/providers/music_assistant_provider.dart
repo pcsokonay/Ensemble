@@ -1017,11 +1017,11 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   Future<void> _restoreAuthCredentials() async {
-    final savedCredentials = await SettingsService.getAuthCredentials();
-    if (savedCredentials != null) {
-      _logger.log('🔐 Restoring saved auth credentials...');
-      _authManager.deserializeCredentials(savedCredentials);
-      _logger.log('🔐 Auth credentials restored: ${_authManager.currentStrategy?.name ?? "none"}');
+    final storedToken = await SettingsService.getMaAuthToken();
+    if (storedToken != null) {
+      _logger.log('🔐 Restoring saved MA token...');
+      _authManager.setToken(storedToken);
+      _logger.log('🔐 Auth token restored');
     }
   }
 

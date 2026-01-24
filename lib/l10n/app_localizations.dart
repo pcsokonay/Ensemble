@@ -164,7 +164,7 @@ abstract class S {
   /// Description for port field
   ///
   /// In en, this message translates to:
-  /// **'Leave blank for reverse proxy or standard ports. Enter 8095 for direct connection.'**
+  /// **'Leave blank unless using a custom port'**
   String get portDescription;
 
   /// Username field label
