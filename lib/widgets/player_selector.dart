@@ -14,9 +14,10 @@ class PlayerSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maProvider = context.watch<MusicAssistantProvider>();
-    final selectedPlayer = maProvider.selectedPlayer;
-    final availablePlayers = maProvider.availablePlayers;
+    // Use select to only rebuild when player data changes (not on every provider update)
+    final (selectedPlayer, availablePlayers) = context.select<MusicAssistantProvider, (dynamic, List)>(
+      (p) => (p.selectedPlayer, p.availablePlayers),
+    );
     final colorScheme = Theme.of(context).colorScheme;
 
     // Count players that are currently playing MA content (excluding selected player)
@@ -45,7 +46,7 @@ class PlayerSelector extends StatelessWidget {
           color: colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(8),
           child: InkWell(
-            onTap: () => _showPlayerSelector(context, maProvider, availablePlayers),
+            onTap: () => _showPlayerSelector(context),
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
@@ -81,11 +82,7 @@ class PlayerSelector extends StatelessWidget {
     );
   }
 
-  void _showPlayerSelector(
-    BuildContext context,
-    MusicAssistantProvider provider,
-    List players,
-  ) {
+  void _showPlayerSelector(BuildContext context) {
     // Use the new player reveal animation
     GlobalPlayerOverlay.showPlayerReveal();
   }

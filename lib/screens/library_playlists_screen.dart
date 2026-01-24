@@ -43,7 +43,6 @@ class _LibraryPlaylistsScreenState extends State<LibraryPlaylistsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<MusicAssistantProvider>();
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -66,11 +65,13 @@ class _LibraryPlaylistsScreenState extends State<LibraryPlaylistsScreen> {
         ),
         centerTitle: true,
       ),
-      body: _buildPlaylistsList(context, provider),
+      body: _buildPlaylistsList(context),
     );
   }
 
-  Widget _buildPlaylistsList(BuildContext context, MusicAssistantProvider provider) {
+  Widget _buildPlaylistsList(BuildContext context) {
+    // Use read since we only need the provider for non-reactive operations
+    final provider = context.read<MusicAssistantProvider>();
     final colorScheme = Theme.of(context).colorScheme;
 
     // Show cached data immediately if available, even while loading

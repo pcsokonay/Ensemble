@@ -132,8 +132,8 @@ class _QueueScreenState extends State<QueueScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final maProvider = context.watch<MusicAssistantProvider>();
-    final player = maProvider.selectedPlayer;
+    // Use select to only rebuild when selectedPlayer changes
+    final player = context.select<MusicAssistantProvider, dynamic>((p) => p.selectedPlayer);
 
     return Scaffold(
       backgroundColor: const Color(0xFF1a1a1a),
@@ -153,7 +153,7 @@ class _QueueScreenState extends State<QueueScreen> {
           IconButton(
             icon: const Icon(Icons.swap_horiz_rounded),
             tooltip: S.of(context)!.transferQueue,
-            onPressed: () => _handleTransferQueue(maProvider),
+            onPressed: () => _handleTransferQueue(context.read<MusicAssistantProvider>()),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -161,11 +161,12 @@ class _QueueScreenState extends State<QueueScreen> {
           ),
         ],
       ),
-      body: _buildBody(maProvider),
+      body: _buildBody(context),
     );
   }
 
-  Widget _buildBody(MusicAssistantProvider maProvider) {
+  Widget _buildBody(BuildContext context) {
+    final maProvider = context.read<MusicAssistantProvider>();
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }

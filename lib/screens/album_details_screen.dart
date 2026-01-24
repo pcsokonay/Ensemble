@@ -58,16 +58,20 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
     _loadTracks();
     _loadAlbumDescription();
 
-    // CRITICAL FIX: Defer both fresh data loading AND color extraction until
-    // after the hero animation completes. This prevents:
-    // 1. setState with new image URL during animation → grey icon flash
-    // 2. Expensive palette extraction blocking animation frames
+    // Mark that we're on a detail screen and extract colors immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 350ms matches FadeSlidePageRoute duration (300ms) + buffer
+      if (mounted) {
+        markDetailScreenEntered(context);
+        _extractColors(); // Extract colors immediately - async so won't block
+      }
+    });
+
+    // Defer fresh data loading until after hero animation completes
+    // This prevents setState with new image URL during animation → grey icon flash
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 350), () {
         if (mounted) {
           _loadFreshAlbumData();
-          _extractColors();
         }
       });
     });
@@ -107,15 +111,18 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
     if (imageUrl == null) return;
 
     try {
-      final colorSchemes = await PaletteHelper.extractColorSchemes(
-        CachedNetworkImageProvider(imageUrl),
-      );
+      // Use isolate-based extraction to avoid blocking the main thread
+      final colorSchemes = await PaletteHelper.extractColorSchemesFromUrl(imageUrl);
 
       if (colorSchemes != null && mounted) {
         setState(() {
           _lightColorScheme = colorSchemes.$1;
           _darkColorScheme = colorSchemes.$2;
         });
+
+        // Update ThemeProvider so nav bar uses adaptive colors
+        final themeProvider = context.read<ThemeProvider>();
+        themeProvider.updateAdaptiveColors(colorSchemes.$1, colorSchemes.$2, isFromDetailScreen: true);
       }
     } catch (e) {
       _logger.log('Failed to extract colors for album: $e');

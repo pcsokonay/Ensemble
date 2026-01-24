@@ -44,12 +44,13 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
   void initState() {
     super.initState();
     _isInLibrary = _checkIfInLibrary(widget.podcast);
+
+    // Mark that we're on a detail screen and extract colors immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 350), () {
-        if (mounted) {
-          _extractColors();
-        }
-      });
+      if (mounted) {
+        markDetailScreenEntered(context);
+        _extractColors(); // Extract colors immediately - async so won't block
+      }
       _loadEpisodes();
     });
   }
@@ -193,14 +194,17 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
 
     if (imageUrl != null) {
       try {
-        final colorSchemes = await PaletteHelper.extractColorSchemes(
-          CachedNetworkImageProvider(imageUrl),
-        );
+        // Use isolate-based extraction to avoid blocking the main thread
+        final colorSchemes = await PaletteHelper.extractColorSchemesFromUrl(imageUrl);
         if (mounted && colorSchemes != null) {
           setState(() {
             _lightColorScheme = colorSchemes.$1;
             _darkColorScheme = colorSchemes.$2;
           });
+
+          // Update ThemeProvider so nav bar uses adaptive colors
+          final themeProvider = context.read<ThemeProvider>();
+          themeProvider.updateAdaptiveColors(colorSchemes.$1, colorSchemes.$2, isFromDetailScreen: true);
         }
       } catch (e) {
         _logger.log('🎙️ Error extracting colors: $e');

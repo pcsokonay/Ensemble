@@ -267,7 +267,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<MusicAssistantProvider>();
+    // Use select to only rebuild when connectionState changes
+    final connectionState = context.select<MusicAssistantProvider, MAConnectionState>((p) => p.connectionState);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -345,15 +346,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    _getStatusIcon(provider.connectionState),
-                    color: _getStatusColor(provider.connectionState, colorScheme),
+                    _getStatusIcon(connectionState),
+                    color: _getStatusColor(connectionState, colorScheme),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _getStatusText(provider.connectionState),
+                    _getStatusText(connectionState),
                     style: textTheme.titleMedium?.copyWith(
-                      color: _getStatusColor(provider.connectionState, colorScheme),
+                      color: _getStatusColor(connectionState, colorScheme),
                       fontWeight: FontWeight.bold,
                     ),
                   ),

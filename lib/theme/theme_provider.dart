@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
 import 'palette_helper.dart';
@@ -10,11 +9,13 @@ final _themeLogger = DebugLogger();
 /// Global function to update adaptive colors from an image URL
 /// This can be called from anywhere in the app (e.g., when tapping an album/artist)
 /// Sets isOnDetailScreen=true so nav bar will also use adaptive colors
+/// Uses isolate-based extraction to avoid blocking the main thread
 Future<void> updateAdaptiveColorsFromImage(BuildContext context, String? imageUrl) async {
   if (imageUrl == null || imageUrl.isEmpty) return;
 
   try {
-    final colorSchemes = await PaletteHelper.extractColorSchemes(CachedNetworkImageProvider(imageUrl));
+    // Use isolate-based extraction for better performance
+    final colorSchemes = await PaletteHelper.extractColorSchemesFromUrl(imageUrl);
     if (colorSchemes != null && context.mounted) {
       final themeProvider = context.read<ThemeProvider>();
       themeProvider.updateAdaptiveColors(colorSchemes.$1, colorSchemes.$2, isFromDetailScreen: true);
@@ -30,6 +31,13 @@ Future<void> updateAdaptiveColorsFromImage(BuildContext context, String? imageUr
 void clearAdaptiveColorsOnBack(BuildContext context) {
   final themeProvider = context.read<ThemeProvider>();
   themeProvider.clearAdaptiveColors();
+}
+
+/// Mark that we're entering a detail screen (call this synchronously on init)
+/// This ensures the nav bar starts using adaptive colors immediately
+void markDetailScreenEntered(BuildContext context) {
+  final themeProvider = context.read<ThemeProvider>();
+  themeProvider.setOnDetailScreen(true);
 }
 
 class ThemeProvider extends ChangeNotifier {
@@ -202,5 +210,13 @@ class ThemeProvider extends ChangeNotifier {
     _adaptiveDarkScheme = null;
     _isOnDetailScreen = false;
     notifyListeners();
+  }
+
+  /// Set the detail screen flag (used for immediate synchronous updates)
+  void setOnDetailScreen(bool value) {
+    if (_isOnDetailScreen != value) {
+      _isOnDetailScreen = value;
+      notifyListeners();
+    }
   }
 }

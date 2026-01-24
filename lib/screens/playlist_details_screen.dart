@@ -57,13 +57,12 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
     _isFavorite = widget.playlist.favorite ?? false;
     _loadTracks();
 
-    // Defer color extraction until after hero animation completes
+    // Mark that we're on a detail screen and extract colors immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 350), () {
-        if (mounted) {
-          _extractColors();
-        }
-      });
+      if (mounted) {
+        markDetailScreenEntered(context);
+        _extractColors(); // Extract colors immediately - async so won't block
+      }
     });
   }
 
@@ -74,15 +73,18 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
     if (imageUrl == null) return;
 
     try {
-      final colorSchemes = await PaletteHelper.extractColorSchemes(
-        CachedNetworkImageProvider(imageUrl),
-      );
+      // Use isolate-based extraction to avoid blocking the main thread
+      final colorSchemes = await PaletteHelper.extractColorSchemesFromUrl(imageUrl);
 
       if (colorSchemes != null && mounted) {
         setState(() {
           _lightColorScheme = colorSchemes.$1;
           _darkColorScheme = colorSchemes.$2;
         });
+
+        // Update ThemeProvider so nav bar uses adaptive colors
+        final themeProvider = context.read<ThemeProvider>();
+        themeProvider.updateAdaptiveColors(colorSchemes.$1, colorSchemes.$2, isFromDetailScreen: true);
       }
     } catch (e) {
       _logger.log('Failed to extract colors for playlist: $e');

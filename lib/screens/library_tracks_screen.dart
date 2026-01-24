@@ -11,7 +11,6 @@ class LibraryTracksScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<MusicAssistantProvider>();
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -34,35 +33,41 @@ class LibraryTracksScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: _buildTracksList(context, provider),
+      body: _buildTracksList(context),
     );
   }
 
-  Widget _buildTracksList(
-      BuildContext context, MusicAssistantProvider provider) {
+  Widget _buildTracksList(BuildContext context) {
+    // Use select to only rebuild when tracks or isLoading changes
+    final (tracks, isLoading) = context.select<MusicAssistantProvider, (List, bool)>(
+      (p) => (p.tracks, p.isLoading),
+    );
     final colorScheme = Theme.of(context).colorScheme;
 
     // Show cached data immediately if available, even while loading
     // Only show spinner if we have no data at all AND we're loading
-    if (provider.tracks.isEmpty && provider.isLoading) {
+    if (tracks.isEmpty && isLoading) {
       return Center(
         child: CircularProgressIndicator(color: colorScheme.primary),
       );
     }
 
-    if (provider.tracks.isEmpty) {
-      return EmptyState.tracks(context: context, onRefresh: provider.loadLibrary);
+    if (tracks.isEmpty) {
+      return EmptyState.tracks(
+        context: context,
+        onRefresh: context.read<MusicAssistantProvider>().loadLibrary,
+      );
     }
 
     return ListView.builder(
-      itemCount: provider.tracks.length,
+      itemCount: tracks.length,
       padding: const EdgeInsets.all(8),
       cacheExtent: 500, // Prebuild items off-screen for smoother scrolling
       addAutomaticKeepAlives: false, // Tiles don't need individual keep-alive
       addRepaintBoundaries: false, // We add RepaintBoundary manually to tiles
       itemBuilder: (context, index) {
-        final track = provider.tracks[index];
-        return _buildTrackTile(context, track, provider, index);
+        final track = tracks[index] as Track;
+        return _buildTrackTile(context, track, index);
       },
     );
   }
@@ -70,9 +75,9 @@ class LibraryTracksScreen extends StatelessWidget {
   Widget _buildTrackTile(
     BuildContext context,
     Track track,
-    MusicAssistantProvider maProvider,
     int index,
   ) {
+    final maProvider = context.read<MusicAssistantProvider>();
     final imageUrl = track.album != null
         ? maProvider.getImageUrl(track.album!, size: 128)
         : null;

@@ -3875,12 +3875,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   // ============ ARTISTS TAB ============
   Widget _buildArtistsTab(BuildContext context, S l10n) {
-    // Note: We don't use Selector here because we need to react to both
-    // MusicAssistantProvider changes AND SyncService changes (source tracking).
-    // The parent's _onSyncServiceChanged listener triggers setState() for SyncService updates.
-    final maProvider = context.watch<MusicAssistantProvider>();
-    final isLoading = maProvider.isLoading;
-    final enabledProviders = maProvider.enabledProviderIds.toSet();
+    // Use select to only rebuild when specific fields change
+    // SyncService changes are handled by _onSyncServiceChanged listener
+    final (isLoading, enabledProviders) = context.select<MusicAssistantProvider, (bool, Set<String>)>(
+      (p) => (p.isLoading, p.enabledProviderIds.toSet()),
+    );
     final colorScheme = Theme.of(context).colorScheme;
     final syncService = SyncService.instance;
 
@@ -4084,12 +4083,11 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
   // ============ ALBUMS TAB ============
   Widget _buildAlbumsTab(BuildContext context, S l10n) {
-    // Note: We don't use Selector here because we need to react to both
-    // MusicAssistantProvider changes AND SyncService changes (source tracking).
-    // The parent's _onSyncServiceChanged listener triggers setState() for SyncService updates.
-    final maProvider = context.watch<MusicAssistantProvider>();
-    final isLoading = maProvider.isLoading;
-    final enabledProviders = maProvider.enabledProviderIds.toSet();
+    // Use select to only rebuild when specific fields change
+    // SyncService changes are handled by _onSyncServiceChanged listener
+    final (isLoading, enabledProviders) = context.select<MusicAssistantProvider, (bool, Set<String>)>(
+      (p) => (p.isLoading, p.enabledProviderIds.toSet()),
+    );
     final colorScheme = Theme.of(context).colorScheme;
     final syncService = SyncService.instance;
 

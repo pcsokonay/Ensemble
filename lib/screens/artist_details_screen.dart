@@ -64,8 +64,18 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
     _loadArtistDescription();
     _refreshFavoriteStatus();
 
-    // Defer higher-res image loading and color extraction until after transition
-    // But hero animation now works because we have initialImageUrl
+    // Mark that we're on a detail screen and extract colors immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        markDetailScreenEntered(context);
+        // Extract colors from initial image URL if available
+        if (widget.initialImageUrl != null) {
+          _extractColors(widget.initialImageUrl!);
+        }
+      }
+    });
+
+    // Defer higher-res image loading until after transition
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 350), () {
         if (mounted) {
@@ -126,12 +136,15 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   }
 
   Future<void> _loadViewPreferences() async {
-    final sortOrder = await SettingsService.getArtistAlbumsSortOrder();
-    final viewMode = await SettingsService.getArtistAlbumsViewMode();
+    // Parallelize settings service calls
+    final results = await Future.wait([
+      SettingsService.getArtistAlbumsSortOrder(),
+      SettingsService.getArtistAlbumsViewMode(),
+    ]);
     if (mounted) {
       setState(() {
-        _sortOrder = sortOrder;
-        _viewMode = viewMode;
+        _sortOrder = results[0];
+        _viewMode = results[1];
       });
     }
   }
@@ -519,15 +532,18 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
   Future<void> _extractColors(String imageUrl) async {
     try {
-      final colorSchemes = await PaletteHelper.extractColorSchemes(
-        CachedNetworkImageProvider(imageUrl),
-      );
+      // Use isolate-based extraction to avoid blocking the main thread
+      final colorSchemes = await PaletteHelper.extractColorSchemesFromUrl(imageUrl);
 
       if (colorSchemes != null && mounted) {
         setState(() {
           _lightColorScheme = colorSchemes.$1;
           _darkColorScheme = colorSchemes.$2;
         });
+
+        // Update ThemeProvider so nav bar uses adaptive colors
+        final themeProvider = context.read<ThemeProvider>();
+        themeProvider.updateAdaptiveColors(colorSchemes.$1, colorSchemes.$2, isFromDetailScreen: true);
       }
     } catch (e) {
       _logger.log('Failed to extract colors for artist: $e');

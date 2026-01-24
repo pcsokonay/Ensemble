@@ -171,8 +171,8 @@ class _VolumeControlState extends State<VolumeControl> {
 
   @override
   Widget build(BuildContext context) {
-    final maProvider = context.watch<MusicAssistantProvider>();
-    final player = maProvider.selectedPlayer;
+    // Use select to only rebuild when selectedPlayer changes (not on every provider update)
+    final player = context.select<MusicAssistantProvider, dynamic>((p) => p.selectedPlayer);
 
     if (player == null) {
       return const SizedBox.shrink();
@@ -203,6 +203,7 @@ class _VolumeControlState extends State<VolumeControl> {
         onPressed: () async {
           // In compact mode, toggle between 0 and 50%
           final newVolume = currentVolume < 0.01 ? 50 : 0;
+          final maProvider = context.read<MusicAssistantProvider>();
           await _adjustVolume(maProvider, player.playerId, newVolume / 100.0, 0);
         },
       );
@@ -216,7 +217,7 @@ class _VolumeControlState extends State<VolumeControl> {
             Icons.volume_down,
             color: Colors.white70,
           ),
-          onPressed: () => _adjustVolume(maProvider, player.playerId, currentVolume, -1),
+          onPressed: () => _adjustVolume(context.read<MusicAssistantProvider>(), player.playerId, currentVolume, -1),
         ),
         // Slider with floating teardrop indicator
         Expanded(
@@ -284,7 +285,7 @@ class _VolumeControlState extends State<VolumeControl> {
                           setState(() {
                             _pendingVolume = newVolume;
                           });
-                          _sendVolumeUpdate(maProvider, player.playerId, newVolume);
+                          _sendVolumeUpdate(context.read<MusicAssistantProvider>(), player.playerId, newVolume);
                         }
                       },
                       onHorizontalDragEnd: (details) {
@@ -298,7 +299,7 @@ class _VolumeControlState extends State<VolumeControl> {
                           FlutterVolumeController.setVolume(finalVolume);
                           _systemVolume = finalVolume;
                         } else {
-                          maProvider.setVolume(player.playerId, volumeLevel);
+                          context.read<MusicAssistantProvider>().setVolume(player.playerId, volumeLevel);
                         }
 
                         _exitPrecisionMode();
@@ -387,7 +388,7 @@ class _VolumeControlState extends State<VolumeControl> {
             Icons.volume_up,
             color: Colors.white70,
           ),
-          onPressed: () => _adjustVolume(maProvider, player.playerId, currentVolume, 1),
+          onPressed: () => _adjustVolume(context.read<MusicAssistantProvider>(), player.playerId, currentVolume, 1),
         ),
       ],
     );

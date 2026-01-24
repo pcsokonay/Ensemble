@@ -271,7 +271,8 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final maProvider = context.watch<MusicAssistantProvider>();
+    // Use read since we only need the provider for non-reactive operations (getImageUrl)
+    final maProvider = context.read<MusicAssistantProvider>();
     final l10n = S.of(context)!;
 
     return Scaffold(
