@@ -406,6 +406,8 @@ class _SeriesCard extends StatelessWidget {
                     ? CachedNetworkImage(
                         imageUrl: coverUrl,
                         fit: BoxFit.cover,
+                        memCacheWidth: 192,
+                        memCacheHeight: 192,
                         fadeInDuration: Duration.zero,
                         fadeOutDuration: Duration.zero,
                         placeholder: (_, __) => Container(

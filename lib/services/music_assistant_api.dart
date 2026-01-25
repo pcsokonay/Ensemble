@@ -2076,6 +2076,37 @@ class MusicAssistantAPI {
     }
   }
 
+  /// Add multiple tracks to queue without interrupting playback
+  Future<void> addTracksToQueue(String playerId, List<Track> tracks, {int startIndex = 0}) async {
+    try {
+      final tracksToAdd = startIndex > 0 ? tracks.sublist(startIndex) : tracks;
+
+      // Filter to only tracks with available provider mappings
+      final playableTracks = tracksToAdd.where((track) {
+        if (track.providerMappings == null || track.providerMappings!.isEmpty) {
+          return false;
+        }
+        return track.providerMappings!.any((m) => m.available);
+      }).toList();
+
+      if (playableTracks.isEmpty) return;
+
+      final uris = playableTracks.map((track) => _buildTrackUri(track)).toList();
+
+      await _sendCommand(
+        'player_queues/play_media',
+        args: {
+          'queue_id': playerId,
+          'media': uris,
+          'option': 'add',  // Add to queue without starting playback
+        },
+      );
+    } catch (e) {
+      _logger.log('Error adding tracks to queue: $e');
+      rethrow;
+    }
+  }
+
   /// Play album on player
   Future<void> playAlbum(String playerId, Album album) async {
     try {

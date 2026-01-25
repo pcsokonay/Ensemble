@@ -2395,7 +2395,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     cacheExtent: 1000,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: false,
-                    itemExtent: 64,
+                    itemExtent: 67,
                     itemCount: sortedAuthorNames.length,
                     padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                     itemBuilder: (context, index) {
@@ -2435,7 +2435,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
       minVerticalPadding: 0,
       leading: Hero(
         tag: HeroTags.authorImage + authorName + '_library$heroSuffix',
@@ -2604,7 +2604,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
       minVerticalPadding: 0,
       leading: Hero(
         tag: HeroTags.audiobookCover + (book.uri ?? book.itemId) + '_library$heroSuffix',
@@ -2776,7 +2776,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                     cacheExtent: 1000,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: false,
-                    itemExtent: 64,
+                    itemExtent: 67,
                     itemCount: audiobooks.length,
                     padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                     itemBuilder: (context, index) {
@@ -3029,7 +3029,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 cacheExtent: 1000,
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
-                itemExtent: 64,
+                itemExtent: 67,
                 itemCount: sortedSeries.length,
                 padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                 itemBuilder: (context, index) {
@@ -3072,7 +3072,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final heroTag = 'series_cover_${series.id}';
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
       minVerticalPadding: 0,
       leading: Hero(
         tag: heroTag,
@@ -3459,7 +3459,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               controller: _podcastsScrollController,
               key: const PageStorageKey<String>('podcasts_list'),
               cacheExtent: 1000,
-              itemExtent: 64,
+              itemExtent: 67,
               padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
               itemCount: sortedPodcasts.length,
               itemBuilder: (context, index) {
@@ -3468,7 +3468,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 final imageUrl = maProvider.getPodcastImageUrl(podcast);
 
                 return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   minVerticalPadding: 0,
                   leading: Hero(
                     tag: HeroTags.podcastCover + (podcast.uri ?? podcast.itemId) + '_library',
@@ -3732,7 +3732,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               controller: _radioScrollController,
               key: const PageStorageKey<String>('radio_stations_list'),
               cacheExtent: 1000,
-              itemExtent: 64,
+              itemExtent: 67,
               padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
               itemCount: sortedRadioStations.length,
               itemBuilder: (context, index) {
@@ -3740,7 +3740,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 final imageUrl = maProvider.getImageUrl(station, size: cacheSize);
 
                 return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   minVerticalPadding: 0,
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
@@ -3944,7 +3944,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 cacheExtent: 1000,
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
-                itemExtent: 64,
+                itemExtent: 67,
                 itemCount: sortedArtists.length,
                 padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                 itemBuilder: (context, index) {
@@ -3994,7 +3994,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     return RepaintBoundary(
       child: ListTile(
         key: key,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         minVerticalPadding: 0,
         leading: ArtistAvatar(
           artist: artist,
@@ -4160,7 +4160,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 cacheExtent: 1000,
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
-                itemExtent: 64,
+                itemExtent: 67,
                 padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                 itemCount: sortedAlbums.length,
                 itemBuilder: (context, index) {
@@ -4204,7 +4204,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final textTheme = Theme.of(context).textTheme;
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
       minVerticalPadding: 0,
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(8),
@@ -4301,7 +4301,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 cacheExtent: 1000,
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: false,
-                itemExtent: 64,
+                itemExtent: 67,
                 itemCount: _sortedPlaylists.length,
                 padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
                 itemBuilder: (context, index) {
@@ -4344,7 +4344,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     return RepaintBoundary(
       child: ListTile(
         key: ValueKey(playlist.itemId),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         minVerticalPadding: 0,
         leading: Hero(
           tag: HeroTags.playlistCover + (playlist.uri ?? playlist.itemId) + heroSuffix,
@@ -4592,7 +4592,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           cacheExtent: 1000,
           addAutomaticKeepAlives: false,
           addRepaintBoundaries: false,
-          itemExtent: 64,
+          itemExtent: 67,
           padding: EdgeInsets.only(left: 8, right: 8, top: 16, bottom: BottomSpacing.withMiniPlayer),
           itemCount: displayTracks.length + (_hasMoreTracks && !_showFavoritesOnly ? 1 : 0),
           itemBuilder: (context, index) {
@@ -4626,7 +4626,7 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     return RepaintBoundary(
       child: ListTile(
         key: ValueKey(track.uri ?? track.itemId),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         minVerticalPadding: 0,
         leading: Container(
         width: 48,

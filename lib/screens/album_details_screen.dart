@@ -555,11 +555,9 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
       onPlayerSelected: (player) async {
         try {
           _logger.log('Adding album to queue on ${player.name}');
-          await maProvider.playTracks(
+          await maProvider.addTracksToQueue(
             player.playerId,
             _tracks,
-            startIndex: 0,
-            clearQueue: false,
           );
           _logger.log('Album added to queue on ${player.name}');
           if (mounted) {
@@ -586,11 +584,10 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
       onPlayerSelected: (player) async {
         try {
           // Add tracks from this index onwards to queue
-          await maProvider.playTracks(
+          await maProvider.addTracksToQueue(
             player.playerId,
             _tracks,
             startIndex: index,
-            clearQueue: false,
           );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

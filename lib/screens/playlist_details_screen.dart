@@ -397,11 +397,9 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
       onPlayerSelected: (player) async {
         try {
           _logger.log('Adding playlist to queue on ${player.name}');
-          await maProvider.playTracks(
+          await maProvider.addTracksToQueue(
             player.playerId,
             _tracks,
-            startIndex: 0,
-            clearQueue: false,
           );
           _logger.log('Playlist added to queue on ${player.name}');
           if (mounted) {
@@ -427,11 +425,10 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
       contextHint: S.of(context)!.addToQueueOn,
       onPlayerSelected: (player) async {
         try {
-          await maProvider.playTracks(
+          await maProvider.addTracksToQueue(
             player.playerId,
             _tracks,
             startIndex: index,
-            clearQueue: false,
           );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

@@ -5243,6 +5243,18 @@ class MusicAssistantProvider with ChangeNotifier {
     }
   }
 
+  Future<void> addTracksToQueue(String playerId, List<Track> tracks, {int startIndex = 0}) async {
+    try {
+      await _api?.addTracksToQueue(playerId, tracks, startIndex: startIndex);
+    } catch (e) {
+      final errorInfo = ErrorHandler.handleError(e, context: 'Add tracks to queue');
+      _error = errorInfo.userMessage;
+      ErrorHandler.logError('Add tracks to queue', e);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   Future<void> playTracks(String playerId, List<Track> tracks, {int? startIndex, bool clearQueue = true}) async {
     try {
       await _api?.playTracks(playerId, tracks, startIndex: startIndex, clearQueue: clearQueue);
