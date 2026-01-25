@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../l10n/app_localizations.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/debug_logger.dart';
@@ -98,7 +99,7 @@ class _RadioStationRowState extends State<RadioStationRow> with AutomaticKeepAli
     if (_radioStations.isEmpty) {
       return Center(
         child: Text(
-          'No radio stations found',
+          S.of(context)!.noRadioStations,
           style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
         ),
       );

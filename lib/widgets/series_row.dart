@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:palette_generator/palette_generator.dart';
+import '../l10n/app_localizations.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/debug_logger.dart';
@@ -172,7 +173,7 @@ class _SeriesRowState extends State<SeriesRow> with AutomaticKeepAliveClientMixi
     if (_series.isEmpty) {
       return Center(
         child: Text(
-          'No series found',
+          S.of(context)!.noSeriesFound,
           style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
         ),
       );

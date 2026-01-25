@@ -1835,6 +1835,18 @@ abstract class S {
   /// **'Display helpful tips for discovering features'**
   String get showHintsDescription;
 
+  /// Setting for fine volume control
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Precision Mode'**
+  String get volumePrecisionMode;
+
+  /// Description for volume precision mode setting
+  ///
+  /// In en, this message translates to:
+  /// **'Hold still while adjusting volume for fine control'**
+  String get volumePrecisionModeDescription;
+
   /// Settings section title for display options
   ///
   /// In en, this message translates to:

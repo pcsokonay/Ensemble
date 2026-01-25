@@ -1357,6 +1357,16 @@
     "description": "Description for show hints toggle"
   },
 
+  "volumePrecisionMode": "Volume Precision Mode",
+  "@volumePrecisionMode": {
+    "description": "Setting for fine volume control"
+  },
+
+  "volumePrecisionModeDescription": "Hold still while adjusting volume for fine control",
+  "@volumePrecisionModeDescription": {
+    "description": "Description for volume precision mode setting"
+  },
+
   "display": "Display",
   "@display": {
     "description": "Settings section title for display options"

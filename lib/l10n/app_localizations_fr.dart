@@ -1001,6 +1001,13 @@ class SFr extends S {
       'Afficher des conseils utiles pour découvrir les fonctionnalites';
 
   @override
+  String get volumePrecisionMode => 'Volume Precision Mode';
+
+  @override
+  String get volumePrecisionModeDescription =>
+      'Hold still while adjusting volume for fine control';
+
+  @override
   String get display => 'Display';
 
   @override

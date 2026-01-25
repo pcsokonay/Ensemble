@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../l10n/app_localizations.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/debug_logger.dart';
@@ -96,7 +97,7 @@ class _TrackRowState extends State<TrackRow> with AutomaticKeepAliveClientMixin 
     if (_tracks.isEmpty) {
       return Center(
         child: Text(
-          'No tracks found',
+          S.of(context)!.noTracksFound,
           style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
         ),
       );

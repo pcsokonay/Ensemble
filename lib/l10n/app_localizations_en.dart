@@ -976,6 +976,13 @@ class SEn extends S {
       'Display helpful tips for discovering features';
 
   @override
+  String get volumePrecisionMode => 'Volume Precision Mode';
+
+  @override
+  String get volumePrecisionModeDescription =>
+      'Hold still while adjusting volume for fine control';
+
+  @override
   String get display => 'Display';
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../l10n/app_localizations.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/debug_logger.dart';
@@ -105,7 +106,7 @@ class _AlbumRowState extends State<AlbumRow> with AutomaticKeepAliveClientMixin 
     if (_albums.isEmpty) {
       return Center(
         child: Text(
-          'No albums found',
+          S.of(context)!.noAlbumsFound,
           style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
         ),
       );

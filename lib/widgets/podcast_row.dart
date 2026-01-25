@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../l10n/app_localizations.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/debug_logger.dart';
@@ -106,7 +107,7 @@ class _PodcastRowState extends State<PodcastRow> with AutomaticKeepAliveClientMi
     if (_podcasts.isEmpty) {
       return Center(
         child: Text(
-          'No podcasts found',
+          S.of(context)!.noPodcasts,
           style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
         ),
       );

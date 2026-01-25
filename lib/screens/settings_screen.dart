@@ -7,6 +7,7 @@ import '../services/music_assistant_api.dart';
 import '../services/settings_service.dart';
 import '../theme/theme_provider.dart';
 import '../theme/app_theme.dart';
+import '../utils/page_transitions.dart';
 import '../widgets/global_player_overlay.dart';
 import 'debug_log_screen.dart';
 import 'login_screen.dart';
@@ -296,9 +297,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const DebugLogScreen(),
-                ),
+                FadeSlidePageRoute(child: const DebugLogScreen()),
               );
             },
             color: colorScheme.onBackground,
@@ -789,11 +788,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               child: SwitchListTile(
                 title: Text(
-                  'Volume precision mode',
+                  S.of(context)!.volumePrecisionMode,
                   style: TextStyle(color: colorScheme.onSurface),
                 ),
                 subtitle: Text(
-                  'Hold still while adjusting volume for fine control',
+                  S.of(context)!.volumePrecisionModeDescription,
                   style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
                 ),
                 value: _volumePrecisionMode,
