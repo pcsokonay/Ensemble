@@ -549,161 +549,63 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
 
   void _addAlbumToQueue() {
     final maProvider = context.read<MusicAssistantProvider>();
-    final players = maProvider.availablePlayers;
 
-    // Slide mini player down out of the way
-    GlobalPlayerOverlay.hidePlayer();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Spacing.vGap16,
-            Text(
-              S.of(context)!.addAlbumToQueueOn,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            Spacing.vGap16,
-            if (players.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Text(S.of(context)!.noPlayersAvailable),
-              )
-            else
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: players.length,
-                  itemBuilder: (context, playerIndex) {
-                    final player = players[playerIndex];
-                    return ListTile(
-                      leading: Icon(
-                        Icons.speaker,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      title: Text(player.name),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        try {
-                          _logger.log('Adding album to queue on ${player.name}');
-                          await maProvider.playTracks(
-                            player.playerId,
-                            _tracks,
-                            startIndex: 0,
-                            clearQueue: false,
-                          );
-                          _logger.log('Album added to queue on ${player.name}');
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(S.of(context)!.albumAddedToQueue),
-                                duration: const Duration(seconds: 1),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          _logger.log('Error adding album to queue: $e');
-                          _showError('Failed to add album to queue: $e');
-                        }
-                      },
-                    );
-                  },
-                ),
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.addAlbumToQueueOn,
+      onPlayerSelected: (player) async {
+        try {
+          _logger.log('Adding album to queue on ${player.name}');
+          await maProvider.playTracks(
+            player.playerId,
+            _tracks,
+            startIndex: 0,
+            clearQueue: false,
+          );
+          _logger.log('Album added to queue on ${player.name}');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(S.of(context)!.albumAddedToQueue),
+                duration: const Duration(seconds: 1),
               ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
-          ],
-        ),
-      ),
-    ).whenComplete(() {
-      // Show mini player again when sheet closes
-      GlobalPlayerOverlay.showPlayer();
-    });
+            );
+          }
+        } catch (e) {
+          _logger.log('Error adding album to queue: $e');
+          _showError('Failed to add album to queue: $e');
+        }
+      },
+    );
   }
 
   void _addTrackToQueue(BuildContext context, int index) {
     final maProvider = context.read<MusicAssistantProvider>();
-    final players = maProvider.availablePlayers;
 
-    // Slide mini player down out of the way
-    GlobalPlayerOverlay.hidePlayer();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Spacing.vGap16,
-            Text(
-              S.of(context)!.addToQueueOn,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            Spacing.vGap16,
-            if (players.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Text(S.of(context)!.noPlayersAvailable),
-              )
-            else
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: players.length,
-                  itemBuilder: (context, playerIndex) {
-                    final player = players[playerIndex];
-                    return ListTile(
-                      leading: Icon(
-                        Icons.speaker,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      title: Text(player.name),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        try {
-                          // Add tracks from this index onwards to queue
-                          await maProvider.playTracks(
-                            player.playerId,
-                            _tracks,
-                            startIndex: index,
-                            clearQueue: false,
-                          );
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(S.of(context)!.tracksAddedToQueue),
-                                duration: const Duration(seconds: 1),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          _logger.log('Error adding to queue: $e');
-                          _showError('Failed to add to queue: $e');
-                        }
-                      },
-                    );
-                  },
-                ),
+    GlobalPlayerOverlay.showPlayerSelectorForAction(
+      contextHint: S.of(context)!.addToQueueOn,
+      onPlayerSelected: (player) async {
+        try {
+          // Add tracks from this index onwards to queue
+          await maProvider.playTracks(
+            player.playerId,
+            _tracks,
+            startIndex: index,
+            clearQueue: false,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(S.of(context)!.tracksAddedToQueue),
+                duration: const Duration(seconds: 1),
               ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
-          ],
-        ),
-      ),
-    ).whenComplete(() {
-      // Slide mini player back up when sheet is dismissed
-      GlobalPlayerOverlay.showPlayer();
-    });
+            );
+          }
+        } catch (e) {
+          _logger.log('Error adding to queue: $e');
+          _showError('Failed to add to queue: $e');
+        }
+      },
+    );
   }
 
   void _navigateToArtist() {
