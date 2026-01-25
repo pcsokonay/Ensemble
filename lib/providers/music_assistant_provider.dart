@@ -2697,21 +2697,31 @@ class MusicAssistantProvider with ChangeNotifier {
           _logger.log('🎙️ Podcast currentMedia: $currentMedia');
         }
 
-        // Check for external source (optical, Spotify, etc.) - skip caching stale metadata
+        // Check for external source (optical, Spotify Connect, etc.) - skip caching stale metadata
+        // Use same logic as Player.fromJson:
+        // 1. If app_id == 'music_assistant' -> NOT external
+        // 2. If active_queue has value -> NOT external (MA controls playback)
+        // 3. If app_id is set and != 'music_assistant' -> external
+        // 4. Fallback: check for simple external IDs (optical, etc.)
+        final appId = event['app_id'] as String?;
+        final activeQueue = event['active_queue'] as String?;
+
         bool isExternalSource = false;
-        if (uri != null) {
+        if (appId == 'music_assistant') {
+          isExternalSource = false;
+        } else if (activeQueue != null && activeQueue.isNotEmpty) {
+          isExternalSource = false;
+        } else if (appId != null && appId.isNotEmpty) {
+          isExternalSource = true;
+        } else if (uri != null) {
           final uriLower = uri.toLowerCase();
-          // Simple external source identifiers (no :// or /)
+          // Only check for simple external source identifiers (physical inputs)
+          // Do NOT flag spotify://, etc. - those need app_id/active_queue context
           final isSimpleExternalId = !uri.contains('://') && !uri.contains('/') &&
               (uriLower == 'optical' || uriLower == 'line_in' || uriLower == 'bluetooth' ||
                uriLower == 'hdmi' || uriLower == 'tv' || uriLower == 'aux' ||
                uriLower == 'coaxial' || uriLower == 'toslink');
-          // External streaming protocols
-          final isExternalProtocol = uriLower.startsWith('spotify://') ||
-              uriLower.startsWith('airplay://') ||
-              uriLower.startsWith('cast://') ||
-              uriLower.startsWith('bluetooth://');
-          isExternalSource = isSimpleExternalId || isExternalProtocol;
+          isExternalSource = isSimpleExternalId;
 
           // Also treat unknown media type with non-MA URIs as external
           if (!isExternalSource && mediaType == 'unknown' &&
@@ -2721,7 +2731,7 @@ class MusicAssistantProvider with ChangeNotifier {
         }
 
         if (isExternalSource) {
-          _logger.log('📡 External source detected for $playerName (uri: $uri) - skipping metadata cache');
+          _logger.log('📡 External source detected for $playerName (app_id: $appId, uri: $uri) - skipping metadata cache');
           // Clear cached track for this player to avoid showing stale data
           _cacheService.clearCachedTrackForPlayer(playerId);
           return; // Skip further processing for external sources
@@ -4262,16 +4272,16 @@ class MusicAssistantProvider with ChangeNotifier {
     if (_api == null) return;
 
     try {
-      // Log app_id for playing players to help diagnose external source detection
+      // Log app_id and active_queue for playing players to help diagnose external source detection
       if (player.state == 'playing') {
-        _logger.log('🔍 Preload ${player.name}: state=${player.state}, app_id=${player.appId}, isExternalSource=${player.isExternalSource}');
+        _logger.log('🔍 Preload ${player.name}: state=${player.state}, app_id=${player.appId}, active_queue=${player.activeQueue != null ? "set" : "null"}, isExternalSource=${player.isExternalSource}');
       } else {
         _logger.log('🔍 Preload ${player.name}: state=${player.state}, available=${player.available}');
       }
 
       // Skip external sources - they're not playing MA content
       if (player.isExternalSource) {
-        _logger.log('🔍 Preload ${player.name}: SKIPPED - external source (app_id=${player.appId})');
+        _logger.log('🔍 Preload ${player.name}: SKIPPED - external source (app_id=${player.appId}, active_queue=${player.activeQueue != null ? "set" : "null"})');
         _cacheService.setCachedTrackForPlayer(player.playerId, null);
         return;
       }
@@ -4482,6 +4492,7 @@ class MusicAssistantProvider with ChangeNotifier {
         currentItemId: rawPlayer.currentItemId,
         isExternalSource: rawPlayer.isExternalSource,
         appId: rawPlayer.appId,
+        activeQueue: rawPlayer.activeQueue,
       );
 
       _selectedPlayer = updatedPlayer;

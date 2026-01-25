@@ -17,6 +17,7 @@ class Player {
   final String? activeSource; // The currently active source for this player
   final bool isExternalSource; // True when an external source (optical, Spotify, etc.) is active
   final String? appId; // The app_id from MA - 'music_assistant' when MA is playing, else external source
+  final String? activeQueue; // The active_queue from MA - has value when MA is controlling playback
 
   Player({
     required this.playerId,
@@ -35,6 +36,7 @@ class Player {
     this.activeSource,
     this.isExternalSource = false,
     this.appId,
+    this.activeQueue,
   });
 
   /// Create a copy of this Player with some fields replaced
@@ -55,6 +57,7 @@ class Player {
     String? activeSource,
     bool? isExternalSource,
     String? appId,
+    String? activeQueue,
   }) {
     return Player(
       playerId: playerId ?? this.playerId,
@@ -73,6 +76,7 @@ class Player {
       activeSource: activeSource ?? this.activeSource,
       isExternalSource: isExternalSource ?? this.isExternalSource,
       appId: appId ?? this.appId,
+      activeQueue: activeQueue ?? this.activeQueue,
     );
   }
 
@@ -218,50 +222,61 @@ class Player {
     // Parse active_source - the currently active source for this player
     final activeSource = json['active_source'] as String?;
 
-    // Detect external source (optical, Spotify, AirPlay, etc.)
-    // Primary indicator: app_id - if not 'music_assistant', it's an external source
-    // Secondary indicators: URI patterns and media_type
+    // Parse active_queue - this is the key indicator for MA-controlled playback
+    // When MA is playing: active_queue = 'uuid:...' or similar queue ID
+    // When external source: active_queue = null
+    final activeQueue = json['active_queue'] as String?;
+
+    // Parse app_id - helps distinguish external sources on DLNA players
+    final appId = json['app_id'] as String?;
+
+    // Detect external source (optical, Spotify Connect, AirPlay, etc.)
+    //
+    // Detection logic priority:
+    // 1. If app_id == 'music_assistant' -> MA is playing, NOT external
+    // 2. If active_queue has a value -> MA has a queue, NOT external
+    //    (This handles Spotify as music provider where URI is spotify:// but MA controls playback)
+    // 3. If app_id is set and NOT 'music_assistant' -> external source (e.g., 'http', 'spotify')
+    // 4. Fallback: Check URI patterns for simple external IDs (optical, line_in, etc.)
     bool isExternalSource = false;
 
-    // Check app_id first - this is the most reliable indicator for DLNA players
-    // When MA is playing: app_id = 'music_assistant'
-    // When external source: app_id = 'http', 'spotify', etc.
-    final appId = json['app_id'] as String?;
-    if (appId != null && appId.isNotEmpty && appId != 'music_assistant') {
-      // app_id is set but not 'music_assistant' - external source is active
+    // If MA explicitly says it's playing, trust that
+    if (appId == 'music_assistant') {
+      isExternalSource = false;
+    }
+    // If there's an active queue, MA is controlling playback (even with spotify:// URIs)
+    else if (activeQueue != null && activeQueue.isNotEmpty) {
+      isExternalSource = false;
+    }
+    // If app_id is set to something else (http, spotify, etc.), it's external
+    else if (appId != null && appId.isNotEmpty) {
       isExternalSource = true;
     }
-
-    // Also check current_media for additional external source indicators
-    if (!isExternalSource && json.containsKey('current_media')) {
+    // Fallback: check current_media for simple external source indicators
+    // Only check these when we have no app_id and no active_queue
+    else if (json.containsKey('current_media')) {
       final currentMedia = json['current_media'] as Map<String, dynamic>?;
       if (currentMedia != null) {
         final uri = currentMedia['uri'] as String?;
         final mediaType = currentMedia['media_type'] as String?;
 
-        // External source indicators:
-        // 1. URI is a simple identifier like 'optical', 'line_in', 'bluetooth', 'hdmi'
-        // 2. URI starts with external protocols: 'spotify://', 'airplay://', etc.
-        // 3. Media type is 'unknown' (MA doesn't recognize the source)
+        // Only check for simple external source identifiers (physical inputs)
+        // Do NOT flag spotify://, airplay://, etc. as external here -
+        // those should only be external if app_id indicates external control
         if (uri != null) {
           final uriLower = uri.toLowerCase();
           // Simple external source identifiers (no :// or /)
+          // These are physical inputs that are always external
           final isSimpleExternalId = !uri.contains('://') && !uri.contains('/') &&
               (uriLower == 'optical' || uriLower == 'line_in' || uriLower == 'bluetooth' ||
                uriLower == 'hdmi' || uriLower == 'tv' || uriLower == 'aux' ||
                uriLower == 'coaxial' || uriLower == 'toslink');
-          // External streaming protocols
-          final isExternalProtocol = uriLower.startsWith('spotify://') ||
-              uriLower.startsWith('airplay://') ||
-              uriLower.startsWith('cast://') ||
-              uriLower.startsWith('bluetooth://');
 
-          isExternalSource = isSimpleExternalId || isExternalProtocol;
+          isExternalSource = isSimpleExternalId;
         }
 
-        // Also check media_type - 'unknown' often indicates external source
+        // Also check media_type - 'unknown' with non-MA URI indicates external source
         if (!isExternalSource && mediaType == 'unknown') {
-          // If media_type is unknown and URI doesn't look like MA content, it's external
           final uri = currentMedia['uri'] as String?;
           if (uri != null && !uri.startsWith('library://') && !uri.contains('://track/')) {
             isExternalSource = true;
@@ -287,6 +302,7 @@ class Player {
       activeSource: activeSource,
       isExternalSource: isExternalSource,
       appId: appId,
+      activeQueue: activeQueue,
     );
   }
 
@@ -308,6 +324,7 @@ class Player {
       if (activeSource != null) 'active_source': activeSource,
       'is_external_source': isExternalSource,
       if (appId != null) 'app_id': appId,
+      if (activeQueue != null) 'active_queue': activeQueue,
     };
   }
 }
