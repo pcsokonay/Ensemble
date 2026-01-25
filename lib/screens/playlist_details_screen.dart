@@ -10,6 +10,7 @@ import '../services/debug_logger.dart';
 import '../services/recently_played_service.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/provider_icon.dart';
+import '../widgets/hires_badge.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 
@@ -863,14 +864,26 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              trailing: track.duration != null
-                                  ? Text(
-                                      _formatDuration(track.duration!),
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurface.withOpacity(0.5),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (HiResBadge.getTooltip(track) != null) ...[
+                                    HiResBadge.fromTrack(track, primaryColor: colorScheme.primary)!,
+                                    const SizedBox(width: 12),
+                                  ],
+                                  if (track.duration != null)
+                                    SizedBox(
+                                      width: 40,
+                                      child: Text(
+                                        _formatDuration(track.duration!),
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: colorScheme.onSurface.withOpacity(0.5),
+                                        ),
+                                        textAlign: TextAlign.right,
                                       ),
-                                    )
-                                  : null,
+                                    ),
+                                ],
+                              ),
                               onTap: () {
                                 if (isExpanded) {
                                   setState(() {

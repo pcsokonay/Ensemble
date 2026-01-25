@@ -18,6 +18,7 @@ import '../theme/theme_provider.dart';
 import '../widgets/common/empty_state.dart';
 import '../widgets/common/disconnected_state.dart';
 import '../widgets/letter_scrollbar.dart';
+import '../widgets/hires_badge.dart';
 import '../services/settings_service.dart';
 import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
@@ -4664,6 +4665,10 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (HiResBadge.getTooltip(track) != null) ...[
+            HiResBadge.fromTrack(track, primaryColor: colorScheme.primary)!,
+            const SizedBox(width: 12),
+          ],
           if (track.favorite == true)
             const Padding(
               padding: EdgeInsets.only(right: 8),
@@ -4674,10 +4679,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               ),
             ),
           if (track.duration != null)
-            Text(
-              _formatTrackDuration(track.duration!),
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.5),
+            SizedBox(
+              width: 40,
+              child: Text(
+                _formatTrackDuration(track.duration!),
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.5),
+                ),
+                textAlign: TextAlign.right,
               ),
             ),
         ],
