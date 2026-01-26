@@ -22,6 +22,7 @@ import 'audiobook_detail_screen.dart';
 import 'podcast_detail_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/media_context_menu.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -111,13 +112,6 @@ class SearchScreenState extends State<SearchScreen> {
   String? _searchError;
   List<String> _recentSearches = [];
   bool _libraryOnly = false;
-  String? _expandedTrackId; // Track ID for expanded quick actions
-  String? _expandedArtistId; // Artist ID for expanded quick actions
-  String? _expandedAlbumId; // Album ID for expanded quick actions
-  String? _expandedPlaylistId; // Playlist ID for expanded quick actions
-  String? _expandedAudiobookId; // Audiobook ID for expanded quick actions
-  String? _expandedRadioId; // Radio ID for expanded quick actions
-  String? _expandedPodcastId; // Podcast ID for expanded quick actions
   bool _hasSearchText = false; // PERF: Track separately to avoid rebuild on every keystroke
 
   // Track library changes locally since item data doesn't update immediately
@@ -1156,161 +1150,67 @@ class SearchScreenState extends State<SearchScreen> {
     final maProvider = context.read<MusicAssistantProvider>();
     final imageUrl = maProvider.getImageUrl(artist, size: 256);
 
-    // Use 'search' suffix to avoid hero tag conflicts with library cards
     const heroSuffix = '_search';
     final artistId = artist.uri ?? artist.itemId;
-    final isExpanded = _expandedArtistId == artistId;
-    final isInLib = _isInLibrary(artist);
 
     return RepaintBoundary(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            key: ValueKey(artistId),
-            leading: Hero(
-              tag: HeroTags.artistImage + artistId + heroSuffix,
-              child: ArtistAvatar(
-                artist: artist,
-                radius: 24,
-                imageSize: 128,
-              ),
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.artist,
+            item: artist,
+            isFavorite: artist.favorite ?? false,
+            isInLibrary: _isInLibrary(artist),
+            onToggleFavorite: () => _toggleArtistFavorite(artist),
+            onToggleLibrary: () => _isInLibrary(artist)
+                ? _removeFromLibrary(artist, 'artist')
+                : _addToLibrary(artist, 'artist'),
+          );
+        },
+        child: ListTile(
+          key: ValueKey(artistId),
+          leading: Hero(
+            tag: HeroTags.artistImage + artistId + heroSuffix,
+            child: ArtistAvatar(
+              artist: artist,
+              radius: 24,
+              imageSize: 128,
             ),
-            title: Text(
-              artist.name,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          ),
+          title: Text(
+            artist.name,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
             ),
-            subtitle: showType
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [_buildTypePill('artist', colorScheme)],
-                  )
-                : Text(
-                    S.of(context)!.artist,
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                  ),
-            onTap: () {
-              if (isExpanded) {
-                setState(() => _expandedArtistId = null);
-              } else {
-                // Update adaptive colors before navigation
-                updateAdaptiveColorsFromImage(context, imageUrl);
-                Navigator.push(
-                  context,
-                  FadeSlidePageRoute(
-                    child: ArtistDetailsScreen(
-                      artist: artist,
-                      heroTagSuffix: 'search',
-                      initialImageUrl: imageUrl,
-                    ),
-                  ),
-                );
-              }
-            },
-            onLongPress: () {
-              setState(() {
-                _expandedArtistId = isExpanded ? null : artistId;
-              });
-            },
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          // Expandable quick actions row
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: isExpanded
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 16.0, bottom: 12.0, top: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // Artist Radio button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _playArtistRadio(artist),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.radio, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Add to queue button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _addArtistToQueue(artist),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.playlist_add, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Favorite button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _toggleArtistFavorite(artist),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(Radii.xxl),
-                              ),
-                            ),
-                            child: Icon(
-                              artist.favorite == true ? Icons.favorite : Icons.favorite_border,
-                              size: 20,
-                              color: artist.favorite == true
-                                  ? colorScheme.error
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Library button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => isInLib
-                                ? _removeFromLibrary(artist, 'artist')
-                                : _addToLibrary(artist, 'artist'),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Icon(
-                              isInLib ? Icons.library_add_check : Icons.library_add,
-                              size: 20,
-                              color: isInLib
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
+          subtitle: showType
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [_buildTypePill('artist', colorScheme)],
+                )
+              : Text(
+                  S.of(context)!.artist,
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                ),
+          onTap: () {
+            updateAdaptiveColorsFromImage(context, imageUrl);
+            Navigator.push(
+              context,
+              FadeSlidePageRoute(
+                child: ArtistDetailsScreen(
+                  artist: artist,
+                  heroTagSuffix: 'search',
+                  initialImageUrl: imageUrl,
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -1320,233 +1220,30 @@ class SearchScreenState extends State<SearchScreen> {
     final imageUrl = maProvider.getImageUrl(album, size: 128);
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Use 'search' suffix to avoid hero tag conflicts with library cards
     const heroSuffix = '_search';
     final albumId = album.uri ?? album.itemId;
-    final isExpanded = _expandedAlbumId == albumId;
-    final isInLib = album.inLibrary;
 
     return RepaintBoundary(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            key: ValueKey(albumId),
-            leading: Hero(
-              tag: HeroTags.albumCover + albumId + heroSuffix,
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                  image: imageUrl != null
-                      ? DecorationImage(
-                          image: CachedNetworkImageProvider(imageUrl),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: imageUrl == null
-                    ? Icon(Icons.album_rounded, color: colorScheme.onSurfaceVariant)
-                    : null,
-              ),
-            ),
-            title: Hero(
-              tag: HeroTags.albumTitle + albumId + heroSuffix,
-              child: Material(
-                color: Colors.transparent,
-                child: Text(
-                  album.nameWithYear,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-            subtitle: Hero(
-              tag: HeroTags.artistName + albumId + heroSuffix,
-              child: Material(
-                color: Colors.transparent,
-                child: showType
-                    ? Row(
-                        children: [
-                          _buildTypePill('album', colorScheme),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              album.artistsString,
-                              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Text(
-                        album.artistsString,
-                        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-              ),
-            ),
-            onTap: () {
-              if (isExpanded) {
-                setState(() => _expandedAlbumId = null);
-              } else {
-                // Update adaptive colors before navigation
-                updateAdaptiveColorsFromImage(context, imageUrl);
-                Navigator.push(
-                  context,
-                  FadeSlidePageRoute(
-                    child: AlbumDetailsScreen(
-                      album: album,
-                      heroTagSuffix: 'search',
-                      initialImageUrl: imageUrl,
-                    ),
-                  ),
-                );
-              }
-            },
-            onLongPress: () {
-              setState(() {
-                _expandedAlbumId = isExpanded ? null : albumId;
-              });
-            },
-          ),
-          // Expandable quick actions row
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: isExpanded
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 16.0, bottom: 12.0, top: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // Play button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _playAlbum(album),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.play_arrow, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Play On button (pick player)
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _showAlbumPlayOnMenu(album),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.speaker_group_outlined, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Add to queue button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _addAlbumToQueue(album),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.playlist_add, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Favorite button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _toggleAlbumFavorite(album),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(Radii.xxl),
-                              ),
-                            ),
-                            child: Icon(
-                              album.favorite == true ? Icons.favorite : Icons.favorite_border,
-                              size: 20,
-                              color: album.favorite == true
-                                  ? colorScheme.error
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Library button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => isInLib
-                                ? _removeFromLibrary(album, 'album')
-                                : _addToLibrary(album, 'album'),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Icon(
-                              isInLib ? Icons.library_add_check : Icons.library_add,
-                              size: 20,
-                              color: isInLib
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTrackTile(Track track, {bool showType = false}) {
-    final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = track.album != null
-        ? maProvider.getImageUrl(track.album!, size: 128)
-        : null;
-    final colorScheme = Theme.of(context).colorScheme;
-    final trackId = track.uri ?? track.itemId;
-    final isExpanded = _expandedTrackId == trackId;
-
-    return RepaintBoundary(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            key: ValueKey(trackId),
-            leading: Container(
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.album,
+            item: album,
+            isFavorite: album.favorite ?? false,
+            isInLibrary: album.inLibrary,
+            onToggleFavorite: () => _toggleAlbumFavorite(album),
+            onToggleLibrary: () => album.inLibrary
+                ? _removeFromLibrary(album, 'album')
+                : _addToLibrary(album, 'album'),
+          );
+        },
+        child: ListTile(
+          key: ValueKey(albumId),
+          leading: Hero(
+            tag: HeroTags.albumCover + albumId + heroSuffix,
+            child: Container(
               width: 48,
               height: 48,
               decoration: BoxDecoration(
@@ -1560,143 +1257,151 @@ class SearchScreenState extends State<SearchScreen> {
                     : null,
               ),
               child: imageUrl == null
-                  ? Icon(Icons.music_note_rounded, color: colorScheme.onSurfaceVariant)
+                  ? Icon(Icons.album_rounded, color: colorScheme.onSurfaceVariant)
                   : null,
             ),
-            title: Text(
-              track.name,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: showType
-                ? Row(
-                    children: [
-                      _buildTypePill('track', colorScheme),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          track.artistsString,
-                          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  )
-                : Text(
-                    track.artistsString,
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-            trailing: track.duration != null
-                ? Text(
-                    _formatDuration(track.duration!),
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
-                  )
-                : null,
-            onTap: () {
-              if (isExpanded) {
-                setState(() => _expandedTrackId = null);
-              } else {
-                _playTrack(track);
-              }
-            },
-            onLongPress: () {
-              setState(() {
-                _expandedTrackId = isExpanded ? null : trackId;
-              });
-            },
           ),
-          // Expandable quick actions row
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: isExpanded
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 16.0, bottom: 12.0, top: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+          title: Hero(
+            tag: HeroTags.albumTitle + albumId + heroSuffix,
+            child: Material(
+              color: Colors.transparent,
+              child: Text(
+                album.nameWithYear,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          subtitle: Hero(
+            tag: HeroTags.artistName + albumId + heroSuffix,
+            child: Material(
+              color: Colors.transparent,
+              child: showType
+                  ? Row(
                       children: [
-                        // Radio button (uses current player - 1 tap)
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _playRadio(track),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.radio, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Radio On button (pick player - 2 taps)
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _showRadioOnMenu(track),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.speaker_group_outlined, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Add to queue button (uses current player - 1 tap)
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _addToQueue(track),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.playlist_add, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Favorite button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _toggleTrackFavorite(track),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(Radii.xxl),
-                              ),
-                            ),
-                            child: Icon(
-                              track.favorite == true ? Icons.favorite : Icons.favorite_border,
-                              size: 20,
-                              color: track.favorite == true
-                                  ? colorScheme.error
-                                  : colorScheme.onSurfaceVariant,
-                            ),
+                        _buildTypePill('album', colorScheme),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            album.artistsString,
+                            style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
+                    )
+                  : Text(
+                      album.artistsString,
+                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  )
-                : const SizedBox.shrink(),
+            ),
           ),
-        ],
+          onTap: () {
+            updateAdaptiveColorsFromImage(context, imageUrl);
+            Navigator.push(
+              context,
+              FadeSlidePageRoute(
+                child: AlbumDetailsScreen(
+                  album: album,
+                  heroTagSuffix: 'search',
+                  initialImageUrl: imageUrl,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrackTile(Track track, {bool showType = false}) {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final imageUrl = track.album != null
+        ? maProvider.getImageUrl(track.album!, size: 128)
+        : null;
+    final colorScheme = Theme.of(context).colorScheme;
+    final trackId = track.uri ?? track.itemId;
+
+    return RepaintBoundary(
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.track,
+            item: track,
+            isFavorite: track.favorite ?? false,
+            isInLibrary: _isInLibrary(track),
+            onToggleFavorite: () => _toggleTrackFavorite(track),
+            onToggleLibrary: () => _isInLibrary(track)
+                ? _removeFromLibrary(track, 'track')
+                : _addToLibrary(track, 'track'),
+          );
+        },
+        child: ListTile(
+          key: ValueKey(trackId),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+              image: imageUrl != null
+                  ? DecorationImage(
+                      image: CachedNetworkImageProvider(imageUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: imageUrl == null
+                ? Icon(Icons.music_note_rounded, color: colorScheme.onSurfaceVariant)
+                : null,
+          ),
+          title: Text(
+            track.name,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: showType
+              ? Row(
+                  children: [
+                    _buildTypePill('track', colorScheme),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        track.artistsString,
+                        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                )
+              : Text(
+                  track.artistsString,
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+          trailing: track.duration != null
+              ? Text(
+                  _formatDuration(track.duration!),
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
+                )
+              : null,
+          onTap: () => _playTrack(track),
+        ),
       ),
     );
   }
@@ -1706,185 +1411,114 @@ class SearchScreenState extends State<SearchScreen> {
     final imageUrl = maProvider.getImageUrl(playlist, size: 128);
     final colorScheme = Theme.of(context).colorScheme;
     final playlistId = playlist.uri ?? playlist.itemId;
-    final isExpanded = _expandedPlaylistId == playlistId;
-    final isInLib = _isInLibrary(playlist);
 
     // Unique suffix for search context
     const heroSuffix = '_search';
 
     return RepaintBoundary(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            key: ValueKey(playlistId),
-            leading: Hero(
-              tag: HeroTags.playlistCover + playlistId + heroSuffix,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  color: colorScheme.surfaceContainerHighest,
-                  child: imageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.cover,
-                          memCacheWidth: 96,
-                          memCacheHeight: 96,
-                          fadeInDuration: Duration.zero,
-                          fadeOutDuration: Duration.zero,
-                          placeholder: (_, __) => const SizedBox(),
-                          errorWidget: (_, __, ___) => Icon(
-                            Icons.queue_music_rounded,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        )
-                      : Icon(
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.playlist,
+            item: playlist,
+            isFavorite: playlist.favorite ?? false,
+            isInLibrary: _isInLibrary(playlist),
+            onToggleLibrary: () => _isInLibrary(playlist)
+                ? _removeFromLibrary(playlist, 'playlist')
+                : _addToLibrary(playlist, 'playlist'),
+          );
+        },
+        child: ListTile(
+          key: ValueKey(playlistId),
+          leading: Hero(
+            tag: HeroTags.playlistCover + playlistId + heroSuffix,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 48,
+                height: 48,
+                color: colorScheme.surfaceContainerHighest,
+                child: imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 96,
+                        memCacheHeight: 96,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
+                        placeholder: (_, __) => const SizedBox(),
+                        errorWidget: (_, __, ___) => Icon(
                           Icons.queue_music_rounded,
                           color: colorScheme.onSurfaceVariant,
                         ),
-                ),
+                      )
+                    : Icon(
+                        Icons.queue_music_rounded,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
               ),
             ),
-            title: Hero(
-              tag: HeroTags.playlistTitle + playlistId + heroSuffix,
-              child: Material(
-                color: Colors.transparent,
-                child: Text(
-                  playlist.name,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                  ),
+          ),
+          title: Hero(
+            tag: HeroTags.playlistTitle + playlistId + heroSuffix,
+            child: Material(
+              color: Colors.transparent,
+              child: Text(
+                playlist.name,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          subtitle: showType
+              ? Row(
+                  children: [
+                    _buildTypePill('playlist', colorScheme),
+                    if (playlist.owner != null) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          playlist.owner!,
+                          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                )
+              : Text(
+                  playlist.owner ?? S.of(context)!.playlist,
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+          trailing: playlist.trackCount != null
+              ? Text(
+                  S.of(context)!.trackCount(playlist.trackCount!),
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
+                )
+              : null,
+          onTap: () {
+            updateAdaptiveColorsFromImage(context, imageUrl);
+            Navigator.push(
+              context,
+              FadeSlidePageRoute(
+                child: PlaylistDetailsScreen(
+                  playlist: playlist,
+                  heroTagSuffix: 'search',
+                  initialImageUrl: imageUrl,
+                ),
               ),
-            ),
-            subtitle: showType
-                ? Row(
-                    children: [
-                      _buildTypePill('playlist', colorScheme),
-                      if (playlist.owner != null) ...[
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            playlist.owner!,
-                            style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ],
-                  )
-                : Text(
-                    playlist.owner ?? S.of(context)!.playlist,
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-            trailing: playlist.trackCount != null
-                ? Text(
-                    S.of(context)!.trackCount(playlist.trackCount!),
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
-                  )
-                : null,
-            onTap: () {
-              if (isExpanded) {
-                setState(() => _expandedPlaylistId = null);
-              } else {
-                updateAdaptiveColorsFromImage(context, imageUrl);
-                Navigator.push(
-                  context,
-                  FadeSlidePageRoute(
-                    child: PlaylistDetailsScreen(
-                      playlist: playlist,
-                      heroTagSuffix: 'search',
-                      initialImageUrl: imageUrl,
-                    ),
-                  ),
-                );
-              }
-            },
-            onLongPress: () {
-              setState(() {
-                _expandedPlaylistId = isExpanded ? null : playlistId;
-              });
-            },
-          ),
-          // Expandable quick actions row
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: isExpanded
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 16.0, bottom: 12.0, top: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // Play button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _playPlaylist(playlist),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.play_arrow, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Play On button (pick player)
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _showPlaylistPlayOnMenu(playlist),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.speaker_group_outlined, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Library button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => isInLib
-                                ? _removeFromLibrary(playlist, 'playlist')
-                                : _addToLibrary(playlist, 'playlist'),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Icon(
-                              isInLib ? Icons.library_add_check : Icons.library_add,
-                              size: 20,
-                              color: isInLib
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -1898,213 +1532,25 @@ class SearchScreenState extends State<SearchScreen> {
     // Use 'search' suffix to avoid hero tag conflicts with library cards
     const heroSuffix = '_search';
     final audiobookId = audiobook.uri ?? audiobook.itemId;
-    final isExpanded = _expandedAudiobookId == audiobookId;
-    final isInLib = _isInLibrary(audiobook);
 
     return RepaintBoundary(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            key: ValueKey(audiobookId),
-            leading: Hero(
-              tag: HeroTags.audiobookCover + audiobookId + heroSuffix,
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                  image: imageUrl != null
-                      ? DecorationImage(
-                          image: CachedNetworkImageProvider(imageUrl),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: imageUrl == null
-                    ? Icon(Icons.headphones_rounded, color: colorScheme.onSurfaceVariant)
-                    : null,
-              ),
-            ),
-            title: Hero(
-              tag: HeroTags.audiobookTitle + audiobookId + heroSuffix,
-              child: Material(
-                color: Colors.transparent,
-                child: Text(
-                  audiobook.name,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-            subtitle: showType
-                ? Row(
-                    children: [
-                      _buildTypePill('audiobook', colorScheme),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          authorText,
-                          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  )
-                : Text(
-                    authorText,
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-            trailing: audiobook.duration != null
-                ? Text(
-                    _formatDuration(audiobook.duration!),
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
-                  )
-                : null,
-            onTap: () {
-              if (isExpanded) {
-                setState(() => _expandedAudiobookId = null);
-              } else {
-                // Update adaptive colors before navigation
-                updateAdaptiveColorsFromImage(context, imageUrl);
-                Navigator.push(
-                  context,
-                  FadeSlidePageRoute(
-                    child: AudiobookDetailScreen(
-                      audiobook: audiobook,
-                      heroTagSuffix: 'search',
-                      initialImageUrl: imageUrl,
-                    ),
-                  ),
-                );
-              }
-            },
-            onLongPress: () {
-              setState(() {
-                _expandedAudiobookId = isExpanded ? null : audiobookId;
-              });
-            },
-          ),
-          // Expandable quick actions row
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: isExpanded
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 16.0, bottom: 12.0, top: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // Play button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _playAudiobook(audiobook),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.play_arrow, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Play On button (pick player)
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _showAudiobookPlayOnMenu(audiobook),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.speaker_group_outlined, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Favorite button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _toggleAudiobookFavorite(audiobook),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(Radii.xxl),
-                              ),
-                            ),
-                            child: Icon(
-                              audiobook.favorite == true ? Icons.favorite : Icons.favorite_border,
-                              size: 20,
-                              color: audiobook.favorite == true
-                                  ? colorScheme.error
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Library button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => isInLib
-                                ? _removeFromLibrary(audiobook, 'audiobook')
-                                : _addToLibrary(audiobook, 'audiobook'),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Icon(
-                              isInLib ? Icons.library_add_check : Icons.library_add,
-                              size: 20,
-                              color: isInLib
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRadioTile(MediaItem radio, {bool showType = false}) {
-    final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.getImageUrl(radio, size: 128);
-    final colorScheme = Theme.of(context).colorScheme;
-    final radioId = radio.uri ?? radio.itemId;
-    final isExpanded = _expandedRadioId == radioId;
-    final isInLib = _isInLibrary(radio);
-
-    return RepaintBoundary(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            key: ValueKey(radioId),
-            leading: Container(
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.audiobook,
+            item: audiobook,
+            isFavorite: audiobook.favorite ?? false,
+            isInLibrary: true,
+            onToggleFavorite: () => _toggleAudiobookFavorite(audiobook),
+          );
+        },
+        child: ListTile(
+          key: ValueKey(audiobookId),
+          leading: Hero(
+            tag: HeroTags.audiobookCover + audiobookId + heroSuffix,
+            child: Container(
               width: 48,
               height: 48,
               decoration: BoxDecoration(
@@ -2118,113 +1564,130 @@ class SearchScreenState extends State<SearchScreen> {
                     : null,
               ),
               child: imageUrl == null
-                  ? Icon(Icons.radio_rounded, color: colorScheme.onSurfaceVariant)
+                  ? Icon(Icons.headphones_rounded, color: colorScheme.onSurfaceVariant)
                   : null,
             ),
-            title: Text(
-              radio.name,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w500,
+          ),
+          title: Hero(
+            tag: HeroTags.audiobookTitle + audiobookId + heroSuffix,
+            child: Material(
+              color: Colors.transparent,
+              child: Text(
+                audiobook.name,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-            subtitle: showType
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [_buildTypePill('radio', colorScheme)],
-                  )
-                : Text(
-                    S.of(context)!.radio,
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-            onTap: () {
-              if (isExpanded) {
-                setState(() => _expandedRadioId = null);
-              } else {
-                _playRadioStation(radio);
-              }
-            },
-            onLongPress: () {
-              setState(() {
-                _expandedRadioId = isExpanded ? null : radioId;
-              });
-            },
           ),
-          // Expandable quick actions row
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: isExpanded
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 16.0, bottom: 12.0, top: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // Play button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _playRadioStation(radio),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.play_arrow, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Play On button (pick player)
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _showRadioPlayOnMenu(radio),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.speaker_group_outlined, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Library button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => isInLib
-                                ? _removeFromLibrary(radio, 'radio')
-                                : _addToLibrary(radio, 'radio'),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Icon(
-                              isInLib ? Icons.library_add_check : Icons.library_add,
-                              size: 20,
-                              color: isInLib
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
+          subtitle: showType
+              ? Row(
+                  children: [
+                    _buildTypePill('audiobook', colorScheme),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        authorText,
+                        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  )
-                : const SizedBox.shrink(),
+                  ],
+                )
+              : Text(
+                  authorText,
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+          trailing: audiobook.duration != null
+              ? Text(
+                  _formatDuration(audiobook.duration!),
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
+                )
+              : null,
+          onTap: () {
+            // Update adaptive colors before navigation
+            updateAdaptiveColorsFromImage(context, imageUrl);
+            Navigator.push(
+              context,
+              FadeSlidePageRoute(
+                child: AudiobookDetailScreen(
+                  audiobook: audiobook,
+                  heroTagSuffix: 'search',
+                  initialImageUrl: imageUrl,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRadioTile(MediaItem radio, {bool showType = false}) {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final imageUrl = maProvider.getImageUrl(radio, size: 128);
+    final colorScheme = Theme.of(context).colorScheme;
+    final radioId = radio.uri ?? radio.itemId;
+
+    return RepaintBoundary(
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.radio,
+            item: radio,
+            isFavorite: false,
+            isInLibrary: true,
+          );
+        },
+        child: ListTile(
+          key: ValueKey(radioId),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+              image: imageUrl != null
+                  ? DecorationImage(
+                      image: CachedNetworkImageProvider(imageUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: imageUrl == null
+                ? Icon(Icons.radio_rounded, color: colorScheme.onSurfaceVariant)
+                : null,
           ),
-        ],
+          title: Text(
+            radio.name,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: showType
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [_buildTypePill('radio', colorScheme)],
+                )
+              : Text(
+                  S.of(context)!.radio,
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+          onTap: () => _playRadioStation(radio),
+        ),
       ),
     );
   }
@@ -2237,154 +1700,80 @@ class SearchScreenState extends State<SearchScreen> {
     // Use 'search' suffix to avoid hero tag conflicts with library cards
     const heroSuffix = '_search';
     final podcastId = podcast.uri ?? podcast.itemId;
-    final isExpanded = _expandedPodcastId == podcastId;
-    final isInLib = _isInLibrary(podcast);
 
     return RepaintBoundary(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            key: ValueKey(podcastId),
-            leading: Hero(
-              tag: HeroTags.podcastCover + podcastId + heroSuffix,
-              // Match library/detail pattern: ClipRRect(16) → Container → CachedNetworkImage
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  color: colorScheme.surfaceContainerHighest,
-                  child: imageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          fadeInDuration: Duration.zero,
-                          fadeOutDuration: Duration.zero,
-                          placeholder: (_, __) => const SizedBox(),
-                          errorWidget: (_, __, ___) => Icon(Icons.podcasts_rounded, color: colorScheme.onSurfaceVariant),
-                        )
-                      : Icon(Icons.podcasts_rounded, color: colorScheme.onSurfaceVariant),
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.podcast,
+            item: podcast,
+            isFavorite: false,
+            isInLibrary: true,
+          );
+        },
+        child: ListTile(
+          key: ValueKey(podcastId),
+          leading: Hero(
+            tag: HeroTags.podcastCover + podcastId + heroSuffix,
+            // Match library/detail pattern: ClipRRect(16) → Container → CachedNetworkImage
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: 48,
+                height: 48,
+                color: colorScheme.surfaceContainerHighest,
+                child: imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
+                        placeholder: (_, __) => const SizedBox(),
+                        errorWidget: (_, __, ___) => Icon(Icons.podcasts_rounded, color: colorScheme.onSurfaceVariant),
+                      )
+                    : Icon(Icons.podcasts_rounded, color: colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ),
+          title: Text(
+            podcast.name,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: showType
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [_buildTypePill('podcast', colorScheme)],
+                )
+              : Text(
+                  S.of(context)!.podcasts,
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+          onTap: () {
+            // Update adaptive colors before navigation
+            updateAdaptiveColorsFromImage(context, imageUrl);
+            Navigator.push(
+              context,
+              FadeSlidePageRoute(
+                child: PodcastDetailScreen(
+                  podcast: podcast,
+                  heroTagSuffix: 'search',
+                  initialImageUrl: imageUrl,
                 ),
               ),
-            ),
-            title: Text(
-              podcast.name,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: showType
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [_buildTypePill('podcast', colorScheme)],
-                  )
-                : Text(
-                    S.of(context)!.podcasts,
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-            onTap: () {
-              if (isExpanded) {
-                setState(() => _expandedPodcastId = null);
-              } else {
-                // Update adaptive colors before navigation
-                updateAdaptiveColorsFromImage(context, imageUrl);
-                Navigator.push(
-                  context,
-                  FadeSlidePageRoute(
-                    child: PodcastDetailScreen(
-                      podcast: podcast,
-                      heroTagSuffix: 'search',
-                      initialImageUrl: imageUrl,
-                    ),
-                  ),
-                );
-              }
-            },
-            onLongPress: () {
-              setState(() {
-                _expandedPodcastId = isExpanded ? null : podcastId;
-              });
-            },
-          ),
-          // Expandable quick actions row
-          AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            child: isExpanded
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 16.0, bottom: 12.0, top: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        // Play button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _playPodcast(podcast),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.play_arrow, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Play On button (pick player)
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => _showPodcastPlayOnMenu(podcast),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Icon(Icons.speaker_group_outlined, size: 20),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Library button
-                        SizedBox(
-                          height: 44,
-                          width: 44,
-                          child: FilledButton.tonal(
-                            onPressed: () => isInLib
-                                ? _removeFromLibrary(podcast, 'podcast')
-                                : _addToLibrary(podcast, 'podcast'),
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Icon(
-                              isInLib ? Icons.library_add_check : Icons.library_add,
-                              size: 20,
-                              color: isInLib
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }

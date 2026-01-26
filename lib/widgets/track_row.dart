@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../l10n/app_localizations.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/debug_logger.dart';
+import 'media_context_menu.dart';
 
 class TrackRow extends StatefulWidget {
   final String title;
@@ -177,7 +179,7 @@ class _TrackRowState extends State<TrackRow> with AutomaticKeepAliveClientMixin 
   }
 }
 
-class _TrackCard extends StatelessWidget {
+class _TrackCard extends StatefulWidget {
   final Track track;
   final List<Track> tracks;
   final int index;
@@ -189,12 +191,171 @@ class _TrackCard extends StatelessWidget {
   });
 
   @override
+  State<_TrackCard> createState() => _TrackCardState();
+}
+
+class _TrackCardState extends State<_TrackCard> {
+  late bool _isFavorite;
+  late bool _isInLibrary;
+
+  @override
+  void initState() {
+    super.initState();
+    _isFavorite = widget.track.favorite ?? false;
+    _isInLibrary = widget.track.inLibrary;
+  }
+
+  Future<void> _toggleFavorite() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isFavorite;
+
+    try {
+      bool success;
+      if (newState) {
+        String actualProvider = widget.track.provider;
+        String actualItemId = widget.track.itemId;
+
+        if (widget.track.providerMappings != null && widget.track.providerMappings!.isNotEmpty) {
+          final mapping = widget.track.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => widget.track.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => widget.track.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        success = await maProvider.addToFavorites(
+          mediaType: 'track',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (widget.track.provider == 'library') {
+          libraryItemId = int.tryParse(widget.track.itemId);
+        } else if (widget.track.providerMappings != null) {
+          final libraryMapping = widget.track.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.track.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        success = await maProvider.removeFromFavorites(
+          mediaType: 'track',
+          libraryItemId: libraryItemId,
+        );
+      }
+
+      if (success && mounted) {
+        setState(() => _isFavorite = newState);
+        maProvider.invalidateHomeCache();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      // Silent failure
+    }
+  }
+
+  Future<void> _toggleLibrary() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isInLibrary;
+
+    try {
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (widget.track.providerMappings != null && widget.track.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = widget.track.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (widget.track.provider != 'library') {
+            actualProvider = widget.track.provider;
+            actualItemId = widget.track.itemId;
+          } else {
+            return;
+          }
+        }
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.addedToLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.addToLibrary(
+          mediaType: 'track',
+          provider: actualProvider,
+          itemId: actualItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      } else {
+        int? libraryItemId;
+        if (widget.track.provider == 'library') {
+          libraryItemId = int.tryParse(widget.track.itemId);
+        } else if (widget.track.providerMappings != null) {
+          final libraryMapping = widget.track.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.track.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.removeFromLibrary(
+          mediaType: 'track',
+          libraryItemId: libraryItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      }
+    } catch (e) {
+      // Silent failure
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
     // Try track image first, then album image
-    final trackImageUrl = maProvider.getImageUrl(track, size: 256);
-    final albumImageUrl = track.album != null
-        ? maProvider.getImageUrl(track.album!, size: 256)
+    final trackImageUrl = maProvider.getImageUrl(widget.track, size: 256);
+    final albumImageUrl = widget.track.album != null
+        ? maProvider.getImageUrl(widget.track.album!, size: 256)
         : null;
     final imageUrl = trackImageUrl ?? albumImageUrl;
     final colorScheme = Theme.of(context).colorScheme;
@@ -203,6 +364,19 @@ class _TrackCard extends StatelessWidget {
     return RepaintBoundary(
       child: GestureDetector(
         onTap: () => _playTrack(context, maProvider),
+        onLongPressStart: (details) {
+          HapticFeedback.mediumImpact();
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.track,
+            item: widget.track,
+            isFavorite: _isFavorite,
+            isInLibrary: _isInLibrary,
+            onToggleFavorite: _toggleFavorite,
+            onToggleLibrary: _toggleLibrary,
+          );
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -242,7 +416,7 @@ class _TrackCard extends StatelessWidget {
             const SizedBox(height: 8),
             // Track title
             Text(
-              track.name,
+              widget.track.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textTheme.titleSmall?.copyWith(
@@ -252,7 +426,7 @@ class _TrackCard extends StatelessWidget {
             ),
             // Artist name
             Text(
-              track.artistsString,
+              widget.track.artistsString,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textTheme.bodySmall?.copyWith(
@@ -275,8 +449,8 @@ class _TrackCard extends StatelessWidget {
 
     await maProvider.playTracks(
       maProvider.selectedPlayer!.playerId,
-      tracks,
-      startIndex: index,
+      widget.tracks,
+      startIndex: widget.index,
     );
   }
 }

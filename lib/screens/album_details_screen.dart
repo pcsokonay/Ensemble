@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
@@ -12,6 +13,7 @@ import '../services/recently_played_service.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/provider_icon.dart';
 import '../widgets/hires_badge.dart';
+import '../widgets/media_context_menu.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 import 'artist_details_screen.dart';
@@ -41,7 +43,6 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
   bool _isInLibrary = false;
   ColorScheme? _lightColorScheme;
   ColorScheme? _darkColorScheme;
-  int? _expandedTrackIndex;
   bool _isDescriptionExpanded = false;
   String? _albumDescription;
   Album? _freshAlbum; // Full album data with image metadata
@@ -449,6 +450,89 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
           ),
         );
       }
+    }
+  }
+
+  Future<void> _toggleTrackLibrary(int trackIndex) async {
+    if (trackIndex < 0 || trackIndex >= _tracks.length) return;
+
+    final track = _tracks[trackIndex];
+    final maProvider = context.read<MusicAssistantProvider>();
+    final currentInLibrary = track.inLibrary;
+
+    try {
+      if (!currentInLibrary) {
+        // Add to library
+        String? actualProvider;
+        String? actualItemId;
+
+        if (track.providerMappings != null && track.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = track.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (track.provider != 'library') {
+            actualProvider = track.provider;
+            actualItemId = track.itemId;
+          } else {
+            return;
+          }
+        }
+
+        await maProvider.addToLibrary(
+          mediaType: 'track',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.addedToLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      } else {
+        // Remove from library
+        int? libraryItemId;
+        if (track.provider == 'library') {
+          libraryItemId = int.tryParse(track.itemId);
+        } else if (track.providerMappings != null) {
+          final libraryMapping = track.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => track.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        await maProvider.removeFromLibrary(
+          mediaType: 'track',
+          libraryItemId: libraryItemId,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.removedFromLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      _logger.log('Error toggling track library: $e');
     }
   }
 
@@ -900,7 +984,6 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                     children: [
                       // Main Play Button
                       Expanded(
-                        flex: 2,
                         child: SizedBox(
                           height: 50,
                           child: ElevatedButton.icon(
@@ -920,37 +1003,24 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                       ),
                       const SizedBox(width: 12),
 
-                      // "Play on..." Button (Square)
+                      // Library Button
                       SizedBox(
                         height: 50,
                         width: 50,
                         child: FilledButton.tonal(
-                          onPressed: _isLoading || _tracks.isEmpty ? null : () => _showPlayOnMenu(context),
+                          onPressed: _toggleLibrary,
                           style: FilledButton.styleFrom(
                             padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Icon(Icons.speaker_group_outlined),
-                        ),
-                      ),
-
-                      const SizedBox(width: 12),
-
-                      // "Add Album to Queue" Button (Square)
-                      SizedBox(
-                        height: 50,
-                        width: 50,
-                        child: FilledButton.tonal(
-                          onPressed: _isLoading || _tracks.isEmpty ? null : _addAlbumToQueue,
-                          style: FilledButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                          child: Icon(
+                            _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                            color: _isInLibrary
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
                           ),
-                          child: const Icon(Icons.playlist_add),
                         ),
                       ),
 
@@ -979,23 +1049,35 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
 
                       const SizedBox(width: 12),
 
-                      // Library Button
-                      SizedBox(
-                        height: 50,
-                        width: 50,
-                        child: FilledButton.tonal(
-                          onPressed: _toggleLibrary,
-                          style: FilledButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                      // Three-dot Menu Button
+                      GestureDetector(
+                        onTapDown: _isLoading || _tracks.isEmpty ? null : (details) {
+                          HapticFeedback.mediumImpact();
+                          MediaContextMenu.show(
+                            context: context,
+                            position: details.globalPosition,
+                            mediaType: ContextMenuMediaType.album,
+                            item: widget.album,
+                            isFavorite: _isFavorite,
+                            isInLibrary: _isInLibrary,
+                            onToggleFavorite: _toggleFavorite,
+                            onToggleLibrary: _toggleLibrary,
+                            adaptiveColorScheme: _darkColorScheme ?? colorScheme,
+                            showTopRow: false, // Only show list items since buttons are already visible
+                          );
+                        },
+                        child: Container(
+                          height: 50,
+                          width: 50,
+                          decoration: BoxDecoration(
+                            color: colorScheme.secondaryContainer,
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
-                            _isInLibrary ? Icons.library_add_check : Icons.library_add,
-                            color: _isInLibrary
-                                ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
+                            Icons.more_vert,
+                            color: _isLoading || _tracks.isEmpty
+                                ? colorScheme.onSecondaryContainer.withOpacity(0.38)
+                                : colorScheme.onSecondaryContainer,
                           ),
                         ),
                       ),
@@ -1029,150 +1111,79 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final track = _tracks[index];
-                  final isExpanded = _expandedTrackIndex == index;
 
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ListTile(
-                        leading: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceVariant,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${track.position ?? index + 1}',
-                              style: TextStyle(
-                                color: colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.bold,
-                              ),
+                  return GestureDetector(
+                    onLongPressStart: (details) {
+                      HapticFeedback.mediumImpact();
+                      MediaContextMenu.show(
+                        context: context,
+                        position: details.globalPosition,
+                        mediaType: ContextMenuMediaType.track,
+                        item: track,
+                        isFavorite: track.favorite ?? false,
+                        isInLibrary: track.inLibrary,
+                        onToggleFavorite: () => _toggleTrackFavorite(index),
+                        onToggleLibrary: () => _toggleTrackLibrary(index),
+                        adaptiveColorScheme: _darkColorScheme ?? colorScheme,
+                      );
+                    },
+                    child: ListTile(
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${track.position ?? index + 1}',
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        title: Text(
-                          track.name,
-                          style: textTheme.bodyLarge?.copyWith(
-                            color: colorScheme.onSurface,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      ),
+                      title: Text(
+                        track.name,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w500,
                         ),
-                        subtitle: Text(
-                          track.artistsString,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        track.artistsString,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withOpacity(0.6),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (HiResBadge.getTooltip(track) != null) ...[
-                              HiResBadge.fromTrack(track, primaryColor: colorScheme.primary)!,
-                              const SizedBox(width: 12),
-                            ],
-                            if (track.duration != null)
-                              SizedBox(
-                                width: 40,
-                                child: Text(
-                                  _formatDuration(track.duration!),
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurface.withOpacity(0.5),
-                                  ),
-                                  textAlign: TextAlign.right,
-                                ),
-                              ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (HiResBadge.getTooltip(track) != null) ...[
+                            HiResBadge.fromTrack(track, primaryColor: colorScheme.primary)!,
+                            const SizedBox(width: 12),
                           ],
-                        ),
-                        onTap: () {
-                          if (isExpanded) {
-                            // Single tap to collapse when expanded
-                            setState(() {
-                              _expandedTrackIndex = null;
-                            });
-                          } else {
-                            _playTrack(index);
-                          }
-                        },
-                        onLongPress: () {
-                          setState(() {
-                            _expandedTrackIndex = isExpanded ? null : index;
-                          });
-                        },
-                      ),
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        child: isExpanded
-                            ? Padding(
-                                padding: const EdgeInsets.only(right: 16.0, bottom: 12.0, top: 4.0),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    // Radio button
-                                    SizedBox(
-                                      height: 44,
-                                      width: 44,
-                                      child: FilledButton.tonal(
-                                        onPressed: () => _showPlayRadioMenu(context, index),
-                                        style: FilledButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        child: const Icon(Icons.radio, size: 20),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    // Add to queue button
-                                    SizedBox(
-                                      height: 44,
-                                      width: 44,
-                                      child: FilledButton.tonal(
-                                        onPressed: () => _addTrackToQueue(context, index),
-                                        style: FilledButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        child: const Icon(Icons.playlist_add, size: 20),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    // Favorite button
-                                    SizedBox(
-                                      height: 44,
-                                      width: 44,
-                                      child: FilledButton.tonal(
-                                        onPressed: () => _toggleTrackFavorite(index),
-                                        style: FilledButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(Radii.xxl),
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          track.favorite == true ? Icons.favorite : Icons.favorite_border,
-                                          size: 20,
-                                          color: track.favorite == true
-                                              ? colorScheme.error
-                                              : colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                          if (track.duration != null)
+                            SizedBox(
+                              width: 40,
+                              child: Text(
+                                _formatDuration(track.duration!),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurface.withOpacity(0.5),
                                 ),
-                              )
-                            : const SizedBox.shrink(),
+                                textAlign: TextAlign.right,
+                              ),
+                            ),
+                        ],
                       ),
-                    ],
+                      onTap: () => _playTrack(index),
+                    ),
                   );
                 },
                 childCount: _tracks.length,
@@ -1225,6 +1236,75 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
         maProvider.selectPlayer(player);
         await maProvider.playTracks(player.playerId, _tracks);
       },
+    );
+  }
+
+  void _showMoreMenu(BuildContext context, ColorScheme colorScheme) {
+    final maProvider = context.read<MusicAssistantProvider>();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Icon(Icons.speaker_group_outlined, color: colorScheme.onSurface),
+              title: Text(S.of(context)!.playOn, style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+                Navigator.pop(context);
+                _showPlayOnMenu(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.playlist_add, color: colorScheme.onSurface),
+              title: Text(S.of(context)!.addToQueue, style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+                Navigator.pop(context);
+                // Add to queue on selected player
+                final player = maProvider.selectedPlayer;
+                if (player != null) {
+                  maProvider.addTracksToQueue(player.playerId, _tracks).then((_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(S.of(context)!.albumAddedToQueue),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                  });
+                } else {
+                  _showError(S.of(context)!.noPlayerSelected);
+                }
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.queue_music, color: colorScheme.onSurface),
+              title: Text(S.of(context)!.addToQueueOn, style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+                Navigator.pop(context);
+                _addAlbumToQueue();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 

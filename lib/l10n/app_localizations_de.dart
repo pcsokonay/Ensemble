@@ -374,6 +374,9 @@ class SDe extends S {
   String get tracksAddedToQueue => 'Songs zur Warteschlange hinzugefügt';
 
   @override
+  String get trackAddedToQueue => 'Track added to queue';
+
+  @override
   String get play => 'Abspielen';
 
   @override
@@ -706,6 +709,9 @@ class SDe extends S {
       'Wähle welche Zeilen auf dem Startbildschirm angezeigt werden';
 
   @override
+  String get favorite => 'Favorite';
+
+  @override
   String get addedToFavorites => 'Zu Favoriten hinzugefügt';
 
   @override
@@ -888,7 +894,13 @@ class SDe extends S {
   String get addAlbumToQueueOn => 'Album zur Warteschlange hinzufügen auf...';
 
   @override
+  String get addToQueue => 'Add to queue';
+
+  @override
   String get addToQueueOn => 'Zur Warteschlange hinzufügen auf...';
+
+  @override
+  String get startRadio => 'Start radio';
 
   @override
   String startRadioOn(String name) {

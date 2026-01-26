@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
@@ -7,10 +8,11 @@ import '../providers/music_assistant_provider.dart';
 import '../screens/artist_details_screen.dart';
 import '../constants/hero_tags.dart';
 import '../constants/timings.dart';
-import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
 import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
+import '../l10n/app_localizations.dart';
+import 'media_context_menu.dart';
 
 class ArtistCard extends StatefulWidget {
   final Artist artist;
@@ -40,6 +42,8 @@ class _ArtistCardState extends State<ArtistCard> {
   String? _cachedMaImageUrl;
   Timer? _fallbackTimer;
   bool _isNavigating = false;
+  late bool _isFavorite;
+  late bool _isInLibrary;
 
   /// Delay before fetching fallback images to avoid requests during fast scroll
   /// PERF: Increased from 200ms to 400ms to reduce network requests during slow scroll
@@ -48,6 +52,8 @@ class _ArtistCardState extends State<ArtistCard> {
   @override
   void initState() {
     super.initState();
+    _isFavorite = widget.artist.favorite ?? false;
+    _isInLibrary = widget.artist.inLibrary;
     // Fetch fallback image once in initState, not during build
     _initFallbackImage();
   }
@@ -94,6 +100,152 @@ class _ArtistCardState extends State<ArtistCard> {
     }
   }
 
+  Future<void> _toggleFavorite() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isFavorite;
+
+    try {
+      bool success;
+      if (newState) {
+        String actualProvider = widget.artist.provider;
+        String actualItemId = widget.artist.itemId;
+
+        if (widget.artist.providerMappings != null && widget.artist.providerMappings!.isNotEmpty) {
+          final mapping = widget.artist.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => widget.artist.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => widget.artist.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        success = await maProvider.addToFavorites(
+          mediaType: 'artist',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (widget.artist.provider == 'library') {
+          libraryItemId = int.tryParse(widget.artist.itemId);
+        } else if (widget.artist.providerMappings != null) {
+          final libraryMapping = widget.artist.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.artist.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        success = await maProvider.removeFromFavorites(
+          mediaType: 'artist',
+          libraryItemId: libraryItemId,
+        );
+      }
+
+      if (success && mounted) {
+        setState(() => _isFavorite = newState);
+        maProvider.invalidateHomeCache();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      // Silent failure
+    }
+  }
+
+  Future<void> _toggleLibrary() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isInLibrary;
+
+    try {
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (widget.artist.providerMappings != null && widget.artist.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = widget.artist.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (widget.artist.provider != 'library') {
+            actualProvider = widget.artist.provider;
+            actualItemId = widget.artist.itemId;
+          } else {
+            return;
+          }
+        }
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.addedToLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.addToLibrary(
+          mediaType: 'artist',
+          provider: actualProvider,
+          itemId: actualItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+          return false;
+        });
+      } else {
+        int? libraryItemId;
+        if (widget.artist.provider == 'library') {
+          libraryItemId = int.tryParse(widget.artist.itemId);
+        } else if (widget.artist.providerMappings != null) {
+          final libraryMapping = widget.artist.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.artist.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.removeFromLibrary(
+          mediaType: 'artist',
+          libraryItemId: libraryItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+          return false;
+        });
+      }
+    } catch (e) {
+      // Silent failure
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
@@ -134,6 +286,19 @@ class _ArtistCardState extends State<ArtistCard> {
               if (mounted) _isNavigating = false;
             });
           });
+        },
+        onLongPressStart: (details) {
+          HapticFeedback.mediumImpact();
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.artist,
+            item: widget.artist,
+            isFavorite: _isFavorite,
+            isInLibrary: _isInLibrary,
+            onToggleFavorite: _toggleFavorite,
+            onToggleLibrary: _toggleLibrary,
+          );
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,

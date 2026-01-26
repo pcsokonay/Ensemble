@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
@@ -10,7 +11,9 @@ import '../constants/timings.dart';
 import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
 import '../services/metadata_service.dart';
+import '../l10n/app_localizations.dart';
 import 'provider_icon.dart';
+import 'media_context_menu.dart';
 
 class AlbumCard extends StatefulWidget {
   final Album album;
@@ -39,6 +42,8 @@ class _AlbumCardState extends State<AlbumCard> {
   String? _cachedMaImageUrl;
   Timer? _fallbackTimer;
   bool _isNavigating = false;
+  late bool _isFavorite;
+  late bool _isInLibrary;
 
   /// Delay before fetching fallback images to avoid requests during fast scroll
   /// PERF: Increased from 200ms to 400ms to reduce network requests during slow scroll
@@ -47,6 +52,8 @@ class _AlbumCardState extends State<AlbumCard> {
   @override
   void initState() {
     super.initState();
+    _isFavorite = widget.album.favorite ?? false;
+    _isInLibrary = widget.album.inLibrary;
     _initFallbackImage();
   }
 
@@ -102,6 +109,150 @@ class _AlbumCardState extends State<AlbumCard> {
     }
   }
 
+  Future<void> _toggleFavorite() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isFavorite;
+
+    try {
+      bool success;
+      if (newState) {
+        String actualProvider = widget.album.provider;
+        String actualItemId = widget.album.itemId;
+
+        if (widget.album.providerMappings != null && widget.album.providerMappings!.isNotEmpty) {
+          final mapping = widget.album.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => widget.album.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => widget.album.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        success = await maProvider.addToFavorites(
+          mediaType: 'album',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (widget.album.provider == 'library') {
+          libraryItemId = int.tryParse(widget.album.itemId);
+        } else if (widget.album.providerMappings != null) {
+          final libraryMapping = widget.album.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.album.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        success = await maProvider.removeFromFavorites(
+          mediaType: 'album',
+          libraryItemId: libraryItemId,
+        );
+      }
+
+      if (success && mounted) {
+        setState(() => _isFavorite = newState);
+        maProvider.invalidateHomeCache();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      // Silent failure
+    }
+  }
+
+  Future<void> _toggleLibrary() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isInLibrary;
+
+    try {
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (widget.album.providerMappings != null && widget.album.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = widget.album.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (widget.album.provider != 'library') {
+            actualProvider = widget.album.provider;
+            actualItemId = widget.album.itemId;
+          } else {
+            return;
+          }
+        }
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.addedToLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.addToLibrary(
+          mediaType: 'album',
+          provider: actualProvider,
+          itemId: actualItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      } else {
+        int? libraryItemId;
+        if (widget.album.provider == 'library') {
+          libraryItemId = int.tryParse(widget.album.itemId);
+        } else if (widget.album.providerMappings != null) {
+          final libraryMapping = widget.album.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.album.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.removeFromLibrary(
+          mediaType: 'album',
+          libraryItemId: libraryItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      }
+    } catch (e) {
+      // Silent failure
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
@@ -142,6 +293,19 @@ class _AlbumCardState extends State<AlbumCard> {
               if (mounted) _isNavigating = false;
             });
           });
+        },
+        onLongPressStart: (details) {
+          HapticFeedback.mediumImpact();
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.album,
+            item: widget.album,
+            isFavorite: _isFavorite,
+            isInLibrary: _isInLibrary,
+            onToggleFavorite: _toggleFavorite,
+            onToggleLibrary: _toggleLibrary,
+          );
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

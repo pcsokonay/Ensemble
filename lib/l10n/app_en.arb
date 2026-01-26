@@ -604,6 +604,11 @@
 
   "tracksAddedToQueue": "Tracks added to queue",
   "@tracksAddedToQueue": {
+    "description": "Snackbar message for tracks added to queue"
+  },
+
+  "trackAddedToQueue": "Track added to queue",
+  "@trackAddedToQueue": {
     "description": "Confirmation when tracks added"
   },
 
@@ -1087,6 +1092,7 @@
   "showFavoritePodcasts": "Show a row of your favorite podcasts",
   "extractColorsFromArtwork": "Extract colors from album and artist artwork",
   "chooseHomeScreenRows": "Choose which rows to display on the home screen",
+  "favorite": "Favorite",
   "addedToFavorites": "Added to favorites",
   "removedFromFavorites": "Removed from favorites",
   "addedToLibrary": "Added to library",
@@ -1207,9 +1213,19 @@
     "description": "Bottom sheet title for adding album to queue"
   },
 
+  "addToQueue": "Add to queue",
+  "@addToQueue": {
+    "description": "Add item to queue on selected player"
+  },
+
   "addToQueueOn": "Add to queue on...",
   "@addToQueueOn": {
     "description": "Bottom sheet title for adding to queue"
+  },
+
+  "startRadio": "Start radio",
+  "@startRadio": {
+    "description": "Start radio on selected player"
   },
 
   "startRadioOn": "Start {name} radio on...",

@@ -19,6 +19,7 @@ import '../widgets/common/empty_state.dart';
 import '../widgets/common/disconnected_state.dart';
 import '../widgets/letter_scrollbar.dart';
 import '../widgets/hires_badge.dart';
+import '../widgets/media_context_menu.dart';
 import '../services/settings_service.dart';
 import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
@@ -2604,7 +2605,20 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final textTheme = Theme.of(context).textTheme;
     final heroSuffix = _showFavoritesOnly ? '_fav' : '';
 
-    return ListTile(
+    return GestureDetector(
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.audiobook,
+          item: book,
+          isFavorite: book.favorite ?? false,
+          isInLibrary: true,
+          onToggleFavorite: () => _toggleAudiobookFavorite(book),
+          onToggleLibrary: () => _toggleAudiobookLibrary(book),
+        );
+      },
+      child: ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 12),
       minVerticalPadding: 0,
       leading: Hero(
@@ -2667,8 +2681,9 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 color: colorScheme.primary,
               ),
             )
-          : null,
-      onTap: () => _navigateToAudiobook(book, heroTagSuffix: 'library$heroSuffix', initialImageUrl: imageUrl),
+            : null,
+        onTap: () => _navigateToAudiobook(book, heroTagSuffix: 'library$heroSuffix', initialImageUrl: imageUrl),
+      ),
     );
   }
 
@@ -2816,6 +2831,18 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
     return GestureDetector(
       onTap: () => _navigateToAudiobook(book, heroTagSuffix: 'library$heroSuffix', initialImageUrl: imageUrl),
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.audiobook,
+          item: book,
+          isFavorite: book.favorite ?? false,
+          isInLibrary: true,
+          onToggleFavorite: () => _toggleAudiobookFavorite(book),
+          onToggleLibrary: () => _toggleAudiobookLibrary(book),
+        );
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -3468,61 +3495,75 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 // iTunes URL from persisted cache (loaded on app start for instant high-res)
                 final imageUrl = maProvider.getPodcastImageUrl(podcast);
 
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  minVerticalPadding: 0,
-                  leading: Hero(
-                    tag: HeroTags.podcastCover + (podcast.uri ?? podcast.itemId) + '_library',
-                    // Match detail screen: ClipRRect(16) → Container → CachedNetworkImage
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        color: colorScheme.surfaceContainerHighest,
-                        child: imageUrl != null
-                            ? CachedNetworkImage(
-                                imageUrl: imageUrl,
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                                // FIXED: Add memCacheWidth to ensure consistent decode size for smooth Hero
-                                memCacheWidth: 256,
-                                memCacheHeight: 256,
-                                fadeInDuration: Duration.zero,
-                                fadeOutDuration: Duration.zero,
-                                placeholder: (_, __) => const SizedBox(),
-                                errorWidget: (_, __, ___) => Icon(
+                return GestureDetector(
+                  onLongPressStart: (details) {
+                    MediaContextMenu.show(
+                      context: context,
+                      position: details.globalPosition,
+                      mediaType: ContextMenuMediaType.podcast,
+                      item: podcast,
+                      isFavorite: podcast.favorite ?? false,
+                      isInLibrary: true,
+                      onToggleFavorite: () => _togglePodcastFavorite(podcast),
+                      onToggleLibrary: () => _togglePodcastLibrary(podcast),
+                    );
+                  },
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    minVerticalPadding: 0,
+                    leading: Hero(
+                      tag: HeroTags.podcastCover + (podcast.uri ?? podcast.itemId) + '_library',
+                      // Match detail screen: ClipRRect(16) → Container → CachedNetworkImage
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          color: colorScheme.surfaceContainerHighest,
+                          child: imageUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                  // FIXED: Add memCacheWidth to ensure consistent decode size for smooth Hero
+                                  memCacheWidth: 256,
+                                  memCacheHeight: 256,
+                                  fadeInDuration: Duration.zero,
+                                  fadeOutDuration: Duration.zero,
+                                  placeholder: (_, __) => const SizedBox(),
+                                  errorWidget: (_, __, ___) => Icon(
+                                    MdiIcons.podcast,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                )
+                              : Icon(
                                   MdiIcons.podcast,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
-                              )
-                            : Icon(
-                                MdiIcons.podcast,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                        ),
                       ),
                     ),
-                  ),
-                  title: Text(
-                    podcast.name,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
+                    title: Text(
+                      podcast.name,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    subtitle: podcast.metadata?['author'] != null
+                        ? Text(
+                            podcast.metadata!['author'] as String,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : null,
+                    onTap: () => _openPodcastDetails(podcast, maProvider, imageUrl),
                   ),
-                  subtitle: podcast.metadata?['author'] != null
-                      ? Text(
-                          podcast.metadata!['author'] as String,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      : null,
-                  onTap: () => _openPodcastDetails(podcast, maProvider, imageUrl),
                 );
               },
             )
@@ -3555,6 +3596,18 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
     return GestureDetector(
       onTap: () => _openPodcastDetails(podcast, maProvider, imageUrl),
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.podcast,
+          item: podcast,
+          isFavorite: podcast.favorite ?? false,
+          isInLibrary: true,
+          onToggleFavorite: () => _togglePodcastFavorite(podcast),
+          onToggleLibrary: () => _togglePodcastLibrary(podcast),
+        );
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -3740,60 +3793,74 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 final station = sortedRadioStations[index];
                 final imageUrl = maProvider.getImageUrl(station, size: cacheSize);
 
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  minVerticalPadding: 0,
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: imageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            memCacheWidth: 128,
-                            memCacheHeight: 128,
-                            fadeInDuration: Duration.zero,
-                            fadeOutDuration: Duration.zero,
-                            placeholder: (context, url) => Container(
+                return GestureDetector(
+                  onLongPressStart: (details) {
+                    MediaContextMenu.show(
+                      context: context,
+                      position: details.globalPosition,
+                      mediaType: ContextMenuMediaType.radio,
+                      item: station,
+                      isFavorite: station.favorite ?? false,
+                      isInLibrary: true,
+                      onToggleFavorite: () => _toggleRadioFavorite(station),
+                      onToggleLibrary: () => _toggleRadioLibrary(station),
+                    );
+                  },
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    minVerticalPadding: 0,
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: imageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                              memCacheWidth: 128,
+                              memCacheHeight: 128,
+                              fadeInDuration: Duration.zero,
+                              fadeOutDuration: Duration.zero,
+                              placeholder: (context, url) => Container(
+                                width: 48,
+                                height: 48,
+                                color: colorScheme.surfaceVariant,
+                                child: Icon(MdiIcons.radio, color: colorScheme.onSurfaceVariant),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                width: 48,
+                                height: 48,
+                                color: colorScheme.surfaceVariant,
+                                child: Icon(MdiIcons.radio, color: colorScheme.onSurfaceVariant),
+                              ),
+                            )
+                          : Container(
                               width: 48,
                               height: 48,
                               color: colorScheme.surfaceVariant,
                               child: Icon(MdiIcons.radio, color: colorScheme.onSurfaceVariant),
                             ),
-                            errorWidget: (context, url, error) => Container(
-                              width: 48,
-                              height: 48,
-                              color: colorScheme.surfaceVariant,
-                              child: Icon(MdiIcons.radio, color: colorScheme.onSurfaceVariant),
-                            ),
-                          )
-                        : Container(
-                            width: 48,
-                            height: 48,
-                            color: colorScheme.surfaceVariant,
-                            child: Icon(MdiIcons.radio, color: colorScheme.onSurfaceVariant),
-                          ),
-                  ),
-                  title: Text(
-                    station.name,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    title: Text(
+                      station.name,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: station.metadata?['description'] != null
+                        ? Text(
+                            station.metadata!['description'] as String,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : null,
+                    onTap: () => _playRadioStation(maProvider, station),
                   ),
-                  subtitle: station.metadata?['description'] != null
-                      ? Text(
-                          station.metadata!['description'] as String,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      : null,
-                  onTap: () => _playRadioStation(maProvider, station),
                 );
               },
             )
@@ -3825,6 +3892,18 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
 
     return GestureDetector(
       onTap: () => _playRadioStation(maProvider, station),
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.radio,
+          item: station,
+          isFavorite: station.favorite ?? false,
+          isInLibrary: true,
+          onToggleFavorite: () => _toggleRadioFavorite(station),
+          onToggleLibrary: () => _toggleRadioLibrary(station),
+        );
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -3993,44 +4072,58 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final imageUrl = maProvider.getImageUrl(artist, size: 256);
 
     return RepaintBoundary(
-      child: ListTile(
-        key: key,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-        minVerticalPadding: 0,
-        leading: ArtistAvatar(
-          artist: artist,
-          radius: 24,
-          imageSize: 128,
-          heroTag: HeroTags.artistImage + (artist.uri ?? artist.itemId) + suffix,
-        ),
-      title: Hero(
-        tag: HeroTags.artistName + (artist.uri ?? artist.itemId) + suffix,
-        child: Material(
-          color: Colors.transparent,
-          child: Text(
-            artist.name,
-            style: textTheme.titleMedium?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ),
-        onTap: () {
-          updateAdaptiveColorsFromImage(context, imageUrl);
-          Navigator.push(
-            context,
-            FadeSlidePageRoute(
-              child: ArtistDetailsScreen(
-                artist: artist,
-                heroTagSuffix: 'library',
-                initialImageUrl: imageUrl,
-              ),
-            ),
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.artist,
+            item: artist,
+            isFavorite: artist.favorite ?? false,
+            isInLibrary: artist.inLibrary,
+            onToggleFavorite: () => _toggleArtistFavorite(artist),
+            onToggleLibrary: () => _toggleArtistLibrary(artist),
           );
         },
+        child: ListTile(
+          key: key,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          minVerticalPadding: 0,
+          leading: ArtistAvatar(
+            artist: artist,
+            radius: 24,
+            imageSize: 128,
+            heroTag: HeroTags.artistImage + (artist.uri ?? artist.itemId) + suffix,
+          ),
+          title: Hero(
+            tag: HeroTags.artistName + (artist.uri ?? artist.itemId) + suffix,
+            child: Material(
+              color: Colors.transparent,
+              child: Text(
+                artist.name,
+                style: textTheme.titleMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          onTap: () {
+            updateAdaptiveColorsFromImage(context, imageUrl);
+            Navigator.push(
+              context,
+              FadeSlidePageRoute(
+                child: ArtistDetailsScreen(
+                  artist: artist,
+                  heroTagSuffix: 'library',
+                  initialImageUrl: imageUrl,
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -4053,6 +4146,18 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
               initialImageUrl: imageUrl,
             ),
           ),
+        );
+      },
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.artist,
+          item: artist,
+          isFavorite: artist.favorite ?? false,
+          isInLibrary: artist.inLibrary,
+          onToggleFavorite: () => _toggleArtistFavorite(artist),
+          onToggleLibrary: () => _toggleArtistLibrary(artist),
         );
       },
       child: Column(
@@ -4185,12 +4290,26 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 itemCount: sortedAlbums.length,
                 itemBuilder: (context, index) {
                   final album = sortedAlbums[index];
-                  return AlbumCard(
-                    key: ValueKey(album.uri ?? album.itemId),
-                    album: album,
-                    heroTagSuffix: 'library_grid',
-                    // Use 256 to match detail screen for smooth Hero animation
-                    imageCacheSize: 256,
+                  return GestureDetector(
+                    onLongPressStart: (details) {
+                      MediaContextMenu.show(
+                        context: context,
+                        position: details.globalPosition,
+                        mediaType: ContextMenuMediaType.album,
+                        item: album,
+                        isFavorite: album.favorite ?? false,
+                        isInLibrary: album.inLibrary,
+                        onToggleFavorite: () => _toggleAlbumFavorite(album),
+                        onToggleLibrary: () => _toggleAlbumLibrary(album),
+                      );
+                    },
+                    child: AlbumCard(
+                      key: ValueKey(album.uri ?? album.itemId),
+                      album: album,
+                      heroTagSuffix: 'library_grid',
+                      // Use 256 to match detail screen for smooth Hero animation
+                      imageCacheSize: 256,
+                    ),
                   );
                 },
               ),
@@ -4204,62 +4323,76 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-      minVerticalPadding: 0,
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          width: 48,
-          height: 48,
-          color: colorScheme.surfaceVariant,
-          child: imageUrl != null
-              ? CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 128,
-                  memCacheHeight: 128,
-                  placeholder: (_, __) => const SizedBox(),
-                  errorWidget: (_, __, ___) => Icon(
+    return GestureDetector(
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.album,
+          item: album,
+          isFavorite: album.favorite ?? false,
+          isInLibrary: album.inLibrary,
+          onToggleFavorite: () => _toggleAlbumFavorite(album),
+          onToggleLibrary: () => _toggleAlbumLibrary(album),
+        );
+      },
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        minVerticalPadding: 0,
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 48,
+            height: 48,
+            color: colorScheme.surfaceVariant,
+            child: imageUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    memCacheWidth: 128,
+                    memCacheHeight: 128,
+                    placeholder: (_, __) => const SizedBox(),
+                    errorWidget: (_, __, ___) => Icon(
+                      Icons.album_rounded,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                : Icon(
                     Icons.album_rounded,
                     color: colorScheme.onSurfaceVariant,
                   ),
-                )
-              : Icon(
-                  Icons.album_rounded,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-        ),
-      ),
-      title: Text(
-        album.nameWithYear,
-        style: textTheme.titleMedium?.copyWith(
-          color: colorScheme.onSurface,
-          fontWeight: FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        album.artistsString,
-        style: textTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurface.withOpacity(0.7),
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      onTap: () {
-        updateAdaptiveColorsFromImage(context, imageUrl);
-        Navigator.push(
-          context,
-          FadeSlidePageRoute(
-            child: AlbumDetailsScreen(
-              album: album,
-              initialImageUrl: imageUrl,
-            ),
           ),
-        );
-      },
+        ),
+        title: Text(
+          album.nameWithYear,
+          style: textTheme.titleMedium?.copyWith(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w500,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          album.artistsString,
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurface.withOpacity(0.7),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        onTap: () {
+          updateAdaptiveColorsFromImage(context, imageUrl);
+          Navigator.push(
+            context,
+            FadeSlidePageRoute(
+              child: AlbumDetailsScreen(
+                album: album,
+                initialImageUrl: imageUrl,
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -4343,8 +4476,21 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     const heroSuffix = '_library_list';
 
     return RepaintBoundary(
-      child: ListTile(
-        key: ValueKey(playlist.itemId),
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.playlist,
+            item: playlist,
+            isFavorite: playlist.favorite ?? false,
+            isInLibrary: playlist.inLibrary,
+            onToggleFavorite: () => _togglePlaylistFavorite(playlist),
+            onToggleLibrary: () => _togglePlaylistLibrary(playlist),
+          );
+        },
+        child: ListTile(
+          key: ValueKey(playlist.itemId),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         minVerticalPadding: 0,
         leading: Hero(
@@ -4415,19 +4561,20 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
         trailing: playlist.favorite == true
             ? const Icon(Icons.favorite, color: StatusColors.favorite, size: 20)
             : null,
-        onTap: () {
-          updateAdaptiveColorsFromImage(context, imageUrl);
-          Navigator.push(
-            context,
-            FadeSlidePageRoute(
-              child: PlaylistDetailsScreen(
-                playlist: playlist,
-                heroTagSuffix: 'library_list',
-                initialImageUrl: imageUrl,
+          onTap: () {
+            updateAdaptiveColorsFromImage(context, imageUrl);
+            Navigator.push(
+              context,
+              FadeSlidePageRoute(
+                child: PlaylistDetailsScreen(
+                  playlist: playlist,
+                  heroTagSuffix: 'library_list',
+                  initialImageUrl: imageUrl,
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -4454,6 +4601,18 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
                 initialImageUrl: imageUrl,
               ),
             ),
+          );
+        },
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.playlist,
+            item: playlist,
+            isFavorite: playlist.favorite ?? false,
+            isInLibrary: playlist.inLibrary,
+            onToggleFavorite: () => _togglePlaylistFavorite(playlist),
+            onToggleLibrary: () => _togglePlaylistLibrary(playlist),
           );
         },
         child: Column(
@@ -4625,8 +4784,21 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final imageUrl = maProvider.api?.getImageUrl(track, size: 128);
 
     return RepaintBoundary(
-      child: ListTile(
-        key: ValueKey(track.uri ?? track.itemId),
+      child: GestureDetector(
+        onLongPressStart: (details) {
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.track,
+            item: track,
+            isFavorite: track.favorite ?? false,
+            isInLibrary: track.inLibrary,
+            onToggleFavorite: () => _toggleTrackFavorite(track),
+            onToggleLibrary: () => _toggleTrackLibrary(track),
+          );
+        },
+        child: ListTile(
+          key: ValueKey(track.uri ?? track.itemId),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         minVerticalPadding: 0,
         leading: Container(
@@ -4700,17 +4872,18 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
           return;
         }
 
-        try {
-          // Start radio from this track
-          await maProvider.api?.playRadio(player.playerId, track);
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to start radio: $e')),
-            );
+          try {
+            // Start radio from this track
+            await maProvider.api?.playRadio(player.playerId, track);
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to start radio: $e')),
+              );
+            }
           }
-        }
-      },
+        },
+        ),
       ),
     );
   }
@@ -4720,6 +4893,945 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
     final minutes = totalSeconds ~/ 60;
     final seconds = totalSeconds % 60;
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  // Context menu toggle handlers
+  Future<void> _toggleAlbumFavorite(Album album) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !(album.favorite ?? false);
+
+      if (newState) {
+        String actualProvider = album.provider;
+        String actualItemId = album.itemId;
+
+        if (album.providerMappings != null && album.providerMappings!.isNotEmpty) {
+          final mapping = album.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => album.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => album.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        await maProvider.addToFavorites(
+          mediaType: 'album',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (album.provider == 'library') {
+          libraryItemId = int.tryParse(album.itemId);
+        } else if (album.providerMappings != null) {
+          final libraryMapping = album.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => album.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromFavorites(
+            mediaType: 'album',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToFavorites : l10n.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling album favorite: $e');
+    }
+  }
+
+  Future<void> _toggleAlbumLibrary(Album album) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !album.inLibrary;
+
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (album.providerMappings != null && album.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = album.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (album.provider != 'library') {
+            actualProvider = album.provider;
+            actualItemId = album.itemId;
+          } else {
+            return;
+          }
+        }
+
+        await maProvider.addToLibrary(
+          mediaType: 'album',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+      } else {
+        int? libraryItemId;
+        if (album.provider == 'library') {
+          libraryItemId = int.tryParse(album.itemId);
+        } else if (album.providerMappings != null) {
+          final libraryMapping = album.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => album.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromLibrary(
+            mediaType: 'album',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToLibrary : l10n.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling album library: $e');
+    }
+  }
+
+  Future<void> _toggleArtistFavorite(Artist artist) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !(artist.favorite ?? false);
+
+      if (newState) {
+        String actualProvider = artist.provider;
+        String actualItemId = artist.itemId;
+
+        if (artist.providerMappings != null && artist.providerMappings!.isNotEmpty) {
+          final mapping = artist.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => artist.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => artist.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        await maProvider.addToFavorites(
+          mediaType: 'artist',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (artist.provider == 'library') {
+          libraryItemId = int.tryParse(artist.itemId);
+        } else if (artist.providerMappings != null) {
+          final libraryMapping = artist.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => artist.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromFavorites(
+            mediaType: 'artist',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToFavorites : l10n.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling artist favorite: $e');
+    }
+  }
+
+  Future<void> _toggleArtistLibrary(Artist artist) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !artist.inLibrary;
+
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (artist.providerMappings != null && artist.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = artist.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (artist.provider != 'library') {
+            actualProvider = artist.provider;
+            actualItemId = artist.itemId;
+          } else {
+            return;
+          }
+        }
+
+        await maProvider.addToLibrary(
+          mediaType: 'artist',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+      } else {
+        int? libraryItemId;
+        if (artist.provider == 'library') {
+          libraryItemId = int.tryParse(artist.itemId);
+        } else if (artist.providerMappings != null) {
+          final libraryMapping = artist.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => artist.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromLibrary(
+            mediaType: 'artist',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToLibrary : l10n.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling artist library: $e');
+    }
+  }
+
+  Future<void> _toggleTrackFavorite(Track track) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !(track.favorite ?? false);
+
+      if (newState) {
+        String actualProvider = track.provider;
+        String actualItemId = track.itemId;
+
+        if (track.providerMappings != null && track.providerMappings!.isNotEmpty) {
+          final mapping = track.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => track.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => track.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        await maProvider.addToFavorites(
+          mediaType: 'track',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (track.provider == 'library') {
+          libraryItemId = int.tryParse(track.itemId);
+        } else if (track.providerMappings != null) {
+          final libraryMapping = track.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => track.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromFavorites(
+            mediaType: 'track',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToFavorites : l10n.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling track favorite: $e');
+    }
+  }
+
+  Future<void> _togglePlaylistFavorite(Playlist playlist) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !(playlist.favorite ?? false);
+
+      if (newState) {
+        String actualProvider = playlist.provider;
+        String actualItemId = playlist.itemId;
+
+        if (playlist.providerMappings != null && playlist.providerMappings!.isNotEmpty) {
+          final mapping = playlist.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => playlist.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => playlist.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        await maProvider.addToFavorites(
+          mediaType: 'playlist',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (playlist.provider == 'library') {
+          libraryItemId = int.tryParse(playlist.itemId);
+        } else if (playlist.providerMappings != null) {
+          final libraryMapping = playlist.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => playlist.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromFavorites(
+            mediaType: 'playlist',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToFavorites : l10n.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling playlist favorite: $e');
+    }
+  }
+
+  Future<void> _toggleTrackLibrary(Track track) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !track.inLibrary;
+
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (track.providerMappings != null && track.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = track.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (track.provider != 'library') {
+            actualProvider = track.provider;
+            actualItemId = track.itemId;
+          } else {
+            return;
+          }
+        }
+
+        await maProvider.addToLibrary(
+          mediaType: 'track',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+      } else {
+        int? libraryItemId;
+        if (track.provider == 'library') {
+          libraryItemId = int.tryParse(track.itemId);
+        } else if (track.providerMappings != null) {
+          final libraryMapping = track.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => track.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromLibrary(
+            mediaType: 'track',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToLibrary : l10n.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling track library: $e');
+    }
+  }
+
+  Future<void> _togglePlaylistLibrary(Playlist playlist) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !playlist.inLibrary;
+
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (playlist.providerMappings != null && playlist.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = playlist.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (playlist.provider != 'library') {
+            actualProvider = playlist.provider;
+            actualItemId = playlist.itemId;
+          } else {
+            return;
+          }
+        }
+
+        await maProvider.addToLibrary(
+          mediaType: 'playlist',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+      } else {
+        int? libraryItemId;
+        if (playlist.provider == 'library') {
+          libraryItemId = int.tryParse(playlist.itemId);
+        } else if (playlist.providerMappings != null) {
+          final libraryMapping = playlist.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => playlist.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromLibrary(
+            mediaType: 'playlist',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToLibrary : l10n.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling playlist library: $e');
+    }
+  }
+
+  Future<void> _toggleAudiobookFavorite(Audiobook book) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !(book.favorite ?? false);
+
+      if (newState) {
+        String actualProvider = book.provider;
+        String actualItemId = book.itemId;
+
+        if (book.providerMappings != null && book.providerMappings!.isNotEmpty) {
+          final mapping = book.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => book.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => book.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        await maProvider.addToFavorites(
+          mediaType: 'audiobook',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (book.provider == 'library') {
+          libraryItemId = int.tryParse(book.itemId);
+        } else if (book.providerMappings != null) {
+          final libraryMapping = book.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => book.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromFavorites(
+            mediaType: 'audiobook',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToFavorites : l10n.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling audiobook favorite: $e');
+    }
+  }
+
+  Future<void> _toggleAudiobookLibrary(Audiobook book) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !book.inLibrary;
+
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (book.providerMappings != null && book.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = book.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (book.provider != 'library') {
+            actualProvider = book.provider;
+            actualItemId = book.itemId;
+          } else {
+            return;
+          }
+        }
+
+        await maProvider.addToLibrary(
+          mediaType: 'audiobook',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+      } else {
+        int? libraryItemId;
+        if (book.provider == 'library') {
+          libraryItemId = int.tryParse(book.itemId);
+        } else if (book.providerMappings != null) {
+          final libraryMapping = book.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => book.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromLibrary(
+            mediaType: 'audiobook',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToLibrary : l10n.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling audiobook library: $e');
+    }
+  }
+
+  Future<void> _togglePodcastLibrary(MediaItem podcast) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !podcast.inLibrary;
+
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (podcast.providerMappings != null && podcast.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = podcast.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (podcast.provider != 'library') {
+            actualProvider = podcast.provider;
+            actualItemId = podcast.itemId;
+          } else {
+            return;
+          }
+        }
+
+        await maProvider.addToLibrary(
+          mediaType: 'podcast',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+      } else {
+        int? libraryItemId;
+        if (podcast.provider == 'library') {
+          libraryItemId = int.tryParse(podcast.itemId);
+        } else if (podcast.providerMappings != null) {
+          final libraryMapping = podcast.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => podcast.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromLibrary(
+            mediaType: 'podcast',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToLibrary : l10n.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling podcast library: $e');
+    }
+  }
+
+  Future<void> _toggleRadioLibrary(MediaItem station) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !station.inLibrary;
+
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (station.providerMappings != null && station.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = station.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (station.provider != 'library') {
+            actualProvider = station.provider;
+            actualItemId = station.itemId;
+          } else {
+            return;
+          }
+        }
+
+        await maProvider.addToLibrary(
+          mediaType: 'radio',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+      } else {
+        int? libraryItemId;
+        if (station.provider == 'library') {
+          libraryItemId = int.tryParse(station.itemId);
+        } else if (station.providerMappings != null) {
+          final libraryMapping = station.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => station.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromLibrary(
+            mediaType: 'radio',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToLibrary : l10n.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling radio library: $e');
+    }
+  }
+
+  Future<void> _togglePodcastFavorite(MediaItem podcast) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !(podcast.favorite ?? false);
+
+      if (newState) {
+        String actualProvider = podcast.provider;
+        String actualItemId = podcast.itemId;
+
+        if (podcast.providerMappings != null && podcast.providerMappings!.isNotEmpty) {
+          final mapping = podcast.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => podcast.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => podcast.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        await maProvider.addToFavorites(
+          mediaType: 'podcast',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (podcast.provider == 'library') {
+          libraryItemId = int.tryParse(podcast.itemId);
+        } else if (podcast.providerMappings != null) {
+          final libraryMapping = podcast.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => podcast.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromFavorites(
+            mediaType: 'podcast',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToFavorites : l10n.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling podcast favorite: $e');
+    }
+  }
+
+  Future<void> _toggleRadioFavorite(MediaItem station) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final l10n = S.of(context)!;
+
+    try {
+      final newState = !(station.favorite ?? false);
+
+      if (newState) {
+        String actualProvider = station.provider;
+        String actualItemId = station.itemId;
+
+        if (station.providerMappings != null && station.providerMappings!.isNotEmpty) {
+          final mapping = station.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => station.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => station.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        await maProvider.addToFavorites(
+          mediaType: 'radio',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (station.provider == 'library') {
+          libraryItemId = int.tryParse(station.itemId);
+        } else if (station.providerMappings != null) {
+          final libraryMapping = station.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => station.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          await maProvider.removeFromFavorites(
+            mediaType: 'radio',
+            libraryItemId: libraryItemId,
+          );
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newState ? l10n.addedToFavorites : l10n.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling radio favorite: $e');
+    }
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
@@ -11,6 +12,7 @@ import '../services/recently_played_service.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/provider_icon.dart';
 import '../widgets/hires_badge.dart';
+import '../widgets/media_context_menu.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 
@@ -42,9 +44,9 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
   List<Track> _tracks = [];
   bool _isLoading = true;
   bool _isFavorite = false;
+  late bool _isInLibrary;
   ColorScheme? _lightColorScheme;
   ColorScheme? _darkColorScheme;
-  int? _expandedTrackIndex;
 
   String get _heroTagSuffix => widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
 
@@ -56,6 +58,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
   void initState() {
     super.initState();
     _isFavorite = widget.playlist.favorite ?? false;
+    _isInLibrary = widget.playlist.inLibrary;
     _loadTracks();
 
     // Mark that we're on a detail screen and extract colors immediately
@@ -230,6 +233,86 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
     }
   }
 
+  Future<void> _toggleLibrary() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isInLibrary;
+
+    try {
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (widget.playlist.providerMappings != null && widget.playlist.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = widget.playlist.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (widget.playlist.provider != 'library') {
+            actualProvider = widget.playlist.provider;
+            actualItemId = widget.playlist.itemId;
+          } else {
+            return;
+          }
+        }
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.addedToLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.addToLibrary(
+          mediaType: 'playlist',
+          provider: actualProvider,
+          itemId: actualItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      } else {
+        int? libraryItemId;
+        if (widget.playlist.provider == 'library') {
+          libraryItemId = int.tryParse(widget.playlist.itemId);
+        } else if (widget.playlist.providerMappings != null) {
+          final libraryMapping = widget.playlist.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.playlist.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.removeFromLibrary(
+          mediaType: 'playlist',
+          libraryItemId: libraryItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      }
+    } catch (e) {
+      // Silent failure
+    }
+  }
+
   Future<void> _toggleTrackFavorite(int trackIndex) async {
     if (trackIndex < 0 || trackIndex >= _tracks.length) return;
 
@@ -327,6 +410,89 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
     }
   }
 
+  Future<void> _toggleTrackLibrary(int trackIndex) async {
+    if (trackIndex < 0 || trackIndex >= _tracks.length) return;
+
+    final track = _tracks[trackIndex];
+    final maProvider = context.read<MusicAssistantProvider>();
+    final currentInLibrary = track.inLibrary;
+
+    try {
+      if (!currentInLibrary) {
+        // Add to library
+        String? actualProvider;
+        String? actualItemId;
+
+        if (track.providerMappings != null && track.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = track.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (track.provider != 'library') {
+            actualProvider = track.provider;
+            actualItemId = track.itemId;
+          } else {
+            return;
+          }
+        }
+
+        await maProvider.addToLibrary(
+          mediaType: 'track',
+          provider: actualProvider,
+          itemId: actualItemId,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.addedToLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      } else {
+        // Remove from library
+        int? libraryItemId;
+        if (track.provider == 'library') {
+          libraryItemId = int.tryParse(track.itemId);
+        } else if (track.providerMappings != null) {
+          final libraryMapping = track.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => track.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        await maProvider.removeFromLibrary(
+          mediaType: 'track',
+          libraryItemId: libraryItemId,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.removedFromLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      _logger.log('Error toggling track library: $e');
+    }
+  }
+
   Future<void> _playPlaylist() async {
     if (_tracks.isEmpty) return;
 
@@ -387,6 +553,75 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
         maProvider.selectPlayer(player);
         await maProvider.playTracks(player.playerId, _tracks);
       },
+    );
+  }
+
+  void _showMoreMenu(BuildContext context, ColorScheme colorScheme) {
+    final maProvider = context.read<MusicAssistantProvider>();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Icon(Icons.speaker_group_outlined, color: colorScheme.onSurface),
+              title: Text(S.of(context)!.playOn, style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+                Navigator.pop(context);
+                _showPlayOnMenu(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.playlist_add, color: colorScheme.onSurface),
+              title: Text(S.of(context)!.addToQueue, style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+                Navigator.pop(context);
+                // Add to queue on selected player
+                final player = maProvider.selectedPlayer;
+                if (player != null) {
+                  maProvider.addTracksToQueue(player.playerId, _tracks).then((_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(S.of(context)!.tracksAddedToQueue),
+                          duration: const Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                  });
+                } else {
+                  _showError(S.of(context)!.noPlayerSelected);
+                }
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.queue_music, color: colorScheme.onSurface),
+              title: Text(S.of(context)!.addToQueueOn, style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+                Navigator.pop(context);
+                _addPlaylistToQueue();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 
@@ -688,7 +923,6 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                           children: [
                             // Main Play Button
                             Expanded(
-                              flex: 2,
                               child: SizedBox(
                                 height: 50,
                                 child: ElevatedButton.icon(
@@ -708,42 +942,6 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                             ),
                             const SizedBox(width: 12),
 
-                            // "Play on..." Button
-                            SizedBox(
-                              height: 50,
-                              width: 50,
-                              child: FilledButton.tonal(
-                                onPressed: _isLoading || _tracks.isEmpty ? null : () => _showPlayOnMenu(context),
-                                style: FilledButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Icon(Icons.speaker_group_outlined),
-                              ),
-                            ),
-
-                            const SizedBox(width: 12),
-
-                            // "Add to Queue" Button
-                            SizedBox(
-                              height: 50,
-                              width: 50,
-                              child: FilledButton.tonal(
-                                onPressed: _isLoading || _tracks.isEmpty ? null : _addPlaylistToQueue,
-                                style: FilledButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Icon(Icons.playlist_add),
-                              ),
-                            ),
-
-                            const SizedBox(width: 12),
-
                             // Favorite Button
                             SizedBox(
                               height: 50,
@@ -761,6 +959,41 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                                   color: _isFavorite
                                       ? colorScheme.error
                                       : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(width: 12),
+
+                            // Three-dot Menu Button
+                            GestureDetector(
+                              onTapDown: _isLoading || _tracks.isEmpty ? null : (details) {
+                                HapticFeedback.mediumImpact();
+                                MediaContextMenu.show(
+                                  context: context,
+                                  position: details.globalPosition,
+                                  mediaType: ContextMenuMediaType.playlist,
+                                  item: widget.playlist,
+                                  isFavorite: _isFavorite,
+                                  isInLibrary: _isInLibrary,
+                                  onToggleFavorite: _toggleFavorite,
+                                  onToggleLibrary: _toggleLibrary,
+                                  adaptiveColorScheme: _darkColorScheme ?? colorScheme,
+                                  showTopRow: false,
+                                );
+                              },
+                              child: Container(
+                                height: 50,
+                                width: 50,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.secondaryContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.more_vert,
+                                  color: _isLoading || _tracks.isEmpty
+                                      ? colorScheme.onSecondaryContainer.withOpacity(0.38)
+                                      : colorScheme.onSecondaryContainer,
                                 ),
                               ),
                             ),
@@ -794,180 +1027,109 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final track = _tracks[index];
-                        final isExpanded = _expandedTrackIndex == index;
                         final trackImageUrl = context.read<MusicAssistantProvider>().getImageUrl(track, size: 80);
 
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ListTile(
-                              leading: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Track number
+                        return GestureDetector(
+                          onLongPressStart: (details) {
+                            HapticFeedback.mediumImpact();
+                            MediaContextMenu.show(
+                              context: context,
+                              position: details.globalPosition,
+                              mediaType: ContextMenuMediaType.track,
+                              item: track,
+                              isFavorite: track.favorite ?? false,
+                              isInLibrary: track.inLibrary,
+                              onToggleFavorite: () => _toggleTrackFavorite(index),
+                              onToggleLibrary: () => _toggleTrackLibrary(index),
+                              adaptiveColorScheme: _darkColorScheme ?? colorScheme,
+                            );
+                          },
+                          child: ListTile(
+                            leading: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Track number
+                                SizedBox(
+                                  width: 28,
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.onSurface.withOpacity(0.5),
+                                    ),
+                                    textAlign: TextAlign.right,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Track artwork
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Container(
+                                    width: 48,
+                                    height: 48,
+                                    color: colorScheme.surfaceContainerHighest,
+                                    child: trackImageUrl != null
+                                        ? CachedNetworkImage(
+                                            imageUrl: trackImageUrl,
+                                            fit: BoxFit.cover,
+                                            memCacheWidth: 96,
+                                            memCacheHeight: 96,
+                                            fadeInDuration: Duration.zero,
+                                            fadeOutDuration: Duration.zero,
+                                            placeholder: (_, __) => const SizedBox(),
+                                            errorWidget: (_, __, ___) => Icon(
+                                              Icons.music_note,
+                                              size: 24,
+                                              color: colorScheme.onSurfaceVariant,
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.music_note,
+                                            size: 24,
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            title: Text(
+                              track.name,
+                              style: textTheme.bodyLarge?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              track.artistsString,
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (HiResBadge.getTooltip(track) != null) ...[
+                                  HiResBadge.fromTrack(track, primaryColor: colorScheme.primary)!,
+                                  const SizedBox(width: 12),
+                                ],
+                                if (track.duration != null)
                                   SizedBox(
-                                    width: 28,
+                                    width: 40,
                                     child: Text(
-                                      '${index + 1}',
-                                      style: textTheme.bodyMedium?.copyWith(
+                                      _formatDuration(track.duration!),
+                                      style: textTheme.bodySmall?.copyWith(
                                         color: colorScheme.onSurface.withOpacity(0.5),
                                       ),
                                       textAlign: TextAlign.right,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  // Track artwork
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: Container(
-                                      width: 48,
-                                      height: 48,
-                                      color: colorScheme.surfaceContainerHighest,
-                                      child: trackImageUrl != null
-                                          ? CachedNetworkImage(
-                                              imageUrl: trackImageUrl,
-                                              fit: BoxFit.cover,
-                                              memCacheWidth: 96,
-                                              memCacheHeight: 96,
-                                              fadeInDuration: Duration.zero,
-                                              fadeOutDuration: Duration.zero,
-                                              placeholder: (_, __) => const SizedBox(),
-                                              errorWidget: (_, __, ___) => Icon(
-                                                Icons.music_note,
-                                                size: 24,
-                                                color: colorScheme.onSurfaceVariant,
-                                              ),
-                                            )
-                                          : Icon(
-                                              Icons.music_note,
-                                              size: 24,
-                                              color: colorScheme.onSurfaceVariant,
-                                            ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              title: Text(
-                                track.name,
-                                style: textTheme.bodyLarge?.copyWith(
-                                  color: colorScheme.onSurface,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                track.artistsString,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: colorScheme.onSurface.withOpacity(0.6),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (HiResBadge.getTooltip(track) != null) ...[
-                                    HiResBadge.fromTrack(track, primaryColor: colorScheme.primary)!,
-                                    const SizedBox(width: 12),
-                                  ],
-                                  if (track.duration != null)
-                                    SizedBox(
-                                      width: 40,
-                                      child: Text(
-                                        _formatDuration(track.duration!),
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: colorScheme.onSurface.withOpacity(0.5),
-                                        ),
-                                        textAlign: TextAlign.right,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              onTap: () {
-                                if (isExpanded) {
-                                  setState(() {
-                                    _expandedTrackIndex = null;
-                                  });
-                                } else {
-                                  _playTrack(index);
-                                }
-                              },
-                              onLongPress: () {
-                                setState(() {
-                                  _expandedTrackIndex = isExpanded ? null : index;
-                                });
-                              },
+                              ],
                             ),
-                            // Expandable action buttons
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                              child: isExpanded
-                                  ? Padding(
-                                      padding: const EdgeInsets.only(right: 16.0, bottom: 12.0, top: 4.0),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        children: [
-                                          // Radio button
-                                          SizedBox(
-                                            height: 44,
-                                            width: 44,
-                                            child: FilledButton.tonal(
-                                              onPressed: () => _showPlayRadioMenu(context, index),
-                                              style: FilledButton.styleFrom(
-                                                padding: EdgeInsets.zero,
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                ),
-                                              ),
-                                              child: const Icon(Icons.radio, size: 20),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          // Add to queue button
-                                          SizedBox(
-                                            height: 44,
-                                            width: 44,
-                                            child: FilledButton.tonal(
-                                              onPressed: () => _addTrackToQueue(context, index),
-                                              style: FilledButton.styleFrom(
-                                                padding: EdgeInsets.zero,
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                ),
-                                              ),
-                                              child: const Icon(Icons.playlist_add, size: 20),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          // Favorite button
-                                          SizedBox(
-                                            height: 44,
-                                            width: 44,
-                                            child: FilledButton.tonal(
-                                              onPressed: () => _toggleTrackFavorite(index),
-                                              style: FilledButton.styleFrom(
-                                                padding: EdgeInsets.zero,
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(Radii.xxl),
-                                                ),
-                                              ),
-                                              child: Icon(
-                                                track.favorite == true ? Icons.favorite : Icons.favorite_border,
-                                                size: 20,
-                                                color: track.favorite == true
-                                                    ? colorScheme.error
-                                                    : colorScheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
-                          ],
+                            onTap: () => _playTrack(index),
+                          ),
                         );
                       },
                       childCount: _tracks.length,

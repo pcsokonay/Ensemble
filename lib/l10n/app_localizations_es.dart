@@ -377,6 +377,9 @@ class SEs extends S {
   String get tracksAddedToQueue => 'Canciones añadidas a la cola';
 
   @override
+  String get trackAddedToQueue => 'Track added to queue';
+
+  @override
   String get play => 'Reproducir';
 
   @override
@@ -713,6 +716,9 @@ class SEs extends S {
       'Elige qué filas mostrar en la pantalla de inicio';
 
   @override
+  String get favorite => 'Favorite';
+
+  @override
   String get addedToFavorites => 'Añadido a favoritos';
 
   @override
@@ -896,7 +902,13 @@ class SEs extends S {
   String get addAlbumToQueueOn => 'Añadir álbum a la cola en...';
 
   @override
+  String get addToQueue => 'Add to queue';
+
+  @override
   String get addToQueueOn => 'Añadir a la cola en...';
+
+  @override
+  String get startRadio => 'Start radio';
 
   @override
   String startRadioOn(String name) {

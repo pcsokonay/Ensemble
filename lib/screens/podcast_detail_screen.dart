@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -6,8 +7,10 @@ import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/provider_icon.dart';
+import '../widgets/media_context_menu.dart';
 import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
+import '../theme/design_tokens.dart';
 import '../services/debug_logger.dart';
 import '../constants/hero_tags.dart';
 import '../l10n/app_localizations.dart';
@@ -36,6 +39,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
   bool _isLoadingEpisodes = false;
   bool _isDescriptionExpanded = false;
   bool _isInLibrary = false;
+  bool _isFavorite = false;
   String? _expandedEpisodeId; // Track which episode is expanded for actions
 
   String get _heroTagSuffix => widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
@@ -44,6 +48,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
   void initState() {
     super.initState();
     _isInLibrary = _checkIfInLibrary(widget.podcast);
+    _isFavorite = widget.podcast.favorite ?? false;
 
     // Mark that we're on a detail screen and extract colors immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -184,6 +189,71 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
           ),
         );
       }
+    }
+  }
+
+  /// Toggle favorite status
+  Future<void> _toggleFavorite() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isFavorite;
+
+    try {
+      bool success;
+      if (newState) {
+        String actualProvider = widget.podcast.provider;
+        String actualItemId = widget.podcast.itemId;
+
+        if (widget.podcast.providerMappings != null && widget.podcast.providerMappings!.isNotEmpty) {
+          final mapping = widget.podcast.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => widget.podcast.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => widget.podcast.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        success = await maProvider.addToFavorites(
+          mediaType: 'podcast',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (widget.podcast.provider == 'library') {
+          libraryItemId = int.tryParse(widget.podcast.itemId);
+        } else if (widget.podcast.providerMappings != null) {
+          final libraryMapping = widget.podcast.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.podcast.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        success = await maProvider.removeFromFavorites(
+          mediaType: 'podcast',
+          libraryItemId: libraryItemId,
+        );
+      }
+
+      if (success && mounted) {
+        setState(() => _isFavorite = newState);
+        maProvider.invalidateHomeCache();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error toggling podcast favorite: $e');
     }
   }
 
@@ -573,7 +643,6 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                             children: [
                               // Main Play Latest Episode Button
                               Expanded(
-                                flex: 2,
                                 child: SizedBox(
                                   height: 50,
                                   child: ElevatedButton.icon(
@@ -595,24 +664,6 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              // "Play on..." Button
-                              SizedBox(
-                                height: 50,
-                                width: 50,
-                                child: FilledButton.tonal(
-                                  onPressed: _isLoadingEpisodes || _episodes.isEmpty
-                                      ? null
-                                      : () => _showPlayOnMenu(context, _episodes.first),
-                                  style: FilledButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.speaker_group_outlined),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
                               // Library button
                               SizedBox(
                                 height: 50,
@@ -630,6 +681,60 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                                     color: _isInLibrary
                                         ? colorScheme.primary
                                         : colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Favorite button
+                              SizedBox(
+                                height: 50,
+                                width: 50,
+                                child: FilledButton.tonal(
+                                  onPressed: _toggleFavorite,
+                                  style: FilledButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(Radii.xxl),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    _isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    color: _isFavorite
+                                        ? colorScheme.error
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Three-dot Menu Button
+                              GestureDetector(
+                                onTapDown: _isLoadingEpisodes || _episodes.isEmpty ? null : (details) {
+                                  HapticFeedback.mediumImpact();
+                                  MediaContextMenu.show(
+                                    context: context,
+                                    position: details.globalPosition,
+                                    mediaType: ContextMenuMediaType.podcast,
+                                    item: widget.podcast,
+                                    isFavorite: _isFavorite,
+                                    isInLibrary: _isInLibrary,
+                                    onToggleFavorite: _toggleFavorite,
+                                    onToggleLibrary: _toggleLibrary,
+                                    adaptiveColorScheme: _darkColorScheme ?? colorScheme,
+                                    showTopRow: false,
+                                  );
+                                },
+                                child: Container(
+                                  height: 50,
+                                  width: 50,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.secondaryContainer,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.more_vert,
+                                    color: _isLoadingEpisodes || _episodes.isEmpty
+                                        ? colorScheme.onSecondaryContainer.withOpacity(0.38)
+                                        : colorScheme.onSecondaryContainer,
                                   ),
                                 ),
                               ),

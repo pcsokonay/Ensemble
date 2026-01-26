@@ -378,6 +378,9 @@ class SFr extends S {
   String get tracksAddedToQueue => 'Pistes ajoutées a la file d\'attente';
 
   @override
+  String get trackAddedToQueue => 'Track added to queue';
+
+  @override
   String get play => 'Lire';
 
   @override
@@ -717,6 +720,9 @@ class SFr extends S {
       'Choisir les rangees a afficher sur l\'ecran d\'accueil';
 
   @override
+  String get favorite => 'Favorite';
+
+  @override
   String get addedToFavorites => 'Ajoute aux favoris';
 
   @override
@@ -903,7 +909,13 @@ class SFr extends S {
       'Ajouter l\'album a la file d\'attente sur...';
 
   @override
+  String get addToQueue => 'Add to queue';
+
+  @override
   String get addToQueueOn => 'Ajouter a la file d\'attente sur...';
+
+  @override
+  String get startRadio => 'Start radio';
 
   @override
   String startRadioOn(String name) {

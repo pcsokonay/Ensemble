@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -8,9 +9,10 @@ import '../providers/music_assistant_provider.dart';
 import '../screens/podcast_detail_screen.dart';
 import '../constants/hero_tags.dart';
 import '../constants/timings.dart';
-import '../theme/theme_provider.dart';
 import '../utils/page_transitions.dart';
+import '../l10n/app_localizations.dart';
 import 'provider_icon.dart';
+import 'media_context_menu.dart';
 
 class PodcastCard extends StatefulWidget {
   final MediaItem podcast;
@@ -34,6 +36,159 @@ class PodcastCard extends StatefulWidget {
 
 class _PodcastCardState extends State<PodcastCard> {
   bool _isNavigating = false;
+  late bool _isFavorite;
+  late bool _isInLibrary;
+
+  @override
+  void initState() {
+    super.initState();
+    _isFavorite = widget.podcast.favorite ?? false;
+    _isInLibrary = widget.podcast.inLibrary;
+  }
+
+  Future<void> _toggleFavorite() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isFavorite;
+
+    try {
+      bool success;
+      if (newState) {
+        String actualProvider = widget.podcast.provider;
+        String actualItemId = widget.podcast.itemId;
+
+        if (widget.podcast.providerMappings != null && widget.podcast.providerMappings!.isNotEmpty) {
+          final mapping = widget.podcast.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => widget.podcast.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => widget.podcast.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerDomain;
+          actualItemId = mapping.itemId;
+        }
+
+        success = await maProvider.addToFavorites(
+          mediaType: 'podcast',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        int? libraryItemId;
+        if (widget.podcast.provider == 'library') {
+          libraryItemId = int.tryParse(widget.podcast.itemId);
+        } else if (widget.podcast.providerMappings != null) {
+          final libraryMapping = widget.podcast.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.podcast.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        success = await maProvider.removeFromFavorites(
+          mediaType: 'podcast',
+          libraryItemId: libraryItemId,
+        );
+      }
+
+      if (success && mounted) {
+        setState(() => _isFavorite = newState);
+        maProvider.invalidateHomeCache();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      // Silent failure
+    }
+  }
+
+  Future<void> _toggleLibrary() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !_isInLibrary;
+
+    try {
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (widget.podcast.providerMappings != null && widget.podcast.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = widget.podcast.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (widget.podcast.provider != 'library') {
+            actualProvider = widget.podcast.provider;
+            actualItemId = widget.podcast.itemId;
+          } else {
+            return;
+          }
+        }
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.addedToLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.addToLibrary(
+          mediaType: 'podcast',
+          provider: actualProvider,
+          itemId: actualItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      } else {
+        int? libraryItemId;
+        if (widget.podcast.provider == 'library') {
+          libraryItemId = int.tryParse(widget.podcast.itemId);
+        } else if (widget.podcast.providerMappings != null) {
+          final libraryMapping = widget.podcast.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.podcast.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.removeFromLibrary(
+          mediaType: 'podcast',
+          libraryItemId: libraryItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      }
+    } catch (e) {
+      // Silent failure
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +227,19 @@ class _PodcastCardState extends State<PodcastCard> {
               if (mounted) _isNavigating = false;
             });
           });
+        },
+        onLongPressStart: (details) {
+          HapticFeedback.mediumImpact();
+          MediaContextMenu.show(
+            context: context,
+            position: details.globalPosition,
+            mediaType: ContextMenuMediaType.podcast,
+            item: widget.podcast,
+            isFavorite: _isFavorite,
+            isInLibrary: _isInLibrary,
+            onToggleFavorite: _toggleFavorite,
+            onToggleLibrary: _toggleLibrary,
+          );
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

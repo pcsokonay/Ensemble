@@ -369,6 +369,9 @@ class SEn extends S {
   String get tracksAddedToQueue => 'Tracks added to queue';
 
   @override
+  String get trackAddedToQueue => 'Track added to queue';
+
+  @override
   String get play => 'Play';
 
   @override
@@ -698,6 +701,9 @@ class SEn extends S {
       'Choose which rows to display on the home screen';
 
   @override
+  String get favorite => 'Favorite';
+
+  @override
   String get addedToFavorites => 'Added to favorites';
 
   @override
@@ -879,7 +885,13 @@ class SEn extends S {
   String get addAlbumToQueueOn => 'Add album to queue on...';
 
   @override
+  String get addToQueue => 'Add to queue';
+
+  @override
   String get addToQueueOn => 'Add to queue on...';
+
+  @override
+  String get startRadio => 'Start radio';
 
   @override
   String startRadioOn(String name) {

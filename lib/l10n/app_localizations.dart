@@ -761,11 +761,17 @@ abstract class S {
   /// **'Album added to queue'**
   String get albumAddedToQueue;
 
-  /// Confirmation when tracks added
+  /// Snackbar message for tracks added to queue
   ///
   /// In en, this message translates to:
   /// **'Tracks added to queue'**
   String get tracksAddedToQueue;
+
+  /// Confirmation when tracks added
+  ///
+  /// In en, this message translates to:
+  /// **'Track added to queue'**
+  String get trackAddedToQueue;
 
   /// Play button label
   ///
@@ -1337,6 +1343,12 @@ abstract class S {
   /// **'Choose which rows to display on the home screen'**
   String get chooseHomeScreenRows;
 
+  /// No description provided for @favorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite'**
+  String get favorite;
+
   /// No description provided for @addedToFavorites.
   ///
   /// In en, this message translates to:
@@ -1673,11 +1685,23 @@ abstract class S {
   /// **'Add album to queue on...'**
   String get addAlbumToQueueOn;
 
+  /// Add item to queue on selected player
+  ///
+  /// In en, this message translates to:
+  /// **'Add to queue'**
+  String get addToQueue;
+
   /// Bottom sheet title for adding to queue
   ///
   /// In en, this message translates to:
   /// **'Add to queue on...'**
   String get addToQueueOn;
+
+  /// Start radio on selected player
+  ///
+  /// In en, this message translates to:
+  /// **'Start radio'**
+  String get startRadio;
 
   /// Bottom sheet title for starting radio
   ///

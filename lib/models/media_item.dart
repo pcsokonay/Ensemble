@@ -137,6 +137,12 @@ class MediaItem {
 
   @override
   int get hashCode => Object.hash(itemId, provider);
+
+  /// Check if this item is in the user's library
+  bool get inLibrary {
+    if (provider == 'library') return true;
+    return providerMappings?.any((m) => m.providerInstance == 'library') ?? false;
+  }
 }
 
 class Artist extends MediaItem {
@@ -163,6 +169,12 @@ class Artist extends MediaItem {
       metadata: item.metadata,
       favorite: item.favorite,
     );
+  }
+
+  /// Check if this artist is in the user's library
+  bool get inLibrary {
+    if (provider == 'library') return true;
+    return providerMappings?.any((m) => m.providerInstance == 'library') ?? false;
   }
 
   @override
@@ -286,6 +298,12 @@ class Track extends MediaItem {
   String get artistsString =>
       artists?.map((a) => a.name).join(', ') ?? 'Unknown Artist';
 
+  /// Check if this track is in the user's library
+  bool get inLibrary {
+    if (provider == 'library') return true;
+    return providerMappings?.any((m) => m.providerInstance == 'library') ?? false;
+  }
+
   @override
   Map<String, dynamic> toJson() {
     final json = super.toJson();
@@ -331,6 +349,12 @@ class Playlist extends MediaItem {
       metadata: item.metadata,
       favorite: item.favorite,
     );
+  }
+
+  /// Check if this playlist is in the user's library
+  bool get inLibrary {
+    if (provider == 'library') return true;
+    return providerMappings?.any((m) => m.providerInstance == 'library') ?? false;
   }
 }
 
@@ -527,6 +551,12 @@ class Audiobook extends MediaItem {
 
   String get narratorsString =>
       narrators?.map((n) => n.name).join(', ') ?? 'Unknown Narrator';
+
+  /// Check if this audiobook is in the user's library
+  bool get inLibrary {
+    if (provider == 'library') return true;
+    return providerMappings?.any((m) => m.providerInstance == 'library') ?? false;
+  }
 
   /// Get progress as a percentage (0.0 to 1.0)
   double get progress {

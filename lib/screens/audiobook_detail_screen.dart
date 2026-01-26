@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -6,6 +7,7 @@ import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/provider_icon.dart';
+import '../widgets/media_context_menu.dart';
 import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
 import '../services/debug_logger.dart';
@@ -35,6 +37,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
   final _logger = DebugLogger();
   bool _isDescriptionExpanded = false;
   bool _isFavorite = false;
+  bool _isInLibrary = false;
   ColorScheme? _lightColorScheme;
   ColorScheme? _darkColorScheme;
   int? _expandedChapterIndex;
@@ -46,10 +49,17 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
   // Use full audiobook if loaded, otherwise use widget audiobook
   Audiobook get _audiobook => _fullAudiobook ?? widget.audiobook;
 
+  /// Check if audiobook is in library
+  bool _checkIfInLibrary(Audiobook audiobook) {
+    if (audiobook.provider == 'library') return true;
+    return audiobook.providerMappings?.any((m) => m.providerInstance == 'library') ?? false;
+  }
+
   @override
   void initState() {
     super.initState();
     _isFavorite = widget.audiobook.favorite ?? false;
+    _isInLibrary = _checkIfInLibrary(widget.audiobook);
 
     // Mark that we're on a detail screen and extract colors immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -209,6 +219,88 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
           ),
         );
       }
+    }
+  }
+
+  /// Toggle library status
+  Future<void> _toggleLibrary() async {
+    final maProvider = context.read<MusicAssistantProvider>();
+
+    try {
+      final newState = !_isInLibrary;
+
+      if (newState) {
+        String? actualProvider;
+        String? actualItemId;
+
+        if (widget.audiobook.providerMappings != null && widget.audiobook.providerMappings!.isNotEmpty) {
+          final nonLibraryMapping = widget.audiobook.providerMappings!.where(
+            (m) => m.providerInstance != 'library' && m.providerDomain != 'library',
+          ).firstOrNull;
+
+          if (nonLibraryMapping != null) {
+            actualProvider = nonLibraryMapping.providerDomain;
+            actualItemId = nonLibraryMapping.itemId;
+          }
+        }
+
+        if (actualProvider == null || actualItemId == null) {
+          if (widget.audiobook.provider != 'library') {
+            actualProvider = widget.audiobook.provider;
+            actualItemId = widget.audiobook.itemId;
+          } else {
+            return;
+          }
+        }
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.addedToLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.addToLibrary(
+          mediaType: 'audiobook',
+          provider: actualProvider,
+          itemId: actualItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      } else {
+        int? libraryItemId;
+        if (widget.audiobook.provider == 'library') {
+          libraryItemId = int.tryParse(widget.audiobook.itemId);
+        } else if (widget.audiobook.providerMappings != null) {
+          final libraryMapping = widget.audiobook.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => widget.audiobook.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId == null) return;
+
+        setState(() => _isInLibrary = newState);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.removedFromLibrary),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        maProvider.removeFromLibrary(
+          mediaType: 'audiobook',
+          libraryItemId: libraryItemId,
+        ).catchError((e) {
+          if (mounted) setState(() => _isInLibrary = !newState);
+        });
+      }
+    } catch (e) {
+      _logger.log('Error toggling audiobook library: $e');
     }
   }
 
@@ -655,7 +747,6 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                       children: [
                         // Play/Resume Button
                         Expanded(
-                          flex: 2,
                           child: SizedBox(
                             height: 50,
                             child: ElevatedButton.icon(
@@ -696,19 +787,24 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
 
                         const SizedBox(width: 12),
 
-                        // Play On Button
+                        // Library Button
                         SizedBox(
                           height: 50,
                           width: 50,
                           child: FilledButton.tonal(
-                            onPressed: () => _showPlayOnMenu(context),
+                            onPressed: _toggleLibrary,
                             style: FilledButton.styleFrom(
                               padding: EdgeInsets.zero,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Icon(Icons.speaker_group_outlined),
+                            child: Icon(
+                              _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                              color: _isInLibrary
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
 
@@ -731,6 +827,39 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
                               color: _isFavorite
                                   ? colorScheme.error
                                   : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 12),
+
+                        // Three-dot Menu Button
+                        GestureDetector(
+                          onTapDown: (details) {
+                            HapticFeedback.mediumImpact();
+                            MediaContextMenu.show(
+                              context: context,
+                              position: details.globalPosition,
+                              mediaType: ContextMenuMediaType.audiobook,
+                              item: widget.audiobook,
+                              isFavorite: _isFavorite,
+                              isInLibrary: _isInLibrary,
+                              onToggleFavorite: _toggleFavorite,
+                              onToggleLibrary: _toggleLibrary,
+                              adaptiveColorScheme: _darkColorScheme ?? colorScheme,
+                              showTopRow: false,
+                            );
+                          },
+                          child: Container(
+                            height: 50,
+                            width: 50,
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.more_vert,
+                              color: colorScheme.onSecondaryContainer,
                             ),
                           ),
                         ),

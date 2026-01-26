@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/provider_icon.dart';
+import '../widgets/media_context_menu.dart';
 import 'album_details_screen.dart';
 import '../constants/hero_tags.dart';
 import '../theme/palette_helper.dart';
@@ -444,7 +446,44 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
     }
   }
 
-  void _showRadioMenu(BuildContext context) {
+  /// Start radio on the selected player directly
+  void _startRadio(BuildContext context) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final player = maProvider.selectedPlayer;
+
+    if (player == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(S.of(context)!.noPlayerSelected)),
+        );
+      }
+      return;
+    }
+
+    try {
+      await maProvider.playArtistRadio(player.playerId, widget.artist);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.startingRadioOnPlayer(widget.artist.name, player.name)),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.log('Error starting artist radio: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context)!.failedToStartRadio(e.toString())),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showRadioOnMenu(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
 
     GlobalPlayerOverlay.showPlayerSelectorForAction(
@@ -472,6 +511,50 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
           }
         }
       },
+    );
+  }
+
+  void _showMoreMenu(BuildContext context, ColorScheme colorScheme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Icon(Icons.speaker_group_outlined, color: colorScheme.onSurface),
+              title: Text(S.of(context)!.startRadioOn(widget.artist.name), style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+                Navigator.pop(context);
+                _showRadioOnMenu(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.playlist_add, color: colorScheme.onSurface),
+              title: Text(S.of(context)!.addToQueueOn, style: TextStyle(color: colorScheme.onSurface)),
+              onTap: () {
+                Navigator.pop(context);
+                _showAddToQueueMenu(context);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 
@@ -764,11 +847,10 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                     children: [
                       // Main Radio Button
                       Expanded(
-                        flex: 2,
                         child: SizedBox(
                           height: 50,
                           child: ElevatedButton.icon(
-                            onPressed: () => _showRadioMenu(context),
+                            onPressed: () => _startRadio(context),
                             icon: const Icon(Icons.radio),
                             label: Text(S.of(context)!.radio),
                             style: ElevatedButton.styleFrom(
@@ -784,19 +866,24 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
                       const SizedBox(width: 12),
 
-                      // "Add to Queue" Button (Square)
+                      // Library Button
                       SizedBox(
                         height: 50,
                         width: 50,
                         child: FilledButton.tonal(
-                          onPressed: () => _showAddToQueueMenu(context),
+                          onPressed: _toggleLibrary,
                           style: FilledButton.styleFrom(
                             padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Icon(Icons.playlist_add),
+                          child: Icon(
+                            _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                            color: _isInLibrary
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
 
@@ -825,23 +912,33 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
                       const SizedBox(width: 12),
 
-                      // Library Button
-                      SizedBox(
-                        height: 50,
-                        width: 50,
-                        child: FilledButton.tonal(
-                          onPressed: _toggleLibrary,
-                          style: FilledButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                      // Three-dot Menu Button
+                      GestureDetector(
+                        onTapDown: (details) {
+                          HapticFeedback.mediumImpact();
+                          MediaContextMenu.show(
+                            context: context,
+                            position: details.globalPosition,
+                            mediaType: ContextMenuMediaType.artist,
+                            item: widget.artist,
+                            isFavorite: _isFavorite,
+                            isInLibrary: _isInLibrary,
+                            onToggleFavorite: _toggleFavorite,
+                            onToggleLibrary: _toggleLibrary,
+                            adaptiveColorScheme: _darkColorScheme ?? colorScheme,
+                            showTopRow: false,
+                          );
+                        },
+                        child: Container(
+                          height: 50,
+                          width: 50,
+                          decoration: BoxDecoration(
+                            color: colorScheme.secondaryContainer,
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
-                            _isInLibrary ? Icons.library_add_check : Icons.library_add,
-                            color: _isInLibrary
-                                ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
+                            Icons.more_vert,
+                            color: colorScheme.onSecondaryContainer,
                           ),
                         ),
                       ),
