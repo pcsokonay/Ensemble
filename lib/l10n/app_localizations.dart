@@ -1376,7 +1376,7 @@ abstract class S {
   /// No description provided for @addToLibrary.
   ///
   /// In en, this message translates to:
-  /// **'Add to library'**
+  /// **'Add'**
   String get addToLibrary;
 
   /// No description provided for @unknown.

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
+import '../widgets/media_context_menu.dart';
 import '../theme/theme_provider.dart';
 import '../services/settings_service.dart';
 import '../services/metadata_service.dart';
+import '../services/debug_logger.dart';
 import '../utils/page_transitions.dart';
 import '../constants/hero_tags.dart';
 import '../l10n/app_localizations.dart';
@@ -33,6 +36,7 @@ class AudiobookAuthorScreen extends StatefulWidget {
 }
 
 class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
+  final _logger = DebugLogger();
   late List<Audiobook> _audiobooks;
   ColorScheme? _lightColorScheme;
   ColorScheme? _darkColorScheme;
@@ -116,6 +120,149 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
     }
   }
 
+  /// Toggle favorite status for an audiobook
+  Future<void> _toggleAudiobookFavorite(Audiobook book) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !(book.favorite ?? false);
+
+    try {
+      bool success;
+      if (newState) {
+        // Add to favorites
+        String actualProvider = book.provider;
+        String actualItemId = book.itemId;
+
+        if (book.providerMappings != null && book.providerMappings!.isNotEmpty) {
+          final mapping = book.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => book.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => book.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerInstance;
+          actualItemId = mapping.itemId;
+        }
+
+        success = await maProvider.addToFavorites(
+          mediaType: 'audiobook',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        // Remove from favorites
+        int? libraryItemId;
+        if (book.provider == 'library') {
+          libraryItemId = int.tryParse(book.itemId);
+        } else if (book.providerMappings != null) {
+          final libraryMapping = book.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => book.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          success = await maProvider.removeFromFavorites(
+            mediaType: 'audiobook',
+            libraryItemId: libraryItemId,
+          );
+        } else {
+          success = false;
+        }
+      }
+
+      if (success && mounted) {
+        setState(() {
+          final index = _audiobooks.indexWhere((b) => b.itemId == book.itemId);
+          if (index != -1) {
+            _audiobooks[index] = Audiobook(
+              itemId: book.itemId,
+              provider: book.provider,
+              name: book.name,
+              sortName: book.sortName,
+              uri: book.uri,
+              providerMappings: book.providerMappings,
+              favorite: newState,
+              metadata: book.metadata,
+              year: book.year,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      _logger.log('Error toggling audiobook favorite: $e');
+    }
+  }
+
+  /// Toggle library status for an audiobook
+  Future<void> _toggleAudiobookLibrary(Audiobook book) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !book.inLibrary;
+
+    try {
+      bool success;
+      if (newState) {
+        // Add to library
+        String? actualProvider;
+        String? actualItemId;
+
+        if (book.providerMappings != null && book.providerMappings!.isNotEmpty) {
+          final mapping = book.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => book.providerMappings!.first,
+          );
+          if (mapping.providerInstance != 'library') {
+            actualProvider = mapping.providerInstance;
+            actualItemId = mapping.itemId;
+          }
+        }
+
+        if (actualProvider != null && actualItemId != null) {
+          success = await maProvider.addToLibrary(
+            mediaType: 'audiobook',
+            itemId: actualItemId,
+            provider: actualProvider,
+          );
+        } else {
+          success = false;
+        }
+      } else {
+        // Remove from library
+        int? libraryItemId;
+        if (book.provider == 'library') {
+          libraryItemId = int.tryParse(book.itemId);
+        } else if (book.providerMappings != null) {
+          final libraryMapping = book.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => book.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          success = await maProvider.removeFromLibrary(
+            mediaType: 'audiobook',
+            libraryItemId: libraryItemId,
+          );
+        } else {
+          success = false;
+        }
+      }
+
+      if (success) {
+        // Refresh would require reloading from parent - for now just show success
+        _logger.log('Audiobook library status toggled');
+      }
+    } catch (e) {
+      _logger.log('Error toggling audiobook library: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final adaptiveTheme = context.select<ThemeProvider, bool>(
@@ -168,6 +315,49 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
                 },
                 color: colorScheme.onSurface,
               ),
+              actions: [
+                // Three-dot menu with sort/view options
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                    height: 40,
+                    width: 40,
+                    child: Builder(
+                      builder: (buttonContext) => FilledButton.tonal(
+                        onPressed: () {
+                          final RenderBox box = buttonContext.findRenderObject() as RenderBox;
+                          final Offset position = box.localToGlobal(Offset(box.size.width / 2, box.size.height));
+                          MediaContextMenu.show(
+                            context: context,
+                            position: position,
+                            mediaType: ContextMenuMediaType.audiobook,
+                            item: _audiobooks.isNotEmpty ? _audiobooks.first : null,
+                            isFavorite: false,
+                            isInLibrary: false,
+                            adaptiveColorScheme: adaptiveScheme,
+                            showTopRow: false,
+                            sortOrder: _sortOrder,
+                            onToggleSort: _toggleSortOrder,
+                            viewMode: _viewMode,
+                            onCycleView: _cycleViewMode,
+                          );
+                        },
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.more_vert,
+                          size: 20,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               flexibleSpace: FlexibleSpaceBar(
                 background: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -242,55 +432,16 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
                 ),
               ),
             ),
-            // Audiobooks Section Header with controls
+            // Audiobooks Section Header
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24.0, 8.0, 12.0, 8.0),
-                child: Row(
-                  children: [
-                    Text(
-                      S.of(context)!.audiobooks,
-                      style: textTheme.titleLarge?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    // Sort toggle
-                    IconButton(
-                      icon: Icon(
-                        _sortOrder == 'alpha' ? Icons.sort_by_alpha : Icons.calendar_today,
-                        color: colorScheme.primary,
-                        size: 20,
-                      ),
-                      tooltip: _sortOrder == 'alpha' ? S.of(context)!.sortByYear : S.of(context)!.sortAlphabetically,
-                      onPressed: _toggleSortOrder,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                    ),
-                    // View mode toggle
-                    IconButton(
-                      icon: Icon(
-                        _viewMode == 'list'
-                            ? Icons.view_list
-                            : _viewMode == 'grid3'
-                                ? Icons.grid_view
-                                : Icons.grid_on,
-                        color: colorScheme.primary,
-                        size: 20,
-                      ),
-                      tooltip: _viewMode == 'grid2'
-                          ? S.of(context)!.threeColumnGrid
-                          : _viewMode == 'grid3'
-                              ? S.of(context)!.listView
-                              : S.of(context)!.twoColumnGrid,
-                      onPressed: _cycleViewMode,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                    ),
-                  ],
+                padding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 8.0),
+                child: Text(
+                  S.of(context)!.audiobooks,
+                  style: textTheme.titleLarge?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -344,10 +495,31 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
     final textTheme = Theme.of(context).textTheme;
     final heroSuffix = 'author${_heroTagSuffix}';
 
-    return InkWell(
-      onTap: () => _navigateToAudiobook(book, heroTagSuffix: heroSuffix, initialImageUrl: imageUrl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    // Get adaptive scheme for context menu
+    final themeProvider = context.read<ThemeProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final adaptiveScheme = themeProvider.adaptiveTheme
+        ? (isDark ? _darkColorScheme : _lightColorScheme)
+        : null;
+
+    return GestureDetector(
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.audiobook,
+          item: book,
+          isFavorite: book.favorite ?? false,
+          isInLibrary: book.inLibrary,
+          adaptiveColorScheme: adaptiveScheme,
+          onToggleFavorite: () => _toggleAudiobookFavorite(book),
+          onToggleLibrary: () => _toggleAudiobookLibrary(book),
+        );
+      },
+      child: InkWell(
+        onTap: () => _navigateToAudiobook(book, heroTagSuffix: heroSuffix, initialImageUrl: imageUrl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AspectRatio(
             aspectRatio: 1.0,
@@ -438,7 +610,8 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -450,9 +623,30 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
     final textTheme = Theme.of(context).textTheme;
     final heroSuffix = 'author${_heroTagSuffix}';
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      leading: Hero(
+    // Get adaptive scheme for context menu
+    final themeProvider = context.read<ThemeProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final adaptiveScheme = themeProvider.adaptiveTheme
+        ? (isDark ? _darkColorScheme : _lightColorScheme)
+        : null;
+
+    return GestureDetector(
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.audiobook,
+          item: book,
+          isFavorite: book.favorite ?? false,
+          isInLibrary: book.inLibrary,
+          adaptiveColorScheme: adaptiveScheme,
+          onToggleFavorite: () => _toggleAudiobookFavorite(book),
+          onToggleLibrary: () => _toggleAudiobookLibrary(book),
+        );
+      },
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: Hero(
         tag: HeroTags.audiobookCover + (book.uri ?? book.itemId) + '_$heroSuffix',
         child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
@@ -533,7 +727,8 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
               ),
             )
           : null,
-      onTap: () => _navigateToAudiobook(book, heroTagSuffix: heroSuffix, initialImageUrl: imageUrl),
+        onTap: () => _navigateToAudiobook(book, heroTagSuffix: heroSuffix, initialImageUrl: imageUrl),
+      ),
     );
   }
 

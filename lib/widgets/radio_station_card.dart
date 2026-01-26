@@ -214,7 +214,6 @@ class _RadioStationCardState extends State<RadioStationCard> {
           });
         },
         onLongPressStart: (details) {
-          HapticFeedback.mediumImpact();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,

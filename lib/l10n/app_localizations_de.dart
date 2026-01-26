@@ -724,7 +724,7 @@ class SDe extends S {
   String get removedFromLibrary => 'Removed from library';
 
   @override
-  String get addToLibrary => 'Add to library';
+  String get addToLibrary => 'Add';
 
   @override
   String get unknown => 'Unbekannt';

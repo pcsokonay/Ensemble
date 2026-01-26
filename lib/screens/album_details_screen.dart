@@ -1017,9 +1017,10 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                           ),
                           child: Icon(
                             _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                            size: 25,
                             color: _isInLibrary
                                 ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
+                                : Colors.white70,
                           ),
                         ),
                       ),
@@ -1039,10 +1040,11 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                             ),
                           ),
                           child: Icon(
-                            _isFavorite ? Icons.favorite : Icons.favorite_border,
+                            Icons.favorite,
+                            size: 25,
                             color: _isFavorite
                                 ? colorScheme.error
-                                : colorScheme.onSurfaceVariant,
+                                : Colors.white70,
                           ),
                         ),
                       ),
@@ -1050,34 +1052,41 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                       const SizedBox(width: 12),
 
                       // Three-dot Menu Button
-                      GestureDetector(
-                        onTapDown: _isLoading || _tracks.isEmpty ? null : (details) {
-                          HapticFeedback.mediumImpact();
-                          MediaContextMenu.show(
-                            context: context,
-                            position: details.globalPosition,
-                            mediaType: ContextMenuMediaType.album,
-                            item: widget.album,
-                            isFavorite: _isFavorite,
-                            isInLibrary: _isInLibrary,
-                            onToggleFavorite: _toggleFavorite,
-                            onToggleLibrary: _toggleLibrary,
-                            adaptiveColorScheme: _darkColorScheme ?? colorScheme,
-                            showTopRow: false, // Only show list items since buttons are already visible
-                          );
-                        },
-                        child: Container(
-                          height: 50,
-                          width: 50,
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.more_vert,
-                            color: _isLoading || _tracks.isEmpty
-                                ? colorScheme.onSecondaryContainer.withOpacity(0.38)
-                                : colorScheme.onSecondaryContainer,
+                      SizedBox(
+                        height: 50,
+                        width: 50,
+                        child: Builder(
+                          builder: (buttonContext) => FilledButton.tonal(
+                            onPressed: () {
+                              if (_isLoading || _tracks.isEmpty) return;
+                              final RenderBox box = buttonContext.findRenderObject() as RenderBox;
+                              final Offset position = box.localToGlobal(Offset(box.size.width / 2, box.size.height));
+                              MediaContextMenu.show(
+                                context: context,
+                                position: position,
+                                mediaType: ContextMenuMediaType.album,
+                                item: widget.album,
+                                isFavorite: _isFavorite,
+                                isInLibrary: _isInLibrary,
+                                onToggleFavorite: _toggleFavorite,
+                                onToggleLibrary: _toggleLibrary,
+                                adaptiveColorScheme: adaptiveScheme,
+                                showTopRow: false, // Only show list items since buttons are already visible
+                              );
+                            },
+                            style: FilledButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.more_vert,
+                              size: 25,
+                              color: _isLoading || _tracks.isEmpty
+                                  ? Colors.white70.withOpacity(0.38)
+                                  : Colors.white70,
+                            ),
                           ),
                         ),
                       ),
@@ -1114,7 +1123,6 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
 
                   return GestureDetector(
                     onLongPressStart: (details) {
-                      HapticFeedback.mediumImpact();
                       MediaContextMenu.show(
                         context: context,
                         position: details.globalPosition,
@@ -1124,7 +1132,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                         isInLibrary: track.inLibrary,
                         onToggleFavorite: () => _toggleTrackFavorite(index),
                         onToggleLibrary: () => _toggleTrackLibrary(index),
-                        adaptiveColorScheme: _darkColorScheme ?? colorScheme,
+                        adaptiveColorScheme: adaptiveScheme,
                       );
                     },
                     child: ListTile(

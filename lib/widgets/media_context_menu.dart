@@ -35,6 +35,11 @@ class MediaContextMenu {
     VoidCallback? onToggleFavorite,
     VoidCallback? onToggleLibrary,
     bool showTopRow = true,
+    // Optional layout/sort controls for detail screens
+    String? sortOrder,
+    VoidCallback? onToggleSort,
+    String? viewMode,
+    VoidCallback? onCycleView,
   }) {
     // Close any existing menu
     hide();
@@ -56,6 +61,10 @@ class MediaContextMenu {
         onToggleFavorite: onToggleFavorite,
         onToggleLibrary: onToggleLibrary,
         showTopRow: showTopRow,
+        sortOrder: sortOrder,
+        onToggleSort: onToggleSort,
+        viewMode: viewMode,
+        onCycleView: onCycleView,
         onDismiss: () {
           hide();
           onDismiss?.call();
@@ -84,6 +93,11 @@ class _MediaContextMenuOverlay extends StatefulWidget {
   final VoidCallback? onToggleFavorite;
   final VoidCallback? onToggleLibrary;
   final bool showTopRow;
+  // Optional layout/sort controls
+  final String? sortOrder;
+  final VoidCallback? onToggleSort;
+  final String? viewMode;
+  final VoidCallback? onCycleView;
 
   const _MediaContextMenuOverlay({
     required this.position,
@@ -96,6 +110,10 @@ class _MediaContextMenuOverlay extends StatefulWidget {
     this.onToggleFavorite,
     this.onToggleLibrary,
     this.showTopRow = true,
+    this.sortOrder,
+    this.onToggleSort,
+    this.viewMode,
+    this.onCycleView,
   });
 
   @override
@@ -461,8 +479,16 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
     // Keep menu on screen horizontally
     left = left.clamp(8.0, screenSize.width - menuWidth - 8);
 
-    // Estimate menu height based on whether top row is shown
-    final estimatedHeight = widget.showTopRow ? 280.0 : 180.0;
+    // Estimate menu height based on content
+    double estimatedHeight = widget.showTopRow ? 280.0 : 180.0;
+    // Add height for sort section (header + 2 items)
+    if (widget.onToggleSort != null) {
+      estimatedHeight += 110.0;
+    }
+    // Add height for view section (divider + header + 3 items)
+    if (widget.onCycleView != null) {
+      estimatedHeight += 140.0;
+    }
 
     // If menu would go off bottom (accounting for mini player), position above the tap point
     if (top + estimatedHeight > screenSize.height - bottomInset) {
@@ -490,27 +516,33 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
             child: ScaleTransition(
               scale: _scaleAnimation,
               alignment: Alignment.center,
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(12),
-                // Use lighter surface when adaptive colors are applied for better contrast
-                // Blend with white to make it noticeably lighter than the background
-                color: widget.adaptiveColorScheme != null
-                    ? Color.lerp(colorScheme.surface, Colors.white, 0.25)!
-                    : colorScheme.surface,
-                child: Container(
+              // Wrap in Theme to ensure FilledButton.tonal uses our colorScheme
+              child: Theme(
+                data: Theme.of(context).copyWith(colorScheme: colorScheme),
+                child: SizedBox(
                   width: menuWidth,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Top row: instant action buttons
-                      if (widget.showTopRow) ...[
-                        Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
+                  child: Material(
+                    elevation: 8,
+                    borderRadius: BorderRadius.circular(12),
+                    clipBehavior: Clip.antiAlias,
+                    // Use lighter surface when adaptive colors are applied for better contrast
+                    // Blend with white to make it subtly lighter than the background
+                    color: widget.adaptiveColorScheme != null
+                        ? Color.lerp(colorScheme.surface, Colors.white, 0.03)!
+                        : colorScheme.surface,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Top row: instant action buttons
+                        if (widget.showTopRow) ...[
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                               // Play button
                               _buildIconButton(
                                 icon: Icons.play_arrow_rounded,
@@ -533,7 +565,7 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
                               if (widget.onToggleFavorite != null) ...[
                                 const SizedBox(width: 12),
                                 _buildIconButton(
-                                  icon: widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                                  icon: Icons.favorite,
                                   label: l10n.favorite,
                                   onTap: _handleToggleFavorite,
                                   colorScheme: colorScheme,
@@ -544,7 +576,7 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
                             ],
                           ),
                         ),
-                        const Divider(height: 1),
+                        Divider(height: 1, color: colorScheme.onSurface.withValues(alpha: 0.15)),
                       ],
                       // List items
                       _buildMenuItem(
@@ -581,10 +613,97 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
                           colorScheme: colorScheme,
                         ),
                       ],
+                      // Layout/sort controls (optional) - styled like library options menu
+                      if (widget.onToggleSort != null || widget.onCycleView != null) ...[
+                        Divider(height: 1, color: colorScheme.onSurface.withValues(alpha: 0.15)),
+                        // Sort section
+                        if (widget.onToggleSort != null) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4),
+                            child: Text(
+                              'Sort',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface.withOpacity(0.5),
+                              ),
+                            ),
+                          ),
+                          _buildViewModeItem(
+                            mode: 'alpha',
+                            label: l10n.sortAlphabetically,
+                            icon: Icons.sort_by_alpha,
+                            isSelected: widget.sortOrder == 'alpha',
+                            onTap: () {
+                              if (widget.sortOrder != 'alpha') widget.onToggleSort!();
+                              widget.onDismiss();
+                            },
+                            colorScheme: colorScheme,
+                          ),
+                          _buildViewModeItem(
+                            mode: 'year',
+                            label: l10n.sortByYear,
+                            icon: Icons.calendar_today,
+                            isSelected: widget.sortOrder != 'alpha',
+                            onTap: () {
+                              if (widget.sortOrder == 'alpha') widget.onToggleSort!();
+                              widget.onDismiss();
+                            },
+                            colorScheme: colorScheme,
+                          ),
+                        ],
+                        // View section
+                        if (widget.onCycleView != null) ...[
+                          Divider(height: 1, color: colorScheme.onSurface.withValues(alpha: 0.15)),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 4),
+                            child: Text(
+                              'View',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface.withOpacity(0.5),
+                              ),
+                            ),
+                          ),
+                          _buildViewModeItem(
+                            mode: 'list',
+                            label: l10n.listView,
+                            icon: Icons.view_list,
+                            isSelected: widget.viewMode == 'list',
+                            onTap: () {
+                              _setViewMode('list');
+                            },
+                            colorScheme: colorScheme,
+                          ),
+                          _buildViewModeItem(
+                            mode: 'grid2',
+                            label: l10n.twoColumnGrid,
+                            icon: Icons.grid_on,
+                            isSelected: widget.viewMode == 'grid2',
+                            onTap: () {
+                              _setViewMode('grid2');
+                            },
+                            colorScheme: colorScheme,
+                          ),
+                          _buildViewModeItem(
+                            mode: 'grid3',
+                            label: l10n.threeColumnGrid,
+                            icon: Icons.grid_view,
+                            isSelected: widget.viewMode == 'grid3',
+                            onTap: () {
+                              _setViewMode('grid3');
+                            },
+                            colorScheme: colorScheme,
+                          ),
+                        ],
+                      ],
                     ],
                   ),
                 ),
               ),
+            ),
+            ),
             ),
           ),
         ),
@@ -599,10 +718,11 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
     required ColorScheme colorScheme,
     bool isActive = false,
     Color? activeColor,
+    Color? inactiveColor,
   }) {
     final iconColor = isActive
         ? (activeColor ?? colorScheme.primary)
-        : colorScheme.onSurfaceVariant;
+        : (inactiveColor ?? Colors.white70);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -626,15 +746,20 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: isActive ? iconColor : colorScheme.onSurface,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+        // Constrain text width to match button width to prevent row overflow
+        SizedBox(
+          width: 44,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: isActive ? iconColor : colorScheme.onSurface,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -668,6 +793,69 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Set view mode and cycle through until we reach the target
+  void _setViewMode(String targetMode) {
+    if (widget.viewMode == targetMode) {
+      widget.onDismiss();
+      return;
+    }
+    // Cycle until we reach target mode
+    String current = widget.viewMode ?? 'grid2';
+    while (current != targetMode) {
+      widget.onCycleView!();
+      // Simulate the cycle logic
+      switch (current) {
+        case 'grid2':
+          current = 'grid3';
+          break;
+        case 'grid3':
+          current = 'list';
+          break;
+        default:
+          current = 'grid2';
+      }
+    }
+    widget.onDismiss();
+  }
+
+  Widget _buildViewModeItem({
+    required String mode,
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required ColorScheme colorScheme,
+  }) {
+    return Material(
+      color: isSelected ? colorScheme.primary.withOpacity(0.12) : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.7),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

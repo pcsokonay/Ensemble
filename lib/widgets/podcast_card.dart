@@ -229,7 +229,6 @@ class _PodcastCardState extends State<PodcastCard> {
           });
         },
         onLongPressStart: (details) {
-          HapticFeedback.mediumImpact();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,

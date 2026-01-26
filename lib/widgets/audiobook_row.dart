@@ -381,7 +381,6 @@ class _AudiobookCardState extends State<_AudiobookCard> {
         );
       },
       onLongPressStart: (details) {
-        HapticFeedback.mediumImpact();
         MediaContextMenu.show(
           context: context,
           position: details.globalPosition,

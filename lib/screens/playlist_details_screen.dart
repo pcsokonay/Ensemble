@@ -955,10 +955,11 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                                   ),
                                 ),
                                 child: Icon(
-                                  _isFavorite ? Icons.favorite : Icons.favorite_border,
+                                  Icons.favorite,
+                                  size: 25,
                                   color: _isFavorite
                                       ? colorScheme.error
-                                      : colorScheme.onSurfaceVariant,
+                                      : Colors.white70,
                                 ),
                               ),
                             ),
@@ -966,34 +967,41 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                             const SizedBox(width: 12),
 
                             // Three-dot Menu Button
-                            GestureDetector(
-                              onTapDown: _isLoading || _tracks.isEmpty ? null : (details) {
-                                HapticFeedback.mediumImpact();
-                                MediaContextMenu.show(
-                                  context: context,
-                                  position: details.globalPosition,
-                                  mediaType: ContextMenuMediaType.playlist,
-                                  item: widget.playlist,
-                                  isFavorite: _isFavorite,
-                                  isInLibrary: _isInLibrary,
-                                  onToggleFavorite: _toggleFavorite,
-                                  onToggleLibrary: _toggleLibrary,
-                                  adaptiveColorScheme: _darkColorScheme ?? colorScheme,
-                                  showTopRow: false,
-                                );
-                              },
-                              child: Container(
-                                height: 50,
-                                width: 50,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  Icons.more_vert,
-                                  color: _isLoading || _tracks.isEmpty
-                                      ? colorScheme.onSecondaryContainer.withOpacity(0.38)
-                                      : colorScheme.onSecondaryContainer,
+                            SizedBox(
+                              height: 50,
+                              width: 50,
+                              child: Builder(
+                                builder: (buttonContext) => FilledButton.tonal(
+                                  onPressed: () {
+                                    if (_isLoading || _tracks.isEmpty) return;
+                                    final RenderBox box = buttonContext.findRenderObject() as RenderBox;
+                                    final Offset position = box.localToGlobal(Offset(box.size.width / 2, box.size.height));
+                                    MediaContextMenu.show(
+                                      context: context,
+                                      position: position,
+                                      mediaType: ContextMenuMediaType.playlist,
+                                      item: widget.playlist,
+                                      isFavorite: _isFavorite,
+                                      isInLibrary: _isInLibrary,
+                                      onToggleFavorite: _toggleFavorite,
+                                      onToggleLibrary: _toggleLibrary,
+                                      adaptiveColorScheme: adaptiveScheme,
+                                      showTopRow: false,
+                                    );
+                                  },
+                                  style: FilledButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.more_vert,
+                                    size: 25,
+                                    color: _isLoading || _tracks.isEmpty
+                                        ? Colors.white70.withOpacity(0.38)
+                                        : Colors.white70,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1031,7 +1039,6 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
 
                         return GestureDetector(
                           onLongPressStart: (details) {
-                            HapticFeedback.mediumImpact();
                             MediaContextMenu.show(
                               context: context,
                               position: details.globalPosition,
@@ -1041,7 +1048,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                               isInLibrary: track.inLibrary,
                               onToggleFavorite: () => _toggleTrackFavorite(index),
                               onToggleLibrary: () => _toggleTrackLibrary(index),
-                              adaptiveColorScheme: _darkColorScheme ?? colorScheme,
+                              adaptiveColorScheme: adaptiveScheme,
                             );
                           },
                           child: ListTile(

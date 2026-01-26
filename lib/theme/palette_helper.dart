@@ -247,12 +247,26 @@ class PaletteHelper {
     final lightOnMiniPlayer = getContrastingTextColor(lightMiniPlayer);
     final darkOnMiniPlayer = getContrastingTextColor(darkMiniPlayer);
 
+    // Generate secondary container colors for FilledButton.tonal
+    // These must be explicitly set or Flutter auto-generates them unpredictably
+    final hslForSecondary = HSLColor.fromColor(adjustedPrimary);
+    final lightSecondaryContainer = hslForSecondary
+        .withLightness(0.9)
+        .withSaturation((hslForSecondary.saturation * 0.5).clamp(0.1, 0.3))
+        .toColor();
+    final darkSecondaryContainer = hslForSecondary
+        .withLightness(0.25)
+        .withSaturation((hslForSecondary.saturation * 0.6).clamp(0.15, 0.4))
+        .toColor();
+
     final lightScheme = ColorScheme(
       brightness: Brightness.light,
       primary: adjustedPrimary,
       onPrimary: lightOnPrimary,
       secondary: adjustedPrimary.withOpacity(0.8),
       onSecondary: lightOnPrimary,
+      secondaryContainer: lightSecondaryContainer,
+      onSecondaryContainer: Colors.black87,
       error: Colors.red,
       onError: Colors.white,
       surface: lightSurface,
@@ -267,6 +281,8 @@ class PaletteHelper {
       onPrimary: darkOnPrimary,
       secondary: adjustedPrimary.withOpacity(0.8),
       onSecondary: darkOnPrimary,
+      secondaryContainer: darkSecondaryContainer,
+      onSecondaryContainer: Colors.white,
       error: Colors.redAccent,
       onError: Colors.black,
       surface: darkSurface,
@@ -391,12 +407,26 @@ class PaletteHelper {
     final lightOnMiniPlayer = getContrastingTextColor(lightColors.miniPlayer);
     final darkOnMiniPlayer = getContrastingTextColor(darkColors.miniPlayer);
 
+    // Generate secondary container colors for FilledButton.tonal
+    final hslLightPrimary = HSLColor.fromColor(lightColors.primary);
+    final lightSecondaryContainer = hslLightPrimary
+        .withLightness(0.9)
+        .withSaturation((hslLightPrimary.saturation * 0.5).clamp(0.1, 0.3))
+        .toColor();
+    final hslDarkPrimary = HSLColor.fromColor(darkColors.primary);
+    final darkSecondaryContainer = hslDarkPrimary
+        .withLightness(0.25)
+        .withSaturation((hslDarkPrimary.saturation * 0.6).clamp(0.15, 0.4))
+        .toColor();
+
     final lightScheme = ColorScheme(
       brightness: Brightness.light,
       primary: lightColors.primary,
       onPrimary: lightOnPrimary,
       secondary: lightColors.primary.withOpacity(0.8),
       onSecondary: lightOnPrimary,
+      secondaryContainer: lightSecondaryContainer,
+      onSecondaryContainer: Colors.black87,
       error: Colors.red,
       onError: Colors.white,
       surface: lightColors.surface,
@@ -411,6 +441,8 @@ class PaletteHelper {
       onPrimary: darkOnPrimary,
       secondary: darkColors.primary.withOpacity(0.8),
       onSecondary: darkOnPrimary,
+      secondaryContainer: darkSecondaryContainer,
+      onSecondaryContainer: Colors.white,
       error: Colors.redAccent,
       onError: Colors.black,
       surface: darkColors.surface,

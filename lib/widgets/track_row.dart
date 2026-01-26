@@ -365,7 +365,6 @@ class _TrackCardState extends State<_TrackCard> {
       child: GestureDetector(
         onTap: () => _playTrack(context, maProvider),
         onLongPressStart: (details) {
-          HapticFeedback.mediumImpact();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,

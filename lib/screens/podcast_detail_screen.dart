@@ -678,9 +678,10 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                                   ),
                                   child: Icon(
                                     _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                                    size: 25,
                                     color: _isInLibrary
                                         ? colorScheme.primary
-                                        : colorScheme.onSurfaceVariant,
+                                        : Colors.white70,
                                   ),
                                 ),
                               ),
@@ -698,43 +699,51 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                                     ),
                                   ),
                                   child: Icon(
-                                    _isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    Icons.favorite,
+                                    size: 25,
                                     color: _isFavorite
                                         ? colorScheme.error
-                                        : colorScheme.onSurfaceVariant,
+                                        : Colors.white70,
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               // Three-dot Menu Button
-                              GestureDetector(
-                                onTapDown: _isLoadingEpisodes || _episodes.isEmpty ? null : (details) {
-                                  HapticFeedback.mediumImpact();
-                                  MediaContextMenu.show(
-                                    context: context,
-                                    position: details.globalPosition,
-                                    mediaType: ContextMenuMediaType.podcast,
-                                    item: widget.podcast,
-                                    isFavorite: _isFavorite,
-                                    isInLibrary: _isInLibrary,
-                                    onToggleFavorite: _toggleFavorite,
-                                    onToggleLibrary: _toggleLibrary,
-                                    adaptiveColorScheme: _darkColorScheme ?? colorScheme,
-                                    showTopRow: false,
-                                  );
-                                },
-                                child: Container(
-                                  height: 50,
-                                  width: 50,
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.secondaryContainer,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(
-                                    Icons.more_vert,
-                                    color: _isLoadingEpisodes || _episodes.isEmpty
-                                        ? colorScheme.onSecondaryContainer.withOpacity(0.38)
-                                        : colorScheme.onSecondaryContainer,
+                              SizedBox(
+                                height: 50,
+                                width: 50,
+                                child: Builder(
+                                  builder: (buttonContext) => FilledButton.tonal(
+                                    onPressed: () {
+                                      if (_isLoadingEpisodes || _episodes.isEmpty) return;
+                                      final RenderBox box = buttonContext.findRenderObject() as RenderBox;
+                                      final Offset position = box.localToGlobal(Offset(box.size.width / 2, box.size.height));
+                                      MediaContextMenu.show(
+                                        context: context,
+                                        position: position,
+                                        mediaType: ContextMenuMediaType.podcast,
+                                        item: widget.podcast,
+                                        isFavorite: _isFavorite,
+                                        isInLibrary: _isInLibrary,
+                                        onToggleFavorite: _toggleFavorite,
+                                        onToggleLibrary: _toggleLibrary,
+                                        adaptiveColorScheme: adaptiveScheme,
+                                        showTopRow: false,
+                                      );
+                                    },
+                                    style: FilledButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.more_vert,
+                                      size: 25,
+                                      color: _isLoadingEpisodes || _episodes.isEmpty
+                                          ? Colors.white70.withOpacity(0.38)
+                                          : Colors.white70,
+                                    ),
                                   ),
                                 ),
                               ),

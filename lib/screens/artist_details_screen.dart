@@ -701,6 +701,133 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
     }
   }
 
+  /// Toggle favorite status for an album
+  Future<void> _toggleAlbumFavorite(Album album) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !(album.favorite ?? false);
+
+    try {
+      bool success;
+      if (newState) {
+        // Add to favorites
+        String actualProvider = album.provider;
+        String actualItemId = album.itemId;
+
+        if (album.providerMappings != null && album.providerMappings!.isNotEmpty) {
+          final mapping = album.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => album.providerMappings!.firstWhere(
+              (m) => m.available,
+              orElse: () => album.providerMappings!.first,
+            ),
+          );
+          actualProvider = mapping.providerInstance;
+          actualItemId = mapping.itemId;
+        }
+
+        success = await maProvider.addToFavorites(
+          mediaType: 'album',
+          itemId: actualItemId,
+          provider: actualProvider,
+        );
+      } else {
+        // Remove from favorites
+        int? libraryItemId;
+        if (album.provider == 'library') {
+          libraryItemId = int.tryParse(album.itemId);
+        } else if (album.providerMappings != null) {
+          final libraryMapping = album.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => album.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          success = await maProvider.removeFromFavorites(
+            mediaType: 'album',
+            libraryItemId: libraryItemId,
+          );
+        } else {
+          success = false;
+        }
+      }
+
+      if (success) {
+        _loadArtistAlbums();
+      }
+    } catch (e) {
+      _logger.log('Error toggling album favorite: $e');
+    }
+  }
+
+  /// Toggle library status for an album
+  Future<void> _toggleAlbumLibrary(Album album) async {
+    final maProvider = context.read<MusicAssistantProvider>();
+    final newState = !album.inLibrary;
+
+    try {
+      bool success;
+      if (newState) {
+        // Add to library
+        String? actualProvider;
+        String? actualItemId;
+
+        if (album.providerMappings != null && album.providerMappings!.isNotEmpty) {
+          final mapping = album.providerMappings!.firstWhere(
+            (m) => m.available && m.providerInstance != 'library',
+            orElse: () => album.providerMappings!.first,
+          );
+          if (mapping.providerInstance != 'library') {
+            actualProvider = mapping.providerInstance;
+            actualItemId = mapping.itemId;
+          }
+        }
+
+        if (actualProvider != null && actualItemId != null) {
+          success = await maProvider.addToLibrary(
+            mediaType: 'album',
+            itemId: actualItemId,
+            provider: actualProvider,
+          );
+        } else {
+          success = false;
+        }
+      } else {
+        // Remove from library
+        int? libraryItemId;
+        if (album.provider == 'library') {
+          libraryItemId = int.tryParse(album.itemId);
+        } else if (album.providerMappings != null) {
+          final libraryMapping = album.providerMappings!.firstWhere(
+            (m) => m.providerInstance == 'library',
+            orElse: () => album.providerMappings!.first,
+          );
+          if (libraryMapping.providerInstance == 'library') {
+            libraryItemId = int.tryParse(libraryMapping.itemId);
+          }
+        }
+
+        if (libraryItemId != null) {
+          success = await maProvider.removeFromLibrary(
+            mediaType: 'album',
+            libraryItemId: libraryItemId,
+          );
+        } else {
+          success = false;
+        }
+      }
+
+      if (success) {
+        _loadArtistAlbums();
+      }
+    } catch (e) {
+      _logger.log('Error toggling album library: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // CRITICAL FIX: Use select() instead of watch() to reduce rebuilds
@@ -880,9 +1007,10 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                           ),
                           child: Icon(
                             _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                            size: 25,
                             color: _isInLibrary
                                 ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
+                                : Colors.white70,
                           ),
                         ),
                       ),
@@ -902,10 +1030,11 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                             ),
                           ),
                           child: Icon(
-                            _isFavorite ? Icons.favorite : Icons.favorite_border,
+                            Icons.favorite,
+                            size: 25,
                             color: _isFavorite
                                 ? colorScheme.error
-                                : colorScheme.onSurfaceVariant,
+                                : Colors.white70,
                           ),
                         ),
                       ),
@@ -913,32 +1042,42 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                       const SizedBox(width: 12),
 
                       // Three-dot Menu Button
-                      GestureDetector(
-                        onTapDown: (details) {
-                          HapticFeedback.mediumImpact();
-                          MediaContextMenu.show(
-                            context: context,
-                            position: details.globalPosition,
-                            mediaType: ContextMenuMediaType.artist,
-                            item: widget.artist,
-                            isFavorite: _isFavorite,
-                            isInLibrary: _isInLibrary,
-                            onToggleFavorite: _toggleFavorite,
-                            onToggleLibrary: _toggleLibrary,
-                            adaptiveColorScheme: _darkColorScheme ?? colorScheme,
-                            showTopRow: false,
-                          );
-                        },
-                        child: Container(
-                          height: 50,
-                          width: 50,
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.more_vert,
-                            color: colorScheme.onSecondaryContainer,
+                      SizedBox(
+                        height: 50,
+                        width: 50,
+                        child: Builder(
+                          builder: (buttonContext) => FilledButton.tonal(
+                            onPressed: () {
+                              final RenderBox box = buttonContext.findRenderObject() as RenderBox;
+                              final Offset position = box.localToGlobal(Offset(box.size.width / 2, box.size.height));
+                              MediaContextMenu.show(
+                                context: context,
+                                position: position,
+                                mediaType: ContextMenuMediaType.artist,
+                                item: widget.artist,
+                                isFavorite: _isFavorite,
+                                isInLibrary: _isInLibrary,
+                                onToggleFavorite: _toggleFavorite,
+                                onToggleLibrary: _toggleLibrary,
+                                adaptiveColorScheme: adaptiveScheme,
+                                showTopRow: false,
+                                sortOrder: _sortOrder,
+                                onToggleSort: _toggleSortOrder,
+                                viewMode: _viewMode,
+                                onCycleView: _cycleViewMode,
+                              );
+                            },
+                            style: FilledButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.more_vert,
+                              size: 25,
+                              color: Colors.white70,
+                            ),
                           ),
                         ),
                       ),
@@ -968,56 +1107,17 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
               ),
             )
           else ...[
-            // Library Albums Section with inline controls
+            // Library Albums Section
             if (_albums.isNotEmpty) ...[
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24.0, 8.0, 12.0, 8.0),
-                  child: Row(
-                    children: [
-                      Text(
-                        S.of(context)!.inLibrary,
-                        style: textTheme.titleLarge?.copyWith(
-                          color: colorScheme.onBackground,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      // Sort toggle
-                      IconButton(
-                        icon: Icon(
-                          _sortOrder == 'alpha' ? Icons.sort_by_alpha : Icons.calendar_today,
-                          color: colorScheme.primary,
-                          size: 20,
-                        ),
-                        tooltip: _sortOrder == 'alpha' ? S.of(context)!.sortByYear : S.of(context)!.sortAlphabetically,
-                        onPressed: _toggleSortOrder,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                      ),
-                      // View mode toggle
-                      IconButton(
-                        icon: Icon(
-                          _viewMode == 'list'
-                              ? Icons.view_list
-                              : _viewMode == 'grid3'
-                                  ? Icons.grid_view
-                                  : Icons.grid_on,
-                          color: colorScheme.primary,
-                          size: 20,
-                        ),
-                        tooltip: _viewMode == 'grid2'
-                            ? S.of(context)!.threeColumnGrid
-                            : _viewMode == 'grid3'
-                                ? S.of(context)!.listView
-                                : S.of(context)!.twoColumnGrid,
-                        onPressed: _cycleViewMode,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                      ),
-                    ],
+                  padding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 8.0),
+                  child: Text(
+                    S.of(context)!.inLibrary,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: colorScheme.onBackground,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -1028,53 +1128,13 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
             if (_providerAlbums.isNotEmpty) ...[
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(24.0, _albums.isEmpty ? 8.0 : 24.0, 12.0, 8.0),
-                  child: Row(
-                    children: [
-                      Text(
-                        S.of(context)!.fromProviders,
-                        style: textTheme.titleLarge?.copyWith(
-                          color: colorScheme.onBackground,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      // Only show controls here if no library albums
-                      if (_albums.isEmpty) ...[
-                        const Spacer(),
-                        IconButton(
-                          icon: Icon(
-                            _sortOrder == 'alpha' ? Icons.sort_by_alpha : Icons.calendar_today,
-                            color: colorScheme.primary,
-                            size: 20,
-                          ),
-                          tooltip: _sortOrder == 'alpha' ? S.of(context)!.sortByYear : S.of(context)!.sortAlphabetically,
-                          onPressed: _toggleSortOrder,
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            _viewMode == 'list'
-                                ? Icons.view_list
-                                : _viewMode == 'grid3'
-                                    ? Icons.grid_view
-                                    : Icons.grid_on,
-                            color: colorScheme.primary,
-                            size: 20,
-                          ),
-                          tooltip: _viewMode == 'grid2'
-                              ? S.of(context)!.threeColumnGrid
-                              : _viewMode == 'grid3'
-                                  ? S.of(context)!.listView
-                                  : S.of(context)!.twoColumnGrid,
-                          onPressed: _cycleViewMode,
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                        ),
-                      ],
-                    ],
+                  padding: EdgeInsets.fromLTRB(24.0, _albums.isEmpty ? 8.0 : 24.0, 24.0, 8.0),
+                  child: Text(
+                    S.of(context)!.fromProviders,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: colorScheme.onBackground,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -1098,99 +1158,121 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
     final textTheme = Theme.of(context).textTheme;
     const String heroSuffix = 'artist_albums';
 
-    return InkWell(
-      onTap: () {
-        // Update adaptive colors immediately on tap
-        updateAdaptiveColorsFromImage(context, imageUrl);
-        Navigator.push(
-          context,
-          FadeSlidePageRoute(
-            child: AlbumDetailsScreen(
-              album: album,
-              heroTagSuffix: heroSuffix,
-              initialImageUrl: imageUrl,
-            ),
-          ),
+    // Get adaptive scheme for context menu
+    final themeProvider = context.read<ThemeProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final adaptiveScheme = themeProvider.adaptiveTheme
+        ? (isDark ? _darkColorScheme : _lightColorScheme)
+        : null;
+
+    return GestureDetector(
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.album,
+          item: album,
+          isFavorite: album.favorite ?? false,
+          isInLibrary: album.inLibrary,
+          adaptiveColorScheme: adaptiveScheme,
+          onToggleFavorite: () => _toggleAlbumFavorite(album),
+          onToggleLibrary: () => _toggleAlbumLibrary(album),
         );
       },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
-            aspectRatio: 1.0,  // Square album art
-            child: Stack(
-              children: [
-                Hero(
-                  tag: HeroTags.albumCover + (album.uri ?? album.itemId) + '_$heroSuffix',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      color: colorScheme.surfaceVariant,
-                      child: imageUrl != null
-                          ? CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fadeInDuration: Duration.zero,
-                              fadeOutDuration: Duration.zero,
-                              errorWidget: (_, __, ___) => Center(
+      child: InkWell(
+        onTap: () {
+          // Update adaptive colors immediately on tap
+          updateAdaptiveColorsFromImage(context, imageUrl);
+          Navigator.push(
+            context,
+            FadeSlidePageRoute(
+              child: AlbumDetailsScreen(
+                album: album,
+                heroTagSuffix: heroSuffix,
+                initialImageUrl: imageUrl,
+              ),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 1.0,  // Square album art
+              child: Stack(
+                children: [
+                  Hero(
+                    tag: HeroTags.albumCover + (album.uri ?? album.itemId) + '_$heroSuffix',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        color: colorScheme.surfaceVariant,
+                        child: imageUrl != null
+                            ? CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                fadeInDuration: Duration.zero,
+                                fadeOutDuration: Duration.zero,
+                                errorWidget: (_, __, ___) => Center(
+                                  child: Icon(
+                                    Icons.album_rounded,
+                                    size: 64,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              )
+                            : Center(
                                 child: Icon(
                                   Icons.album_rounded,
                                   size: 64,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
-                            )
-                          : Center(
-                              child: Icon(
-                                Icons.album_rounded,
-                                size: 64,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
+                      ),
                     ),
                   ),
-                ),
-                // Provider icon overlay
-                if (album.providerMappings?.isNotEmpty == true)
-                  ProviderIconOverlay(
-                    domain: album.providerMappings!.first.providerDomain,
+                  // Provider icon overlay
+                  if (album.providerMappings?.isNotEmpty == true)
+                    ProviderIconOverlay(
+                      domain: album.providerMappings!.first.providerDomain,
+                    ),
+                ],
+              ),
+            ),
+            Spacing.vGap8,
+            Hero(
+              tag: HeroTags.albumTitle + (album.uri ?? album.itemId) + '_$heroSuffix',
+              child: Material(
+                color: Colors.transparent,
+                child: Text(
+                  album.nameWithYear,
+                  style: textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
                   ),
-              ],
-            ),
-          ),
-          Spacing.vGap8,
-          Hero(
-            tag: HeroTags.albumTitle + (album.uri ?? album.itemId) + '_$heroSuffix',
-            child: Material(
-              color: Colors.transparent,
-              child: Text(
-                album.nameWithYear,
-                style: textTheme.titleSmall?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
-          Hero(
-            tag: HeroTags.artistName + (album.uri ?? album.itemId) + '_$heroSuffix',
-            child: Material(
-              color: Colors.transparent,
-              child: Text(
-                album.artistsString,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
+            Hero(
+              tag: HeroTags.artistName + (album.uri ?? album.itemId) + '_$heroSuffix',
+              child: Material(
+                color: Colors.transparent,
+                child: Text(
+                  album.artistsString,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1234,61 +1316,83 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          width: 56,
-          height: 56,
-          color: colorScheme.surfaceVariant,
-          child: imageUrl != null
-              ? CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.cover,
-                  fadeInDuration: Duration.zero,
-                  fadeOutDuration: Duration.zero,
-                  errorWidget: (_, __, ___) => Icon(
+    // Get adaptive scheme for context menu
+    final themeProvider = context.read<ThemeProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final adaptiveScheme = themeProvider.adaptiveTheme
+        ? (isDark ? _darkColorScheme : _lightColorScheme)
+        : null;
+
+    return GestureDetector(
+      onLongPressStart: (details) {
+        MediaContextMenu.show(
+          context: context,
+          position: details.globalPosition,
+          mediaType: ContextMenuMediaType.album,
+          item: album,
+          isFavorite: album.favorite ?? false,
+          isInLibrary: album.inLibrary,
+          adaptiveColorScheme: adaptiveScheme,
+          onToggleFavorite: () => _toggleAlbumFavorite(album),
+          onToggleLibrary: () => _toggleAlbumLibrary(album),
+        );
+      },
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 56,
+            height: 56,
+            color: colorScheme.surfaceVariant,
+            child: imageUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                    errorWidget: (_, __, ___) => Icon(
+                      Icons.album_rounded,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                : Icon(
                     Icons.album_rounded,
                     color: colorScheme.onSurfaceVariant,
                   ),
-                )
-              : Icon(
-                  Icons.album_rounded,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-        ),
-      ),
-      title: Text(
-        album.nameWithYear,
-        style: textTheme.titleMedium?.copyWith(
-          color: colorScheme.onSurface,
-          fontWeight: FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        album.artistsString,
-        style: textTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurface.withOpacity(0.7),
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      onTap: () {
-        updateAdaptiveColorsFromImage(context, imageUrl);
-        Navigator.push(
-          context,
-          FadeSlidePageRoute(
-            child: AlbumDetailsScreen(
-              album: album,
-              heroTagSuffix: 'artist_albums',
-              initialImageUrl: imageUrl,
-            ),
           ),
-        );
-      },
+        ),
+        title: Text(
+          album.nameWithYear,
+          style: textTheme.titleMedium?.copyWith(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w500,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          album.artistsString,
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurface.withOpacity(0.7),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        onTap: () {
+          updateAdaptiveColorsFromImage(context, imageUrl);
+          Navigator.push(
+            context,
+            FadeSlidePageRoute(
+              child: AlbumDetailsScreen(
+                album: album,
+                heroTagSuffix: 'artist_albums',
+                initialImageUrl: imageUrl,
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

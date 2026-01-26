@@ -225,7 +225,6 @@ class _PlaylistCardState extends State<PlaylistCard> {
           });
         },
         onLongPressStart: (details) {
-          HapticFeedback.mediumImpact();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,

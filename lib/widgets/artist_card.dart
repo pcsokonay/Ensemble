@@ -288,7 +288,6 @@ class _ArtistCardState extends State<ArtistCard> {
           });
         },
         onLongPressStart: (details) {
-          HapticFeedback.mediumImpact();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,
