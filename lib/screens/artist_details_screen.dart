@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
@@ -1006,8 +1007,9 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                             ),
                           ),
                           child: Icon(
-                            _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                            Symbols.book_2,
                             size: 25,
+                            fill: _isInLibrary ? 1 : 0,
                             color: _isInLibrary
                                 ? colorScheme.primary
                                 : Colors.white70,

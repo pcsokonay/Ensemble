@@ -655,6 +655,18 @@ class SFr extends S {
   String get sortBySeriesOrder => 'Trier par ordre de série';
 
   @override
+  String get sortByDuration => 'Sort by duration';
+
+  @override
+  String get newestFirst => 'Newest first';
+
+  @override
+  String get oldestFirst => 'Oldest first';
+
+  @override
+  String get viewDetails => 'View details';
+
+  @override
   String get listView => 'Vue en liste';
 
   @override

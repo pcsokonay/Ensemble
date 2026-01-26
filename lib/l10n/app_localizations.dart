@@ -1235,6 +1235,30 @@ abstract class S {
   /// **'Sort by series order'**
   String get sortBySeriesOrder;
 
+  /// No description provided for @sortByDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by duration'**
+  String get sortByDuration;
+
+  /// No description provided for @newestFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest first'**
+  String get newestFirst;
+
+  /// No description provided for @oldestFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest first'**
+  String get oldestFirst;
+
+  /// No description provided for @viewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View details'**
+  String get viewDetails;
+
   /// No description provided for @listView.
   ///
   /// In en, this message translates to:

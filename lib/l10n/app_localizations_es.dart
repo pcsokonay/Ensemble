@@ -654,6 +654,18 @@ class SEs extends S {
   String get sortBySeriesOrder => 'Ordenar por orden de serie';
 
   @override
+  String get sortByDuration => 'Sort by duration';
+
+  @override
+  String get newestFirst => 'Newest first';
+
+  @override
+  String get oldestFirst => 'Oldest first';
+
+  @override
+  String get viewDetails => 'View details';
+
+  @override
   String get listView => 'Vista de lista';
 
   @override

@@ -644,6 +644,18 @@ class SEn extends S {
   String get sortBySeriesOrder => 'Sort by series order';
 
   @override
+  String get sortByDuration => 'Sort by duration';
+
+  @override
+  String get newestFirst => 'Newest first';
+
+  @override
+  String get oldestFirst => 'Oldest first';
+
+  @override
+  String get viewDetails => 'View details';
+
+  @override
   String get listView => 'List view';
 
   @override

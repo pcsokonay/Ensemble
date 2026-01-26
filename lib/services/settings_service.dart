@@ -152,6 +152,7 @@ class SettingsService {
   static const String _keyLibrarySeriesSortOrder = 'library_series_sort_order'; // 'alpha', 'alpha_desc', 'books'
   static const String _keyLibraryRadioSortOrder = 'library_radio_sort_order'; // 'alpha', 'alpha_desc'
   static const String _keyLibraryPodcastsSortOrder = 'library_podcasts_sort_order'; // 'alpha', 'alpha_desc'
+  static const String _keyPodcastEpisodesSortOrder = 'podcast_episodes_sort_order'; // 'newest', 'oldest', 'alpha', 'duration'
 
   // Audiobookshelf Direct Integration Settings
   static const String _keyAbsServerUrl = 'abs_server_url';
@@ -690,6 +691,17 @@ class SettingsService {
   static Future<void> setLibraryPodcastsSortOrder(String order) async {
     final prefs = await _getPrefs();
     await prefs.setString(_keyLibraryPodcastsSortOrder, order);
+  }
+
+  // Podcast Episode Sort Order (within podcast detail screen)
+  static Future<String> getPodcastEpisodesSortOrder() async {
+    final prefs = await _getPrefs();
+    return prefs.getString(_keyPodcastEpisodesSortOrder) ?? 'newest';
+  }
+
+  static Future<void> setPodcastEpisodesSortOrder(String order) async {
+    final prefs = await _getPrefs();
+    await prefs.setString(_keyPodcastEpisodesSortOrder, order);
   }
 
   // Audiobookshelf Settings

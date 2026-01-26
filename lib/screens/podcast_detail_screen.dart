@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart';
@@ -12,8 +13,11 @@ import '../theme/palette_helper.dart';
 import '../theme/theme_provider.dart';
 import '../theme/design_tokens.dart';
 import '../services/debug_logger.dart';
+import '../services/settings_service.dart';
 import '../constants/hero_tags.dart';
 import '../l10n/app_localizations.dart';
+import '../utils/page_transitions.dart';
+import 'podcast_episode_detail_screen.dart';
 
 class PodcastDetailScreen extends StatefulWidget {
   final MediaItem podcast;
@@ -40,7 +44,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
   bool _isDescriptionExpanded = false;
   bool _isInLibrary = false;
   bool _isFavorite = false;
-  String? _expandedEpisodeId; // Track which episode is expanded for actions
+  String _sortOrder = 'newest'; // 'newest', 'oldest', 'alpha', 'duration'
 
   String get _heroTagSuffix => widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
 
@@ -49,6 +53,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
     super.initState();
     _isInLibrary = _checkIfInLibrary(widget.podcast);
     _isFavorite = widget.podcast.favorite ?? false;
+    _loadSortPreference();
 
     // Mark that we're on a detail screen and extract colors immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -58,6 +63,96 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
       }
       _loadEpisodes();
     });
+  }
+
+  Future<void> _loadSortPreference() async {
+    final sortOrder = await SettingsService.getPodcastEpisodesSortOrder();
+    if (mounted) {
+      setState(() {
+        _sortOrder = sortOrder;
+      });
+    }
+  }
+
+  void _toggleSortOrder() {
+    // Cycle through sort orders: newest -> oldest -> alpha -> duration -> newest
+    String newOrder;
+    switch (_sortOrder) {
+      case 'newest':
+        newOrder = 'oldest';
+        break;
+      case 'oldest':
+        newOrder = 'alpha';
+        break;
+      case 'alpha':
+        newOrder = 'duration';
+        break;
+      default:
+        newOrder = 'newest';
+    }
+    setState(() {
+      _sortOrder = newOrder;
+      _sortEpisodes();
+    });
+    SettingsService.setPodcastEpisodesSortOrder(newOrder);
+  }
+
+  void _sortEpisodes() {
+    switch (_sortOrder) {
+      case 'newest':
+        _episodes.sort((a, b) {
+          final aDate = _getPublishDate(a.metadata);
+          final bDate = _getPublishDate(b.metadata);
+          if (aDate == null && bDate == null) return 0;
+          if (aDate == null) return 1;
+          if (bDate == null) return -1;
+          return bDate.compareTo(aDate); // Newest first
+        });
+        break;
+      case 'oldest':
+        _episodes.sort((a, b) {
+          final aDate = _getPublishDate(a.metadata);
+          final bDate = _getPublishDate(b.metadata);
+          if (aDate == null && bDate == null) return 0;
+          if (aDate == null) return 1;
+          if (bDate == null) return -1;
+          return aDate.compareTo(bDate); // Oldest first
+        });
+        break;
+      case 'alpha':
+        _episodes.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case 'duration':
+        _episodes.sort((a, b) {
+          final aDur = a.duration ?? Duration.zero;
+          final bDur = b.duration ?? Duration.zero;
+          return aDur.compareTo(bDur); // Shortest first
+        });
+        break;
+    }
+  }
+
+  DateTime? _getPublishDate(Map<String, dynamic>? metadata) {
+    if (metadata == null) return null;
+
+    dynamic dateValue = metadata['published'] ??
+        metadata['pub_date'] ??
+        metadata['release_date'] ??
+        metadata['aired'] ??
+        metadata['timestamp'];
+
+    if (dateValue == null) return null;
+
+    try {
+      if (dateValue is String) {
+        return DateTime.tryParse(dateValue);
+      } else if (dateValue is int) {
+        return DateTime.fromMillisecondsSinceEpoch(dateValue * 1000);
+      }
+    } catch (e) {
+      // Silent failure
+    }
+    return null;
   }
 
   /// Check if podcast is in library
@@ -335,6 +430,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
           }
           setState(() {
             _episodes = episodes;
+            _sortEpisodes();
           });
         }
       }
@@ -478,6 +574,35 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
         );
       }
     }
+  }
+
+  /// Show context menu for an episode
+  void _showEpisodeContextMenu(BuildContext context, Offset position, MediaItem episode, String? episodeImageUrl) {
+    MediaContextMenu.show(
+      context: context,
+      position: position,
+      mediaType: ContextMenuMediaType.podcastEpisode,
+      item: episode,
+      isFavorite: false,
+      isInLibrary: false,
+      onPlay: () => _playEpisode(episode),
+      onPlayOn: () => _showPlayOnMenu(context, episode),
+      onAddToQueue: () => _addToQueue(episode),
+      onViewDetails: () {
+        final maProvider = this.context.read<MusicAssistantProvider>();
+        final initialImageUrl = episodeImageUrl ?? maProvider.getPodcastImageUrl(widget.podcast);
+        Navigator.push(
+          this.context,
+          FadeSlidePageRoute(
+            child: PodcastEpisodeDetailScreen(
+              episode: episode,
+              podcast: widget.podcast,
+              initialImageUrl: initialImageUrl,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -677,8 +802,9 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                                     ),
                                   ),
                                   child: Icon(
-                                    _isInLibrary ? Icons.library_add_check : Icons.library_add,
+                                    Symbols.book_2,
                                     size: 25,
+                                    fill: _isInLibrary ? 1 : 0,
                                     color: _isInLibrary
                                         ? colorScheme.primary
                                         : Colors.white70,
@@ -729,6 +855,8 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                                         onToggleLibrary: _toggleLibrary,
                                         adaptiveColorScheme: adaptiveScheme,
                                         showTopRow: false,
+                                        sortOrder: _sortOrder,
+                                        onToggleSort: _toggleSortOrder,
                                       );
                                     },
                                     style: FilledButton.styleFrom(
@@ -850,190 +978,126 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                         final episode = _episodes[index];
                         final episodeDescription = episode.metadata?['description'] as String?;
                         final duration = episode.duration;
-                        final episodeId = episode.uri ?? episode.itemId;
-                        final isExpanded = _expandedEpisodeId == episodeId;
                         final episodeImageUrl = context.read<MusicAssistantProvider>().getImageUrl(episode, size: 256);
 
                         // Try to get release date from metadata
                         final releaseDate = _formatReleaseDate(episode.metadata);
 
-                        return Column(
-                          children: [
-                            InkWell(
-                              onTap: () => _playEpisode(episode),
-                              onLongPress: () {
-                                setState(() {
-                                  _expandedEpisodeId = isExpanded ? null : episodeId;
-                                });
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Episode cover (bigger than before)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        width: 72,
-                                        height: 72,
-                                        color: colorScheme.surfaceContainerHighest,
-                                        child: episodeImageUrl != null
-                                            ? CachedNetworkImage(
-                                                imageUrl: episodeImageUrl,
-                                                fit: BoxFit.cover,
-                                                fadeInDuration: Duration.zero,
-                                                fadeOutDuration: Duration.zero,
-                                                placeholder: (_, __) => Icon(
-                                                  MdiIcons.podcast,
-                                                  size: 32,
-                                                  color: colorScheme.onSurfaceVariant,
-                                                ),
-                                                errorWidget: (_, __, ___) => Icon(
-                                                  MdiIcons.podcast,
-                                                  size: 32,
-                                                  color: colorScheme.onSurfaceVariant,
-                                                ),
-                                              )
-                                            : Icon(
+                        return GestureDetector(
+                          onTap: () => _playEpisode(episode),
+                          onLongPressStart: (details) => _showEpisodeContextMenu(
+                            context,
+                            details.globalPosition,
+                            episode,
+                            episodeImageUrl,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Episode cover
+                                Hero(
+                                  tag: HeroTags.podcastEpisodeCover + (episode.uri ?? episode.itemId),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      width: 72,
+                                      height: 72,
+                                      color: colorScheme.surfaceContainerHighest,
+                                      child: episodeImageUrl != null
+                                          ? CachedNetworkImage(
+                                              imageUrl: episodeImageUrl,
+                                              fit: BoxFit.cover,
+                                              fadeInDuration: Duration.zero,
+                                              fadeOutDuration: Duration.zero,
+                                              placeholder: (_, __) => Icon(
                                                 MdiIcons.podcast,
                                                 size: 32,
                                                 color: colorScheme.onSurfaceVariant,
                                               ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    // Episode info
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            episode.name,
-                                            style: textTheme.titleSmall?.copyWith(
-                                              fontWeight: FontWeight.w500,
+                                              errorWidget: (_, __, ___) => Icon(
+                                                MdiIcons.podcast,
+                                                size: 32,
+                                                color: colorScheme.onSurfaceVariant,
+                                              ),
+                                            )
+                                          : Icon(
+                                              MdiIcons.podcast,
+                                              size: 32,
+                                              color: colorScheme.onSurfaceVariant,
                                             ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Episode info
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        episode.name,
+                                        style: textTheme.titleSmall?.copyWith(
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (episodeDescription != null && episodeDescription.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          episodeDescription,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: textTheme.bodySmall?.copyWith(
+                                            color: colorScheme.onSurface.withOpacity(0.6),
                                           ),
-                                          if (episodeDescription != null && episodeDescription.isNotEmpty) ...[
-                                            const SizedBox(height: 4),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 6),
+                                      // Duration and release date row
+                                      Row(
+                                        children: [
+                                          if (duration != null && duration > Duration.zero) ...[
+                                            Icon(
+                                              Icons.access_time,
+                                              size: 14,
+                                              color: colorScheme.onSurface.withOpacity(0.5),
+                                            ),
+                                            const SizedBox(width: 4),
                                             Text(
-                                              episodeDescription,
-                                              maxLines: isExpanded ? 100 : 2,
-                                              overflow: TextOverflow.ellipsis,
+                                              _formatDuration(duration),
                                               style: textTheme.bodySmall?.copyWith(
-                                                color: colorScheme.onSurface.withOpacity(0.6),
+                                                color: colorScheme.onSurface.withOpacity(0.5),
                                               ),
                                             ),
                                           ],
-                                          const SizedBox(height: 6),
-                                          // Duration and release date row
-                                          Row(
-                                            children: [
-                                              if (duration != null && duration > Duration.zero) ...[
-                                                Icon(
-                                                  Icons.access_time,
-                                                  size: 14,
+                                          if (duration != null && duration > Duration.zero && releaseDate != null)
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                                              child: Text(
+                                                '•',
+                                                style: textTheme.bodySmall?.copyWith(
                                                   color: colorScheme.onSurface.withOpacity(0.5),
                                                 ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  _formatDuration(duration),
-                                                  style: textTheme.bodySmall?.copyWith(
-                                                    color: colorScheme.onSurface.withOpacity(0.5),
-                                                  ),
-                                                ),
-                                              ],
-                                              if (duration != null && duration > Duration.zero && releaseDate != null)
-                                                Padding(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                                  child: Text(
-                                                    '•',
-                                                    style: textTheme.bodySmall?.copyWith(
-                                                      color: colorScheme.onSurface.withOpacity(0.5),
-                                                    ),
-                                                  ),
-                                                ),
-                                              if (releaseDate != null)
-                                                Text(
-                                                  releaseDate,
-                                                  style: textTheme.bodySmall?.copyWith(
-                                                    color: colorScheme.onSurface.withOpacity(0.5),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
+                                              ),
+                                            ),
+                                          if (releaseDate != null)
+                                            Text(
+                                              releaseDate,
+                                              style: textTheme.bodySmall?.copyWith(
+                                                color: colorScheme.onSurface.withOpacity(0.5),
+                                              ),
+                                            ),
                                         ],
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                            // Expanded action buttons (matching album track style)
-                            AnimatedCrossFade(
-                              firstChild: const SizedBox.shrink(),
-                              secondChild: Padding(
-                                padding: const EdgeInsets.only(left: 100, right: 16, bottom: 12),
-                                child: Row(
-                                  children: [
-                                    // Play button
-                                    SizedBox(
-                                      height: 44,
-                                      width: 44,
-                                      child: FilledButton.tonal(
-                                        onPressed: () => _playEpisode(episode),
-                                        style: FilledButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        child: const Icon(Icons.play_arrow, size: 20),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    // Play on... button
-                                    SizedBox(
-                                      height: 44,
-                                      width: 44,
-                                      child: FilledButton.tonal(
-                                        onPressed: () => _showPlayOnMenu(context, episode),
-                                        style: FilledButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        child: const Icon(Icons.speaker_group_outlined, size: 20),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    // Add to queue button
-                                    SizedBox(
-                                      height: 44,
-                                      width: 44,
-                                      child: FilledButton.tonal(
-                                        onPressed: () => _addToQueue(episode),
-                                        style: FilledButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        child: const Icon(Icons.playlist_add, size: 20),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              crossFadeState: isExpanded
-                                  ? CrossFadeState.showSecond
-                                  : CrossFadeState.showFirst,
-                              duration: const Duration(milliseconds: 200),
-                            ),
-                          ],
+                          ),
                         );
                       },
                       childCount: _episodes.length,

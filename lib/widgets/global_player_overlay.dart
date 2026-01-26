@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/music_assistant_provider.dart';
 import '../providers/navigation_provider.dart';
@@ -634,8 +635,8 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
                                     label: S.of(context)!.home,
                                   ),
                                   BottomNavigationBarItem(
-                                    icon: const Icon(Icons.library_music_outlined),
-                                    activeIcon: const Icon(Icons.library_music_rounded),
+                                    icon: const Icon(Symbols.book_2, fill: 0),
+                                    activeIcon: const Icon(Symbols.book_2, fill: 1),
                                     label: S.of(context)!.library,
                                   ),
                                   BottomNavigationBarItem(

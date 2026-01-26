@@ -650,6 +650,18 @@ class SDe extends S {
   String get sortBySeriesOrder => 'Nach Serienreihenfolge sortieren';
 
   @override
+  String get sortByDuration => 'Sort by duration';
+
+  @override
+  String get newestFirst => 'Newest first';
+
+  @override
+  String get oldestFirst => 'Oldest first';
+
+  @override
+  String get viewDetails => 'View details';
+
+  @override
   String get listView => 'Listenansicht';
 
   @override

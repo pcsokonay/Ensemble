@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../constants/timings.dart';
 import '../providers/music_assistant_provider.dart';
 import '../models/media_item.dart';
@@ -575,9 +576,7 @@ class SearchScreenState extends State<SearchScreen> {
                         width: 44,
                         height: 44,
                         child: Material(
-                          color: _libraryOnly
-                              ? colorScheme.primary
-                              : colorScheme.surfaceVariant.withOpacity(0.6),
+                          color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
                           shape: const CircleBorder(),
                           child: InkWell(
                             onTap: () {
@@ -590,10 +589,11 @@ class SearchScreenState extends State<SearchScreen> {
                             },
                             customBorder: const CircleBorder(),
                             child: Icon(
-                              _libraryOnly ? Icons.library_music : Icons.library_music_outlined,
+                              Symbols.book_2,
+                              fill: _libraryOnly ? 1 : 0,
                               size: 22,
                               color: _libraryOnly
-                                  ? colorScheme.onPrimary
+                                  ? colorScheme.primary
                                   : colorScheme.onSurface,
                             ),
                           ),

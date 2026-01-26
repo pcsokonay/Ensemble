@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart' show GlobalPlayerOverlay, BottomSpacing;
@@ -15,6 +16,7 @@ enum ContextMenuMediaType {
   track,
   audiobook,
   podcast,
+  podcastEpisode,
   radio,
 }
 
@@ -40,6 +42,11 @@ class MediaContextMenu {
     VoidCallback? onToggleSort,
     String? viewMode,
     VoidCallback? onCycleView,
+    // Episode-specific callbacks (for podcastEpisode type)
+    VoidCallback? onPlay,
+    VoidCallback? onPlayOn,
+    VoidCallback? onAddToQueue,
+    VoidCallback? onViewDetails,
   }) {
     // Close any existing menu
     hide();
@@ -65,6 +72,10 @@ class MediaContextMenu {
         onToggleSort: onToggleSort,
         viewMode: viewMode,
         onCycleView: onCycleView,
+        onPlay: onPlay,
+        onPlayOn: onPlayOn,
+        onAddToQueue: onAddToQueue,
+        onViewDetails: onViewDetails,
         onDismiss: () {
           hide();
           onDismiss?.call();
@@ -98,6 +109,11 @@ class _MediaContextMenuOverlay extends StatefulWidget {
   final VoidCallback? onToggleSort;
   final String? viewMode;
   final VoidCallback? onCycleView;
+  // Episode-specific callbacks
+  final VoidCallback? onPlay;
+  final VoidCallback? onPlayOn;
+  final VoidCallback? onAddToQueue;
+  final VoidCallback? onViewDetails;
 
   const _MediaContextMenuOverlay({
     required this.position,
@@ -114,6 +130,10 @@ class _MediaContextMenuOverlay extends StatefulWidget {
     this.onToggleSort,
     this.viewMode,
     this.onCycleView,
+    this.onPlay,
+    this.onPlayOn,
+    this.onAddToQueue,
+    this.onViewDetails,
   });
 
   @override
@@ -163,6 +183,7 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
       case ContextMenuMediaType.audiobook:
         return (widget.item as Audiobook).name;
       case ContextMenuMediaType.podcast:
+      case ContextMenuMediaType.podcastEpisode:
       case ContextMenuMediaType.radio:
         return (widget.item as MediaItem).name;
     }
@@ -206,6 +227,9 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
           break;
         case ContextMenuMediaType.podcast:
           // Podcasts are shows, not directly playable - would need to play latest episode
+          break;
+        case ContextMenuMediaType.podcastEpisode:
+          // Episodes are handled via onPlay callback
           break;
         case ContextMenuMediaType.radio:
           final station = widget.item as MediaItem;
@@ -251,6 +275,9 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
               break;
             case ContextMenuMediaType.podcast:
               // Podcasts are shows, not directly playable
+              break;
+            case ContextMenuMediaType.podcastEpisode:
+              // Episodes are handled via onPlayOn callback
               break;
             case ContextMenuMediaType.radio:
               final station = widget.item as MediaItem;
@@ -303,8 +330,9 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
         case ContextMenuMediaType.artist:
         case ContextMenuMediaType.audiobook:
         case ContextMenuMediaType.podcast:
+        case ContextMenuMediaType.podcastEpisode:
         case ContextMenuMediaType.radio:
-          // These types don't support direct queue addition
+          // These types don't support direct queue addition (episodes use callback)
           break;
       }
     } catch (e) {
@@ -345,6 +373,7 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
             case ContextMenuMediaType.artist:
             case ContextMenuMediaType.audiobook:
             case ContextMenuMediaType.podcast:
+            case ContextMenuMediaType.podcastEpisode:
             case ContextMenuMediaType.radio:
               // These types don't support direct queue addition
               break;
@@ -383,6 +412,7 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
         case ContextMenuMediaType.playlist:
         case ContextMenuMediaType.audiobook:
         case ContextMenuMediaType.podcast:
+        case ContextMenuMediaType.podcastEpisode:
         case ContextMenuMediaType.radio:
           // These types don't support radio mode
           break;
@@ -416,6 +446,7 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
             case ContextMenuMediaType.playlist:
             case ContextMenuMediaType.audiobook:
             case ContextMenuMediaType.podcast:
+            case ContextMenuMediaType.podcastEpisode:
             case ContextMenuMediaType.radio:
               // These types don't support radio mode
               break;
@@ -465,7 +496,7 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
     final l10n = S.of(context)!;
 
     // Calculate menu position
-    const menuWidth = 180.0;
+    const menuWidth = 185.0;
     final screenSize = MediaQuery.of(context).size;
     final viewPadding = MediaQuery.of(context).viewPadding;
 
@@ -480,14 +511,21 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
     left = left.clamp(8.0, screenSize.width - menuWidth - 8);
 
     // Estimate menu height based on content
-    double estimatedHeight = widget.showTopRow ? 280.0 : 180.0;
-    // Add height for sort section (header + 2 items)
-    if (widget.onToggleSort != null) {
-      estimatedHeight += 110.0;
-    }
-    // Add height for view section (divider + header + 3 items)
-    if (widget.onCycleView != null) {
-      estimatedHeight += 140.0;
+    double estimatedHeight;
+    if (widget.mediaType == ContextMenuMediaType.podcastEpisode) {
+      // Episode menu: 4 items + divider = ~200px
+      estimatedHeight = 200.0;
+    } else {
+      estimatedHeight = widget.showTopRow ? 280.0 : 180.0;
+      // Add height for sort section (header + items)
+      if (widget.onToggleSort != null) {
+        // Podcast has 4 sort options, others have 2
+        estimatedHeight += widget.mediaType == ContextMenuMediaType.podcast ? 170.0 : 110.0;
+      }
+      // Add height for view section (divider + header + 3 items)
+      if (widget.onCycleView != null) {
+        estimatedHeight += 140.0;
+      }
     }
 
     // If menu would go off bottom (accounting for mini player), position above the tap point
@@ -535,6 +573,47 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
                       child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Podcast episode menu - simplified options
+                        if (widget.mediaType == ContextMenuMediaType.podcastEpisode) ...[
+                          _buildMenuItem(
+                            icon: Icons.play_arrow_rounded,
+                            label: l10n.play,
+                            onTap: () {
+                              widget.onPlay?.call();
+                              widget.onDismiss();
+                            },
+                            colorScheme: colorScheme,
+                          ),
+                          _buildMenuItem(
+                            icon: Icons.speaker_group_outlined,
+                            label: l10n.playOn,
+                            onTap: () {
+                              widget.onPlayOn?.call();
+                              widget.onDismiss();
+                            },
+                            colorScheme: colorScheme,
+                          ),
+                          _buildMenuItem(
+                            icon: Icons.playlist_add,
+                            label: l10n.addToQueue,
+                            onTap: () {
+                              widget.onAddToQueue?.call();
+                              widget.onDismiss();
+                            },
+                            colorScheme: colorScheme,
+                          ),
+                          Divider(height: 1, color: colorScheme.onSurface.withValues(alpha: 0.15)),
+                          _buildMenuItem(
+                            icon: Icons.info_outline,
+                            label: l10n.viewDetails,
+                            onTap: () {
+                              widget.onViewDetails?.call();
+                              widget.onDismiss();
+                            },
+                            colorScheme: colorScheme,
+                          ),
+                        ] else ...[
+                        // Standard menu for other media types
                         // Top row: instant action buttons
                         if (widget.showTopRow) ...[
                           Padding(
@@ -554,11 +633,12 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
                               if (widget.onToggleLibrary != null) ...[
                                 const SizedBox(width: 12),
                                 _buildIconButton(
-                                  icon: widget.isInLibrary ? Icons.library_add_check : Icons.library_add,
+                                  icon: Symbols.book_2,
                                   label: widget.isInLibrary ? l10n.inLibrary : l10n.addToLibrary,
                                   onTap: _handleToggleLibrary,
                                   colorScheme: colorScheme,
                                   isActive: widget.isInLibrary,
+                                  fill: widget.isInLibrary ? 1 : 0,
                                 ),
                               ],
                               // Favorite button
@@ -629,28 +709,73 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
                               ),
                             ),
                           ),
-                          _buildViewModeItem(
-                            mode: 'alpha',
-                            label: l10n.sortAlphabetically,
-                            icon: Icons.sort_by_alpha,
-                            isSelected: widget.sortOrder == 'alpha',
-                            onTap: () {
-                              if (widget.sortOrder != 'alpha') widget.onToggleSort!();
-                              widget.onDismiss();
-                            },
-                            colorScheme: colorScheme,
-                          ),
-                          _buildViewModeItem(
-                            mode: 'year',
-                            label: l10n.sortByYear,
-                            icon: Icons.calendar_today,
-                            isSelected: widget.sortOrder != 'alpha',
-                            onTap: () {
-                              if (widget.sortOrder == 'alpha') widget.onToggleSort!();
-                              widget.onDismiss();
-                            },
-                            colorScheme: colorScheme,
-                          ),
+                          // Podcast-specific sort options
+                          if (widget.mediaType == ContextMenuMediaType.podcast) ...[
+                            _buildViewModeItem(
+                              mode: 'newest',
+                              label: l10n.newestFirst,
+                              icon: Icons.arrow_downward,
+                              isSelected: widget.sortOrder == 'newest',
+                              onTap: () {
+                                _setSortOrder('newest');
+                              },
+                              colorScheme: colorScheme,
+                            ),
+                            _buildViewModeItem(
+                              mode: 'oldest',
+                              label: l10n.oldestFirst,
+                              icon: Icons.arrow_upward,
+                              isSelected: widget.sortOrder == 'oldest',
+                              onTap: () {
+                                _setSortOrder('oldest');
+                              },
+                              colorScheme: colorScheme,
+                            ),
+                            _buildViewModeItem(
+                              mode: 'alpha',
+                              label: l10n.sortAlphabetically,
+                              icon: Icons.sort_by_alpha,
+                              isSelected: widget.sortOrder == 'alpha',
+                              onTap: () {
+                                _setSortOrder('alpha');
+                              },
+                              colorScheme: colorScheme,
+                            ),
+                            _buildViewModeItem(
+                              mode: 'duration',
+                              label: l10n.sortByDuration,
+                              icon: Icons.timer_outlined,
+                              isSelected: widget.sortOrder == 'duration',
+                              onTap: () {
+                                _setSortOrder('duration');
+                              },
+                              colorScheme: colorScheme,
+                            ),
+                          ] else ...[
+                            // Default sort options (alpha/year)
+                            _buildViewModeItem(
+                              mode: 'alpha',
+                              label: l10n.sortAlphabetically,
+                              icon: Icons.sort_by_alpha,
+                              isSelected: widget.sortOrder == 'alpha',
+                              onTap: () {
+                                if (widget.sortOrder != 'alpha') widget.onToggleSort!();
+                                widget.onDismiss();
+                              },
+                              colorScheme: colorScheme,
+                            ),
+                            _buildViewModeItem(
+                              mode: 'year',
+                              label: l10n.sortByYear,
+                              icon: Icons.calendar_today,
+                              isSelected: widget.sortOrder != 'alpha',
+                              onTap: () {
+                                if (widget.sortOrder == 'alpha') widget.onToggleSort!();
+                                widget.onDismiss();
+                              },
+                              colorScheme: colorScheme,
+                            ),
+                          ],
                         ],
                         // View section
                         if (widget.onCycleView != null) ...[
@@ -698,6 +823,7 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
                           ),
                         ],
                       ],
+                      ], // end else (standard menu)
                     ],
                   ),
                 ),
@@ -719,6 +845,7 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
     bool isActive = false,
     Color? activeColor,
     Color? inactiveColor,
+    double? fill,
   }) {
     final iconColor = isActive
         ? (activeColor ?? colorScheme.primary)
@@ -728,8 +855,8 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: 44,
-          height: 44,
+          width: 46,
+          height: 46,
           child: FilledButton.tonal(
             onPressed: onTap,
             style: FilledButton.styleFrom(
@@ -741,25 +868,21 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
             child: Icon(
               icon,
               color: iconColor,
-              size: 22,
+              size: 23,
+              fill: fill,
             ),
           ),
         ),
         const SizedBox(height: 4),
-        // Constrain text width to match button width to prevent row overflow
-        SizedBox(
-          width: 44,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: isActive ? iconColor : colorScheme.onSurface,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: colorScheme.onSurface,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
           ),
+          maxLines: 1,
+          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -818,6 +941,34 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
           break;
         default:
           current = 'grid2';
+      }
+    }
+    widget.onDismiss();
+  }
+
+  /// Set sort order and cycle through until we reach the target (for podcasts)
+  void _setSortOrder(String targetOrder) {
+    if (widget.sortOrder == targetOrder) {
+      widget.onDismiss();
+      return;
+    }
+    // Cycle until we reach target order
+    String current = widget.sortOrder ?? 'newest';
+    while (current != targetOrder) {
+      widget.onToggleSort!();
+      // Simulate the cycle logic: newest -> oldest -> alpha -> duration -> newest
+      switch (current) {
+        case 'newest':
+          current = 'oldest';
+          break;
+        case 'oldest':
+          current = 'alpha';
+          break;
+        case 'alpha':
+          current = 'duration';
+          break;
+        default:
+          current = 'newest';
       }
     }
     widget.onDismiss();
