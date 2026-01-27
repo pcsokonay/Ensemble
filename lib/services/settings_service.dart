@@ -90,9 +90,7 @@ class SettingsService {
   static const String _keyLocalPlayerName = 'local_player_name';
   static const String _keyOwnerName = 'owner_name';
   static const String _keyLastSelectedPlayerId = 'last_selected_player_id';
-  static const String _keyPreferLocalPlayer = 'prefer_local_player';
   static const String _keySmartSortPlayers = 'smart_sort_players';
-  static const String _keyDisableAutoSwitch = 'disable_auto_switch';
   static const String _keyShowRecentAlbums = 'show_recent_albums';
   static const String _keyShowDiscoverArtists = 'show_discover_artists';
   static const String _keyShowDiscoverAlbums = 'show_discover_albums';
@@ -355,17 +353,9 @@ class SettingsService {
   static Future<void> setLastSelectedPlayerId(String? playerId) =>
       _setString(_keyLastSelectedPlayerId, playerId, removeIfEmpty: true);
 
-  // Prefer Local Player - always select local player first when available
-  static Future<bool> getPreferLocalPlayer() => _getBool(_keyPreferLocalPlayer, defaultValue: false);
-  static Future<void> setPreferLocalPlayer(bool prefer) => _setBool(_keyPreferLocalPlayer, prefer);
-
   // Smart Sort Players - sort by status (playing > on > off) instead of alphabetically
   static Future<bool> getSmartSortPlayers() => _getBool(_keySmartSortPlayers, defaultValue: false);
   static Future<void> setSmartSortPlayers(bool smartSort) => _setBool(_keySmartSortPlayers, smartSort);
-
-  // Disable Auto-Switch - prevents automatic switching to playing players
-  static Future<bool> getDisableAutoSwitch() => _getBool(_keyDisableAutoSwitch, defaultValue: false);
-  static Future<void> setDisableAutoSwitch(bool disable) => _setBool(_keyDisableAutoSwitch, disable);
 
   // Helper to create player name with possessive apostrophe
   // Automatically detects Phone vs Tablet based on screen size

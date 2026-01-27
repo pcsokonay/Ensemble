@@ -64,8 +64,6 @@ class MusicAssistantProvider with ChangeNotifier {
   Player? _selectedPlayer;
   List<Player> _availablePlayers = [];
   bool _selectPlayerInProgress = false; // Reentrancy guard for selectPlayer()
-  DateTime? _lastPlayerSwitchTime; // Debounce for auto-selection
-  static const _playerSwitchCooldown = Duration(seconds: 3); // Minimum time between auto-switches
   Map<String, String> _castToSendspinIdMap = {}; // Maps regular Cast IDs to Sendspin IDs for grouping
   Track? _currentTrack;
   Audiobook? _currentAudiobook; // Currently playing audiobook context (with chapters)
@@ -3793,33 +3791,20 @@ class MusicAssistantProvider with ChangeNotifier {
 
       if (_availablePlayers.isNotEmpty) {
         Player? playerToSelect;
-        final preferLocalPlayer = await SettingsService.getPreferLocalPlayer();
-        final disableAutoSwitch = await SettingsService.getDisableAutoSwitch();
         final lastSelectedPlayerId = await SettingsService.getLastSelectedPlayerId();
 
-        // Log settings for debugging player selection issues
-        _logger.log('⚙️ Player selection settings: preferLocal=$preferLocalPlayer, disableAutoSwitch=$disableAutoSwitch, coldStart=$coldStart');
-        _logger.log('⚙️ Current selection: ${_selectedPlayer?.name ?? 'none'}, lastSelected=$lastSelectedPlayerId');
+        _logger.log('⚙️ Current selection: ${_selectedPlayer?.name ?? 'none'}, lastSelected=$lastSelectedPlayerId, coldStart=$coldStart');
 
-        // If "Prefer Local Player" is ON, always try to select local player first
-        // This takes priority even over the currently selected player
-        if (preferLocalPlayer && builtinPlayerId != null) {
-          try {
-            playerToSelect = _availablePlayers.firstWhere(
-              (p) => p.playerId == builtinPlayerId && p.available,
-            );
-            _logger.log('📱 Auto-selected local player (preferred): ${playerToSelect?.name}');
-          } catch (e) {
-            // Local player not available yet, will fall through to other options
-            _logger.log('⚠️ Prefer local player ON but local player not available');
-          }
-        }
+        // SIMPLIFIED PLAYER SELECTION LOGIC:
+        // 1. User's manual selection is always respected
+        // 2. On app reopen: restore last selection
+        // 3. If selected player unavailable: switch to local player
+        // 4. First launch (no history): select local player
+        // 5. Local player unavailable: select first available
 
-        // Keep currently selected player if still available (and not overridden by prefer local)
-        // On coldStart, skip this block and apply full priority logic
-        if (playerToSelect == null && _selectedPlayer != null && !coldStart) {
+        // Keep currently selected player if still available
+        if (_selectedPlayer != null && !coldStart) {
           // Check if selected player is still available - also check translated Cast/Sendspin IDs
-          // When Cast player gets replaced by Sendspin version (or vice versa), we should keep selection
           final selectedId = _selectedPlayer!.playerId;
           final translatedId = _castToSendspinIdMap[selectedId];
           String? reverseTranslatedId;
@@ -3836,101 +3821,53 @@ class MusicAssistantProvider with ChangeNotifier {
                    (reverseTranslatedId != null && p.playerId == reverseTranslatedId)),
           );
           if (stillAvailable) {
-            // Find the actual player in the list (might be Cast or Sendspin version)
             final currentPlayer = _availablePlayers.firstWhere(
               (p) => p.playerId == selectedId ||
                      (translatedId != null && p.playerId == translatedId) ||
                      (reverseTranslatedId != null && p.playerId == reverseTranslatedId),
             );
-
-            // Keep current selection - no auto-switching during non-coldStart refreshes
-            // Auto-switch to playing player is now ONLY done on coldStart (see below)
             playerToSelect = currentPlayer;
             if (currentPlayer.playerId != selectedId) {
               _logger.log('🔄 Selected player ID changed (Cast<->Sendspin): $selectedId -> ${currentPlayer.playerId}');
             } else {
               _logger.log('✓ Keeping current selection: ${currentPlayer.name}');
             }
+          } else {
+            // Selected player went offline - will fall through to local player
+            _logger.log('⚠️ Selected player ${_selectedPlayer!.name} no longer available');
           }
         }
 
-        if (coldStart) {
-          _logger.log('🚀 Cold start: applying full priority logic');
+        // Priority 1: Restore last selected player (on coldStart)
+        if (playerToSelect == null && coldStart && lastSelectedPlayerId != null) {
+          playerToSelect = _availablePlayers.cast<Player?>().firstWhere(
+            (p) => p!.playerId == lastSelectedPlayerId && p.available,
+            orElse: () => null,
+          );
+          if (playerToSelect != null) {
+            _logger.log('🔄 Restored last selected player: ${playerToSelect.name}');
+          }
         }
 
-        if (playerToSelect == null) {
-          // Smart auto-selection priority (coldStart only for auto-switch to playing):
-          // Priority 1: Single playing player (only on coldStart and if disableAutoSwitch is OFF)
-          // Priority 2: Local player (if preferLocalPlayer is OFF but we still try local as fallback)
-          // Priority 3: Last manually selected player
-          // Priority 4: First available player
-
-          // Priority 1: Auto-switch to single playing player
-          // ONLY on coldStart AND only if disableAutoSwitch is OFF
-          // Also apply cooldown to prevent rapid successive auto-switches
-          final cooldownActive = _lastPlayerSwitchTime != null &&
-              DateTime.now().difference(_lastPlayerSwitchTime!) < _playerSwitchCooldown;
-
-          if (coldStart && !disableAutoSwitch && !preferLocalPlayer && !cooldownActive) {
-            final playingPlayers = _availablePlayers.where(
-              (p) => p.state == 'playing' && p.available && !p.isExternalSource,
-            ).toList();
-            if (playingPlayers.length == 1) {
-              playerToSelect = playingPlayers.first;
-              _lastPlayerSwitchTime = DateTime.now(); // Update cooldown timestamp
-              _logger.log('🎵 Auto-selected playing player: ${playerToSelect?.name}');
-            } else if (playingPlayers.length > 1) {
-              _logger.log('⚠️ Multiple players playing (${playingPlayers.length}), skipping auto-switch');
-            }
-          } else if (cooldownActive) {
-            _logger.log('⏳ Auto-switch cooldown active, skipping');
-          } else if (!coldStart) {
-            _logger.log('⚠️ Not coldStart, skipping auto-switch to playing player');
-          } else if (disableAutoSwitch) {
-            _logger.log('⚠️ Auto-switch disabled by user setting');
-          }
-
-          // Priority 2: Local player (fallback even when preferLocalPlayer is OFF)
-          if (playerToSelect == null && builtinPlayerId != null) {
-            try {
-              playerToSelect = _availablePlayers.firstWhere(
-                (p) => p.playerId == builtinPlayerId && p.available,
-              );
-              _logger.log('📱 Auto-selected local player: ${playerToSelect?.name}');
-            } catch (e) {
-              // Local player not found or not available - check why
-              final localPlayer = _availablePlayers
-                  .where((p) => p.playerId == builtinPlayerId)
-                  .toList();
-              if (localPlayer.isEmpty) {
-                _logger.log('⚠️ Priority 2 skipped: local player ($builtinPlayerId) not in available players list');
-              } else {
-                _logger.log('⚠️ Priority 2 skipped: local player found but available=${localPlayer.first.available}');
-              }
-            }
-          } else if (playerToSelect == null && builtinPlayerId == null) {
-            _logger.log('⚠️ Priority 2 skipped: builtinPlayerId is null');
-          }
-
-          // Priority 3: Last manually selected player
-          if (playerToSelect == null && lastSelectedPlayerId != null) {
-            playerToSelect = _availablePlayers.cast<Player?>().firstWhere(
-              (p) => p!.playerId == lastSelectedPlayerId && p.available,
-              orElse: () => null,
-            );
-            if (playerToSelect != null) {
-              _logger.log('🔄 Auto-selected last used player: ${playerToSelect?.name}');
-            }
-          }
-
-          // Priority 4: First available player
-          if (playerToSelect == null) {
+        // Priority 2: Local player (default fallback)
+        if (playerToSelect == null && builtinPlayerId != null) {
+          try {
             playerToSelect = _availablePlayers.firstWhere(
-              (p) => p.available,
-              orElse: () => _availablePlayers.first,
+              (p) => p.playerId == builtinPlayerId && p.available,
             );
-            _logger.log('🔄 Fallback to first available player: ${playerToSelect.name}');
+            _logger.log('📱 Selected local player: ${playerToSelect.name}');
+          } catch (e) {
+            _logger.log('⚠️ Local player not available');
           }
+        }
+
+        // Priority 3: First available player
+        if (playerToSelect == null) {
+          playerToSelect = _availablePlayers.firstWhere(
+            (p) => p.available,
+            orElse: () => _availablePlayers.first,
+          );
+          _logger.log('🔄 Fallback to first available player: ${playerToSelect.name}');
         }
 
         selectPlayer(playerToSelect);

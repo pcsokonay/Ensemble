@@ -40,9 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Home row order
   List<String> _homeRowOrder = List.from(SettingsService.defaultHomeRowOrder);
   // Player settings
-  bool _preferLocalPlayer = false;
   bool _smartSortPlayers = false;
-  bool _disableAutoSwitch = false;
   bool _volumePrecisionMode = true;
   // Hint settings
   bool _showHints = true;
@@ -86,9 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final rowOrder = await SettingsService.getHomeRowOrder();
 
     // Load player settings
-    final preferLocal = await SettingsService.getPreferLocalPlayer();
     final smartSort = await SettingsService.getSmartSortPlayers();
-    final disableAutoSwitch = await SettingsService.getDisableAutoSwitch();
     final volumePrecision = await SettingsService.getVolumePrecisionMode();
 
     // Load hint settings
@@ -112,9 +108,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _showDiscoverAudiobooks = showDiscAudiobooks;
         _showDiscoverSeries = showDiscSeries;
         _homeRowOrder = rowOrder;
-        _preferLocalPlayer = preferLocal;
         _smartSortPlayers = smartSort;
-        _disableAutoSwitch = disableAutoSwitch;
         _volumePrecisionMode = volumePrecision;
         _showHints = showHints;
         _showProviderIcons = showProviderIcons;
@@ -711,33 +705,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               child: SwitchListTile(
                 title: Text(
-                  S.of(context)!.preferLocalPlayer,
-                  style: TextStyle(color: colorScheme.onSurface),
-                ),
-                subtitle: Text(
-                  S.of(context)!.preferLocalPlayerDescription,
-                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                ),
-                value: _preferLocalPlayer,
-                onChanged: (value) {
-                  setState(() => _preferLocalPlayer = value);
-                  SettingsService.setPreferLocalPlayer(value);
-                },
-                activeColor: colorScheme.primary,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceVariant.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SwitchListTile(
-                title: Text(
                   S.of(context)!.smartSortPlayers,
                   style: TextStyle(color: colorScheme.onSurface),
                 ),
@@ -754,32 +721,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
             ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceVariant.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SwitchListTile(
-                title: Text(
-                  S.of(context)!.disableAutoSwitch,
-                  style: TextStyle(color: colorScheme.onSurface),
-                ),
-                subtitle: Text(
-                  S.of(context)!.disableAutoSwitchDescription,
-                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                ),
-                value: _disableAutoSwitch,
-                onChanged: (value) {
-                  setState(() => _disableAutoSwitch = value);
-                  SettingsService.setDisableAutoSwitch(value);
-                },
-                activeColor: colorScheme.primary,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
