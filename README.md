@@ -127,25 +127,11 @@ To find the correct URL:
 
 If you run Music Assistant as a Home Assistant add-on:
 - Use the IP address of your Home Assistant server
-- Enter `8095` in the port field
 - Do **not** use your Home Assistant URL or ingress URL
 
 ### Remote Access
 
-For access outside your home network, you'll need to expose Music Assistant through a reverse proxy (e.g., Nginx Proxy Manager, Cloudflare Tunnel).
-
-## Authentication
-
-Ensemble supports multiple authentication methods:
-
-| Method | Status |
-|--------|--------|
-| Music Assistant native auth | Tested |
-| No authentication | Tested |
-| Authelia | Implemented, not recently tested |
-| HTTP Basic Auth | Implemented, not recently tested |
-
-**Note:** Development and testing is done against Music Assistant beta with native authentication enabled.
+For access outside your home network, you'll need to expose Music Assistant through a reverse proxy (e.g., Traefik, Nginx Proxy Manager, Cloudflare Tunnel).
 
 ## Requirements
 
