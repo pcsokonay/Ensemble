@@ -26,6 +26,7 @@ import '../services/pcm_audio_player.dart';
 import '../services/offline_action_queue.dart';
 import '../constants/timings.dart';
 import '../services/database_service.dart';
+import '../services/library_status_service.dart';
 import '../main.dart' show audioHandler;
 
 /// Main provider that coordinates connection, player, and library state.
@@ -920,6 +921,7 @@ class MusicAssistantProvider with ChangeNotifier {
         _artists = syncService.cachedArtists;
         // Note: tracks are loaded separately via API, not cached in SyncService
         _logger.log('📦 Pre-loaded library for favorites: ${_albums.length} albums, ${_artists.length} artists');
+        _syncLibraryStatusToService();
         notifyListeners();
       }
     } catch (e) {
@@ -1621,6 +1623,41 @@ class MusicAssistantProvider with ChangeNotifier {
   // LIBRARY MANAGEMENT
   // ============================================================================
 
+  /// Sync library status to centralized service for reactive UI updates
+  void _syncLibraryStatusToService() {
+    final service = LibraryStatusService.instance;
+
+    // Sync albums
+    service.syncFromLibrary(
+      mediaType: 'album',
+      items: _albums,
+      getInLibrary: (a) => (a as Album).inLibrary,
+      getFavorite: (a) => (a as Album).favorite ?? false,
+      getProvider: (a) => (a as Album).provider,
+      getItemId: (a) => (a as Album).itemId,
+    );
+
+    // Sync artists
+    service.syncFromLibrary(
+      mediaType: 'artist',
+      items: _artists,
+      getInLibrary: (a) => (a as Artist).inLibrary,
+      getFavorite: (a) => (a as Artist).favorite ?? false,
+      getProvider: (a) => (a as Artist).provider,
+      getItemId: (a) => (a as Artist).itemId,
+    );
+
+    // Sync tracks
+    service.syncFromLibrary(
+      mediaType: 'track',
+      items: _tracks,
+      getInLibrary: (t) => (t as Track).inLibrary,
+      getFavorite: (t) => (t as Track).favorite ?? false,
+      getProvider: (t) => (t as Track).provider,
+      getItemId: (t) => (t as Track).itemId,
+    );
+  }
+
   /// Add item to library
   /// Returns true if action was executed successfully
   Future<bool> addToLibrary({
@@ -1666,8 +1703,11 @@ class MusicAssistantProvider with ChangeNotifier {
       // OPTIMISTIC UPDATE: Update local cache immediately for instant UI feedback
       // This ensures library screens show the change even before API completes
       _removeFromLocalLibrary(mediaType, libraryItemId);
+      // Also remove from SyncService's in-memory cache
+      SyncService.instance.removeFromCacheByLibraryId(mediaType, libraryItemId);
       // Also mark as deleted in database cache so it doesn't reappear on next load
-      DatabaseService.instance.markCachedItemDeleted(mediaType, libraryItemId.toString());
+      // Use the library ID aware method that handles cases where itemId differs from libraryId
+      DatabaseService.instance.markCachedItemDeletedByLibraryId(mediaType, libraryItemId.toString());
       // Invalidate caches that could show stale inLibrary status
       _cacheService.invalidateSearchCache();
       if (mediaType == 'album') {
@@ -1788,6 +1828,7 @@ class MusicAssistantProvider with ChangeNotifier {
         } else if (mediaType == 'podcast') {
           _podcasts = await _api!.getPodcasts(limit: 100);
         }
+        _syncLibraryStatusToService();
         notifyListeners();
       } catch (e) {
         _logger.log('⚠️ Background library refresh failed: $e');
@@ -3173,6 +3214,7 @@ class MusicAssistantProvider with ChangeNotifier {
       _logger.log('⚠️ Failed to refresh tracks: $e');
     }
 
+    _syncLibraryStatusToService();
     notifyListeners();
     _logger.log('✅ Force sync complete');
   }
@@ -4780,6 +4822,7 @@ class MusicAssistantProvider with ChangeNotifier {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
         _logger.log('📦 Loaded ${_albums.length} albums, ${_artists.length} artists from cache');
+        _syncLibraryStatusToService();
         notifyListeners();
       }
 
@@ -4797,6 +4840,7 @@ class MusicAssistantProvider with ChangeNotifier {
       }
 
       _isLoading = false;
+      _syncLibraryStatusToService();
       notifyListeners();
 
       // Trigger background sync (non-blocking)
@@ -4823,6 +4867,7 @@ class MusicAssistantProvider with ChangeNotifier {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
         _logger.log('🔄 Updated library from background sync: ${_albums.length} albums, ${_artists.length} artists');
+        _syncLibraryStatusToService();
         notifyListeners();
       }
       syncService.removeListener(onSyncComplete);
@@ -4920,6 +4965,7 @@ class MusicAssistantProvider with ChangeNotifier {
       SyncService.instance.updateCachedArtists(_artists);
 
       _isLoading = false;
+      _syncLibraryStatusToService();
       notifyListeners();
     } catch (e) {
       final errorInfo = ErrorHandler.handleError(e, context: 'Load artists');
@@ -4955,6 +5001,7 @@ class MusicAssistantProvider with ChangeNotifier {
       SyncService.instance.updateCachedAlbums(_albums);
 
       _isLoading = false;
+      _syncLibraryStatusToService();
       notifyListeners();
     } catch (e) {
       final errorInfo = ErrorHandler.handleError(e, context: 'Load albums');

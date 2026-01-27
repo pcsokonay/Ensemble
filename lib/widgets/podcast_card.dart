@@ -11,8 +11,10 @@ import '../constants/hero_tags.dart';
 import '../constants/timings.dart';
 import '../utils/page_transitions.dart';
 import '../l10n/app_localizations.dart';
+import '../services/library_status_service.dart';
 import 'provider_icon.dart';
 import 'media_context_menu.dart';
+import 'library_status_builder.dart';
 
 class PodcastCard extends StatefulWidget {
   final MediaItem podcast;
@@ -34,21 +36,37 @@ class PodcastCard extends StatefulWidget {
   State<PodcastCard> createState() => _PodcastCardState();
 }
 
-class _PodcastCardState extends State<PodcastCard> {
+class _PodcastCardState extends State<PodcastCard> with LibraryStatusMixin {
   bool _isNavigating = false;
-  late bool _isFavorite;
-  late bool _isInLibrary;
+
+  @override
+  String get libraryItemKey => LibraryStatusService.makeKey(
+    'podcast',
+    widget.podcast.provider,
+    widget.podcast.itemId,
+  );
 
   @override
   void initState() {
     super.initState();
-    _isFavorite = widget.podcast.favorite ?? false;
-    _isInLibrary = widget.podcast.inLibrary;
+    // Initialize status in centralized service from widget data
+    final service = LibraryStatusService.instance;
+    final key = libraryItemKey;
+    if (!service.isInLibrary(key) && widget.podcast.inLibrary) {
+      service.setLibraryStatus(key, true);
+    }
+    if (!service.isFavorite(key) && (widget.podcast.favorite ?? false)) {
+      service.setFavoriteStatus(key, true);
+    }
   }
 
   Future<void> _toggleFavorite() async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final newState = !_isFavorite;
+    final currentFavorite = isFavorite;
+    final newState = !currentFavorite;
+
+    // Optimistic update via centralized service
+    setFavoriteStatus(newState);
 
     try {
       bool success;
@@ -87,7 +105,10 @@ class _PodcastCardState extends State<PodcastCard> {
           }
         }
 
-        if (libraryItemId == null) return;
+        if (libraryItemId == null) {
+          rollbackFavoriteOperation();
+          return;
+        }
 
         success = await maProvider.removeFromFavorites(
           mediaType: 'podcast',
@@ -96,23 +117,26 @@ class _PodcastCardState extends State<PodcastCard> {
       }
 
       if (success && mounted) {
-        setState(() => _isFavorite = newState);
+        completeFavoriteOperation();
         maProvider.invalidateHomeCache();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+            content: Text(newState ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
             duration: const Duration(seconds: 1),
           ),
         );
+      } else {
+        rollbackFavoriteOperation();
       }
     } catch (e) {
-      // Silent failure
+      rollbackFavoriteOperation();
     }
   }
 
   Future<void> _toggleLibrary() async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final newState = !_isInLibrary;
+    final currentInLibrary = isInLibrary;
+    final newState = !currentInLibrary;
 
     try {
       if (newState) {
@@ -139,21 +163,29 @@ class _PodcastCardState extends State<PodcastCard> {
           }
         }
 
-        setState(() => _isInLibrary = newState);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(S.of(context)!.addedToLibrary),
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        // Optimistic update via centralized service
+        setLibraryStatus(newState);
 
-        maProvider.addToLibrary(
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.addedToLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+
+        final success = await maProvider.addToLibrary(
           mediaType: 'podcast',
           provider: actualProvider,
           itemId: actualItemId,
-        ).catchError((e) {
-          if (mounted) setState(() => _isInLibrary = !newState);
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       } else {
         int? libraryItemId;
         if (widget.podcast.provider == 'library') {
@@ -170,23 +202,31 @@ class _PodcastCardState extends State<PodcastCard> {
 
         if (libraryItemId == null) return;
 
-        setState(() => _isInLibrary = newState);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(S.of(context)!.removedFromLibrary),
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        // Optimistic update via centralized service
+        setLibraryStatus(newState);
 
-        maProvider.removeFromLibrary(
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.removedFromLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+
+        final success = await maProvider.removeFromLibrary(
           mediaType: 'podcast',
           libraryItemId: libraryItemId,
-        ).catchError((e) {
-          if (mounted) setState(() => _isInLibrary = !newState);
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       }
     } catch (e) {
-      // Silent failure
+      rollbackLibraryOperation();
     }
   }
 
@@ -234,8 +274,8 @@ class _PodcastCardState extends State<PodcastCard> {
             position: details.globalPosition,
             mediaType: ContextMenuMediaType.podcast,
             item: widget.podcast,
-            isFavorite: _isFavorite,
-            isInLibrary: _isInLibrary,
+            isFavorite: isFavorite,
+            isInLibrary: isInLibrary,
             onToggleFavorite: _toggleFavorite,
             onToggleLibrary: _toggleLibrary,
           );

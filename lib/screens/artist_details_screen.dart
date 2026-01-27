@@ -18,6 +18,8 @@ import '../services/debug_logger.dart';
 import '../utils/page_transitions.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
+import '../services/library_status_service.dart';
+import '../widgets/library_status_builder.dart';
 
 class ArtistDetailsScreen extends StatefulWidget {
   final Artist artist;
@@ -35,19 +37,24 @@ class ArtistDetailsScreen extends StatefulWidget {
   State<ArtistDetailsScreen> createState() => _ArtistDetailsScreenState();
 }
 
-class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
+class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> with LibraryStatusMixin {
   final _logger = DebugLogger();
   List<Album> _albums = [];
   List<Album> _providerAlbums = [];
   bool _isLoading = true;
-  bool _isFavorite = false;
-  bool _isInLibrary = false;
   ColorScheme? _lightColorScheme;
   ColorScheme? _darkColorScheme;
   bool _isDescriptionExpanded = false;
   String? _artistDescription;
   String? _artistImageUrl;
   MusicAssistantProvider? _maProvider;
+
+  @override
+  String get libraryItemKey => LibraryStatusService.makeKey(
+    'artist',
+    widget.artist.provider,
+    widget.artist.itemId,
+  );
 
   // View preferences
   String _sortOrder = 'alpha'; // 'alpha' or 'year'
@@ -58,8 +65,15 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _isFavorite = widget.artist.favorite ?? false;
-    _isInLibrary = _checkIfInLibrary(widget.artist);
+    // Initialize status in centralized service from widget data
+    final service = LibraryStatusService.instance;
+    final key = libraryItemKey;
+    if (!service.isInLibrary(key) && _checkIfInLibrary(widget.artist)) {
+      service.setLibraryStatus(key, true);
+    }
+    if (!service.isFavorite(key) && (widget.artist.favorite ?? false)) {
+      service.setFavoriteStatus(key, true);
+    }
     // Use initial image URL immediately for smooth hero animation
     _artistImageUrl = widget.initialImageUrl;
     _loadViewPreferences();
@@ -96,12 +110,12 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
   void _onProviderChanged() {
     if (!mounted) return;
-    // Re-check library status when provider data changes
+    // Re-check library status when provider data changes and sync to service
     final newIsInLibrary = _checkIfInLibraryFromProvider();
-    if (newIsInLibrary != _isInLibrary) {
-      setState(() {
-        _isInLibrary = newIsInLibrary;
-      });
+    final service = LibraryStatusService.instance;
+    final key = libraryItemKey;
+    if (newIsInLibrary != service.isInLibrary(key)) {
+      service.setLibraryStatus(key, newIsInLibrary);
     }
   }
 
@@ -214,9 +228,13 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
     try {
       final freshArtist = await maProvider.api!.getArtistByUri(artistUri);
       if (freshArtist != null && mounted) {
-        setState(() {
-          _isFavorite = freshArtist.favorite ?? false;
-        });
+        // Sync with centralized service
+        final service = LibraryStatusService.instance;
+        final key = libraryItemKey;
+        final newFavorite = freshArtist.favorite ?? false;
+        if (service.isFavorite(key) != newFavorite) {
+          service.setFavoriteStatus(key, newFavorite);
+        }
       }
     } catch (e) {
       _logger.log('Error refreshing artist favorite status: $e');
@@ -225,9 +243,13 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
   Future<void> _toggleFavorite() async {
     final maProvider = context.read<MusicAssistantProvider>();
+    final currentFavorite = isFavorite;
+    final newState = !currentFavorite;
+
+    // Optimistic update via centralized service
+    setFavoriteStatus(newState);
 
     try {
-      final newState = !_isFavorite;
       bool success;
 
       if (newState) {
@@ -270,6 +292,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
 
         if (libraryItemId == null) {
           _logger.log('Error: Could not determine library_item_id for removal');
+          rollbackFavoriteOperation();
           throw Exception('Could not determine library ID for this artist');
         }
 
@@ -280,10 +303,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
       }
 
       if (success) {
-        setState(() {
-          _isFavorite = newState;
-        });
-
+        completeFavoriteOperation();
         maProvider.invalidateHomeCache();
 
         if (mounted) {
@@ -293,14 +313,17 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
               content: Text(
                 isOffline
                     ? S.of(context)!.actionQueuedForSync
-                    : (_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+                    : (newState ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
               ),
               duration: const Duration(seconds: 1),
             ),
           );
         }
+      } else {
+        rollbackFavoriteOperation();
       }
     } catch (e) {
+      rollbackFavoriteOperation();
       _logger.log('Error toggling artist favorite: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -322,10 +345,10 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
   /// Toggle library status
   Future<void> _toggleLibrary() async {
     final maProvider = context.read<MusicAssistantProvider>();
+    final currentInLibrary = isInLibrary;
+    final newState = !currentInLibrary;
 
     try {
-      final newState = !_isInLibrary;
-
       if (newState) {
         // Add to library - MUST use non-library provider
         String? actualProvider;
@@ -355,10 +378,8 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
           }
         }
 
-        // OPTIMISTIC UPDATE: Update UI immediately
-        setState(() {
-          _isInLibrary = newState;
-        });
+        // Optimistic update via centralized service
+        setLibraryStatus(newState);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -370,21 +391,17 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
         }
 
         _logger.log('Adding artist to library: provider=$actualProvider, itemId=$actualItemId');
-        // Fire and forget - API call happens in background
-        maProvider.addToLibrary(
+        final success = await maProvider.addToLibrary(
           mediaType: 'artist',
           provider: actualProvider,
           itemId: actualItemId,
-        ).catchError((e) {
-          _logger.log('❌ Failed to add artist to library: $e');
-          // Revert on failure
-          if (mounted) {
-            setState(() {
-              _isInLibrary = !newState;
-            });
-          }
-          return false;
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       } else {
         // Remove from library
         int? libraryItemId;
@@ -405,10 +422,8 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
           return;
         }
 
-        // OPTIMISTIC UPDATE: Update UI immediately
-        setState(() {
-          _isInLibrary = newState;
-        });
+        // Optimistic update via centralized service
+        setLibraryStatus(newState);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -419,22 +434,19 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
           );
         }
 
-        // Fire and forget - API call happens in background
-        maProvider.removeFromLibrary(
+        final success = await maProvider.removeFromLibrary(
           mediaType: 'artist',
           libraryItemId: libraryItemId,
-        ).catchError((e) {
-          _logger.log('❌ Failed to remove artist from library: $e');
-          // Revert on failure
-          if (mounted) {
-            setState(() {
-              _isInLibrary = !newState;
-            });
-          }
-          return false;
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       }
     } catch (e) {
+      rollbackLibraryOperation();
       _logger.log('Error toggling artist library: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1009,8 +1021,8 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                           child: Icon(
                             Symbols.book_2,
                             size: 25,
-                            fill: _isInLibrary ? 1 : 0,
-                            color: _isInLibrary
+                            fill: isInLibrary ? 1 : 0,
+                            color: isInLibrary
                                 ? colorScheme.primary
                                 : Colors.white70,
                           ),
@@ -1034,7 +1046,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                           child: Icon(
                             Icons.favorite,
                             size: 25,
-                            color: _isFavorite
+                            color: isFavorite
                                 ? colorScheme.error
                                 : Colors.white70,
                           ),
@@ -1057,8 +1069,8 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> {
                                 position: position,
                                 mediaType: ContextMenuMediaType.artist,
                                 item: widget.artist,
-                                isFavorite: _isFavorite,
-                                isInLibrary: _isInLibrary,
+                                isFavorite: isFavorite,
+                                isInLibrary: isInLibrary,
                                 onToggleFavorite: _toggleFavorite,
                                 onToggleLibrary: _toggleLibrary,
                                 adaptiveColorScheme: adaptiveScheme,

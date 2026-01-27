@@ -6,7 +6,9 @@ import '../l10n/app_localizations.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/debug_logger.dart';
+import '../services/library_status_service.dart';
 import 'media_context_menu.dart';
+import 'library_status_builder.dart';
 
 class TrackRow extends StatefulWidget {
   final String title;
@@ -194,20 +196,35 @@ class _TrackCard extends StatefulWidget {
   State<_TrackCard> createState() => _TrackCardState();
 }
 
-class _TrackCardState extends State<_TrackCard> {
-  late bool _isFavorite;
-  late bool _isInLibrary;
+class _TrackCardState extends State<_TrackCard> with LibraryStatusMixin {
+  @override
+  String get libraryItemKey => LibraryStatusService.makeKey(
+    'track',
+    widget.track.provider,
+    widget.track.itemId,
+  );
 
   @override
   void initState() {
     super.initState();
-    _isFavorite = widget.track.favorite ?? false;
-    _isInLibrary = widget.track.inLibrary;
+    // Initialize status in centralized service from widget data
+    final service = LibraryStatusService.instance;
+    final key = libraryItemKey;
+    if (!service.isInLibrary(key) && widget.track.inLibrary) {
+      service.setLibraryStatus(key, true);
+    }
+    if (!service.isFavorite(key) && (widget.track.favorite ?? false)) {
+      service.setFavoriteStatus(key, true);
+    }
   }
 
   Future<void> _toggleFavorite() async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final newState = !_isFavorite;
+    final currentFavorite = isFavorite;
+    final newState = !currentFavorite;
+
+    // Optimistic update via centralized service
+    setFavoriteStatus(newState);
 
     try {
       bool success;
@@ -246,7 +263,10 @@ class _TrackCardState extends State<_TrackCard> {
           }
         }
 
-        if (libraryItemId == null) return;
+        if (libraryItemId == null) {
+          rollbackFavoriteOperation();
+          return;
+        }
 
         success = await maProvider.removeFromFavorites(
           mediaType: 'track',
@@ -255,23 +275,26 @@ class _TrackCardState extends State<_TrackCard> {
       }
 
       if (success && mounted) {
-        setState(() => _isFavorite = newState);
+        completeFavoriteOperation();
         maProvider.invalidateHomeCache();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+            content: Text(newState ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
             duration: const Duration(seconds: 1),
           ),
         );
+      } else {
+        rollbackFavoriteOperation();
       }
     } catch (e) {
-      // Silent failure
+      rollbackFavoriteOperation();
     }
   }
 
   Future<void> _toggleLibrary() async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final newState = !_isInLibrary;
+    final currentInLibrary = isInLibrary;
+    final newState = !currentInLibrary;
 
     try {
       if (newState) {
@@ -298,21 +321,29 @@ class _TrackCardState extends State<_TrackCard> {
           }
         }
 
-        setState(() => _isInLibrary = newState);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(S.of(context)!.addedToLibrary),
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        // Optimistic update via centralized service
+        setLibraryStatus(newState);
 
-        maProvider.addToLibrary(
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.addedToLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+
+        final success = await maProvider.addToLibrary(
           mediaType: 'track',
           provider: actualProvider,
           itemId: actualItemId,
-        ).catchError((e) {
-          if (mounted) setState(() => _isInLibrary = !newState);
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       } else {
         int? libraryItemId;
         if (widget.track.provider == 'library') {
@@ -329,23 +360,31 @@ class _TrackCardState extends State<_TrackCard> {
 
         if (libraryItemId == null) return;
 
-        setState(() => _isInLibrary = newState);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(S.of(context)!.removedFromLibrary),
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        // Optimistic update via centralized service
+        setLibraryStatus(newState);
 
-        maProvider.removeFromLibrary(
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.removedFromLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+
+        final success = await maProvider.removeFromLibrary(
           mediaType: 'track',
           libraryItemId: libraryItemId,
-        ).catchError((e) {
-          if (mounted) setState(() => _isInLibrary = !newState);
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       }
     } catch (e) {
-      // Silent failure
+      rollbackLibraryOperation();
     }
   }
 
@@ -370,8 +409,8 @@ class _TrackCardState extends State<_TrackCard> {
             position: details.globalPosition,
             mediaType: ContextMenuMediaType.track,
             item: widget.track,
-            isFavorite: _isFavorite,
-            isInLibrary: _isInLibrary,
+            isFavorite: isFavorite,
+            isInLibrary: isInLibrary,
             onToggleFavorite: _toggleFavorite,
             onToggleLibrary: _toggleLibrary,
           );

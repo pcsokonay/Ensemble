@@ -11,8 +11,10 @@ import '../constants/timings.dart';
 import '../utils/page_transitions.dart';
 import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
+import '../services/library_status_service.dart';
 import '../l10n/app_localizations.dart';
 import 'media_context_menu.dart';
+import 'library_status_builder.dart';
 
 class ArtistCard extends StatefulWidget {
   final Artist artist;
@@ -34,7 +36,7 @@ class ArtistCard extends StatefulWidget {
   State<ArtistCard> createState() => _ArtistCardState();
 }
 
-class _ArtistCardState extends State<ArtistCard> {
+class _ArtistCardState extends State<ArtistCard> with LibraryStatusMixin {
   static final _logger = DebugLogger();
   String? _fallbackImageUrl;
   bool _triedFallback = false;
@@ -42,18 +44,30 @@ class _ArtistCardState extends State<ArtistCard> {
   String? _cachedMaImageUrl;
   Timer? _fallbackTimer;
   bool _isNavigating = false;
-  late bool _isFavorite;
-  late bool _isInLibrary;
 
   /// Delay before fetching fallback images to avoid requests during fast scroll
   /// PERF: Increased from 200ms to 400ms to reduce network requests during slow scroll
   static const _fallbackDelay = Duration(milliseconds: 400);
 
   @override
+  String get libraryItemKey => LibraryStatusService.makeKey(
+    'artist',
+    widget.artist.provider,
+    widget.artist.itemId,
+  );
+
+  @override
   void initState() {
     super.initState();
-    _isFavorite = widget.artist.favorite ?? false;
-    _isInLibrary = widget.artist.inLibrary;
+    // Initialize status in centralized service from widget data
+    final service = LibraryStatusService.instance;
+    final key = libraryItemKey;
+    if (!service.isInLibrary(key) && widget.artist.inLibrary) {
+      service.setLibraryStatus(key, true);
+    }
+    if (!service.isFavorite(key) && (widget.artist.favorite ?? false)) {
+      service.setFavoriteStatus(key, true);
+    }
     // Fetch fallback image once in initState, not during build
     _initFallbackImage();
   }
@@ -102,7 +116,11 @@ class _ArtistCardState extends State<ArtistCard> {
 
   Future<void> _toggleFavorite() async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final newState = !_isFavorite;
+    final currentFavorite = isFavorite;
+    final newState = !currentFavorite;
+
+    // Optimistic update via centralized service
+    setFavoriteStatus(newState);
 
     try {
       bool success;
@@ -141,7 +159,10 @@ class _ArtistCardState extends State<ArtistCard> {
           }
         }
 
-        if (libraryItemId == null) return;
+        if (libraryItemId == null) {
+          rollbackFavoriteOperation();
+          return;
+        }
 
         success = await maProvider.removeFromFavorites(
           mediaType: 'artist',
@@ -150,23 +171,26 @@ class _ArtistCardState extends State<ArtistCard> {
       }
 
       if (success && mounted) {
-        setState(() => _isFavorite = newState);
+        completeFavoriteOperation();
         maProvider.invalidateHomeCache();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+            content: Text(newState ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
             duration: const Duration(seconds: 1),
           ),
         );
+      } else {
+        rollbackFavoriteOperation();
       }
     } catch (e) {
-      // Silent failure
+      rollbackFavoriteOperation();
     }
   }
 
   Future<void> _toggleLibrary() async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final newState = !_isInLibrary;
+    final currentInLibrary = isInLibrary;
+    final newState = !currentInLibrary;
 
     try {
       if (newState) {
@@ -193,22 +217,29 @@ class _ArtistCardState extends State<ArtistCard> {
           }
         }
 
-        setState(() => _isInLibrary = newState);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(S.of(context)!.addedToLibrary),
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        // Optimistic update via centralized service
+        setLibraryStatus(newState);
 
-        maProvider.addToLibrary(
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.addedToLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+
+        final success = await maProvider.addToLibrary(
           mediaType: 'artist',
           provider: actualProvider,
           itemId: actualItemId,
-        ).catchError((e) {
-          if (mounted) setState(() => _isInLibrary = !newState);
-          return false;
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       } else {
         int? libraryItemId;
         if (widget.artist.provider == 'library') {
@@ -225,24 +256,31 @@ class _ArtistCardState extends State<ArtistCard> {
 
         if (libraryItemId == null) return;
 
-        setState(() => _isInLibrary = newState);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(S.of(context)!.removedFromLibrary),
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        // Optimistic update via centralized service
+        setLibraryStatus(newState);
 
-        maProvider.removeFromLibrary(
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context)!.removedFromLibrary),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+
+        final success = await maProvider.removeFromLibrary(
           mediaType: 'artist',
           libraryItemId: libraryItemId,
-        ).catchError((e) {
-          if (mounted) setState(() => _isInLibrary = !newState);
-          return false;
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       }
     } catch (e) {
-      // Silent failure
+      rollbackLibraryOperation();
     }
   }
 
@@ -293,8 +331,8 @@ class _ArtistCardState extends State<ArtistCard> {
             position: details.globalPosition,
             mediaType: ContextMenuMediaType.artist,
             item: widget.artist,
-            isFavorite: _isFavorite,
-            isInLibrary: _isInLibrary,
+            isFavorite: isFavorite,
+            isInLibrary: isInLibrary,
             onToggleFavorite: _toggleFavorite,
             onToggleLibrary: _toggleLibrary,
           );

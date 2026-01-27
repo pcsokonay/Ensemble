@@ -596,4 +596,78 @@ class SyncService with ChangeNotifier {
     _cachedPlaylists = playlists;
     notifyListeners();
   }
+
+  /// Remove an item from in-memory cache by library ID
+  /// Called when an item is removed from library to keep SyncService in sync
+  void removeFromCacheByLibraryId(String mediaType, int libraryItemId) {
+    final libraryIdStr = libraryItemId.toString();
+    bool updated = false;
+
+    // Helper to check if item matches the library ID being removed
+    bool matchesLibraryId(String? provider, String? itemId, List<ProviderMapping>? mappings) {
+      if (provider == 'library' && itemId == libraryIdStr) return true;
+      if (mappings != null) {
+        for (final m in mappings) {
+          if ((m.providerInstance == 'library' || m.providerDomain == 'library') &&
+              m.itemId == libraryIdStr) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    switch (mediaType) {
+      case 'album':
+        final before = _cachedAlbums.length;
+        _cachedAlbums = _cachedAlbums.where((a) =>
+          !matchesLibraryId(a.provider, a.itemId, a.providerMappings)
+        ).toList();
+        updated = _cachedAlbums.length != before;
+        // Also remove from source provider tracking
+        if (updated) {
+          _albumSourceProviders.removeWhere((key, _) =>
+            _cachedAlbums.every((a) => a.itemId != key));
+        }
+        break;
+      case 'artist':
+        final before = _cachedArtists.length;
+        _cachedArtists = _cachedArtists.where((a) =>
+          !matchesLibraryId(a.provider, a.itemId, a.providerMappings)
+        ).toList();
+        updated = _cachedArtists.length != before;
+        if (updated) {
+          _artistSourceProviders.removeWhere((key, _) =>
+            _cachedArtists.every((a) => a.itemId != key));
+        }
+        break;
+      case 'audiobook':
+        final before = _cachedAudiobooks.length;
+        _cachedAudiobooks = _cachedAudiobooks.where((a) =>
+          !matchesLibraryId(a.provider, a.itemId, a.providerMappings)
+        ).toList();
+        updated = _cachedAudiobooks.length != before;
+        if (updated) {
+          _audiobookSourceProviders.removeWhere((key, _) =>
+            _cachedAudiobooks.every((a) => a.itemId != key));
+        }
+        break;
+      case 'playlist':
+        final before = _cachedPlaylists.length;
+        _cachedPlaylists = _cachedPlaylists.where((p) =>
+          !matchesLibraryId(p.provider, p.itemId, p.providerMappings)
+        ).toList();
+        updated = _cachedPlaylists.length != before;
+        if (updated) {
+          _playlistSourceProviders.removeWhere((key, _) =>
+            _cachedPlaylists.every((p) => p.itemId != key));
+        }
+        break;
+    }
+
+    if (updated) {
+      _logger.log('🗑️ Removed $mediaType with libraryId=$libraryItemId from SyncService cache');
+      notifyListeners();
+    }
+  }
 }

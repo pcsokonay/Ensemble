@@ -11,10 +11,12 @@ import '../theme/theme_provider.dart';
 import '../services/metadata_service.dart';
 import '../services/debug_logger.dart';
 import '../services/recently_played_service.dart';
+import '../services/library_status_service.dart';
 import '../widgets/global_player_overlay.dart';
 import '../widgets/provider_icon.dart';
 import '../widgets/hires_badge.dart';
 import '../widgets/media_context_menu.dart';
+import '../widgets/library_status_builder.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/design_tokens.dart';
 import 'artist_details_screen.dart';
@@ -36,12 +38,10 @@ class AlbumDetailsScreen extends StatefulWidget {
   State<AlbumDetailsScreen> createState() => _AlbumDetailsScreenState();
 }
 
-class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTickerProviderStateMixin {
+class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTickerProviderStateMixin, LibraryStatusMixin {
   final _logger = DebugLogger();
   List<Track> _tracks = [];
   bool _isLoading = true;
-  bool _isFavorite = false;
-  bool _isInLibrary = false;
   ColorScheme? _lightColorScheme;
   ColorScheme? _darkColorScheme;
   bool _isDescriptionExpanded = false;
@@ -54,10 +54,24 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
   String get _heroTagSuffix => widget.heroTagSuffix != null ? '_${widget.heroTagSuffix}' : '';
 
   @override
+  String get libraryItemKey => LibraryStatusService.makeKey(
+    'album',
+    widget.album.provider,
+    widget.album.itemId,
+  );
+
+  @override
   void initState() {
     super.initState();
-    _isFavorite = widget.album.favorite ?? false;
-    _isInLibrary = widget.album.inLibrary;
+    // Initialize status in centralized service from widget data
+    final service = LibraryStatusService.instance;
+    final key = libraryItemKey;
+    if (!service.isInLibrary(key) && widget.album.inLibrary) {
+      service.setLibraryStatus(key, true);
+    }
+    if (!service.isFavorite(key) && (widget.album.favorite ?? false)) {
+      service.setFavoriteStatus(key, true);
+    }
     _loadTracks();
     _loadAlbumDescription();
 
@@ -97,8 +111,14 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
       if (freshAlbum != null && mounted) {
         setState(() {
           _freshAlbum = freshAlbum;
-          _isFavorite = freshAlbum.favorite ?? false;
         });
+        // Sync fresh data to centralized service
+        final service = LibraryStatusService.instance;
+        service.syncSingleItem(
+          key: libraryItemKey,
+          inLibrary: freshAlbum.inLibrary,
+          favorite: freshAlbum.favorite ?? false,
+        );
         // Re-extract colors now that we have fresh album with images
         _extractColors();
       }
@@ -134,9 +154,13 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
 
   Future<void> _toggleFavorite() async {
     final maProvider = context.read<MusicAssistantProvider>();
+    final currentFavorite = isFavorite;
+    final newState = !currentFavorite;
+
+    // Optimistic update via centralized service
+    setFavoriteStatus(newState);
 
     try {
-      final newState = !_isFavorite;
       bool success;
 
       if (newState) {
@@ -182,6 +206,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
 
         if (libraryItemId == null) {
           _logger.log('Error: Could not determine library_item_id for removal');
+          rollbackFavoriteOperation();
           throw Exception('Could not determine library ID for this album');
         }
 
@@ -192,11 +217,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
       }
 
       if (success) {
-        // Optimistically update UI regardless of online/offline state
-        setState(() {
-          _isFavorite = newState;
-        });
-
+        completeFavoriteOperation();
         // Invalidate home cache so the home screen shows updated favorite status
         maProvider.invalidateHomeCache();
 
@@ -207,14 +228,17 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
               content: Text(
                 isOffline
                     ? S.of(context)!.actionQueuedForSync
-                    : (_isFavorite ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
+                    : (newState ? S.of(context)!.addedToFavorites : S.of(context)!.removedFromFavorites),
               ),
               duration: const Duration(seconds: 1),
             ),
           );
         }
+      } else {
+        rollbackFavoriteOperation();
       }
     } catch (e) {
+      rollbackFavoriteOperation();
       _logger.log('Error toggling favorite: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -230,10 +254,10 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
   /// Toggle library status
   Future<void> _toggleLibrary() async {
     final maProvider = context.read<MusicAssistantProvider>();
+    final currentInLibrary = isInLibrary;
+    final newState = !currentInLibrary;
 
     try {
-      final newState = !_isInLibrary;
-
       if (newState) {
         // Add to library - MUST use non-library provider
         String? actualProvider;
@@ -263,10 +287,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
           }
         }
 
-        // OPTIMISTIC UPDATE: Update UI immediately
-        setState(() {
-          _isInLibrary = newState;
-        });
+        // OPTIMISTIC UPDATE via centralized service
+        setLibraryStatus(newState);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -278,20 +300,17 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
         }
 
         _logger.log('Adding album to library: provider=$actualProvider, itemId=$actualItemId');
-        // Fire and forget - API call happens in background
-        maProvider.addToLibrary(
+        final success = await maProvider.addToLibrary(
           mediaType: 'album',
           provider: actualProvider,
           itemId: actualItemId,
-        ).catchError((e) {
-          _logger.log('❌ Failed to add album to library: $e');
-          // Revert on failure
-          if (mounted) {
-            setState(() {
-              _isInLibrary = !newState;
-            });
-          }
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       } else {
         // Remove from library
         int? libraryItemId;
@@ -312,10 +331,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
           return;
         }
 
-        // OPTIMISTIC UPDATE: Update UI immediately
-        setState(() {
-          _isInLibrary = newState;
-        });
+        // OPTIMISTIC UPDATE via centralized service
+        setLibraryStatus(newState);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -326,21 +343,19 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
           );
         }
 
-        // Fire and forget - API call happens in background
-        maProvider.removeFromLibrary(
+        final success = await maProvider.removeFromLibrary(
           mediaType: 'album',
           libraryItemId: libraryItemId,
-        ).catchError((e) {
-          _logger.log('❌ Failed to remove album from library: $e');
-          // Revert on failure
-          if (mounted) {
-            setState(() {
-              _isInLibrary = !newState;
-            });
-          }
-        });
+        );
+
+        if (success) {
+          completeLibraryOperation();
+        } else {
+          rollbackLibraryOperation();
+        }
       }
     } catch (e) {
+      rollbackLibraryOperation();
       _logger.log('Error toggling album library: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1019,8 +1034,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                           child: Icon(
                             Symbols.book_2,
                             size: 25,
-                            fill: _isInLibrary ? 1 : 0,
-                            color: _isInLibrary
+                            fill: isInLibrary ? 1 : 0,
+                            color: isInLibrary
                                 ? colorScheme.primary
                                 : Colors.white70,
                           ),
@@ -1044,7 +1059,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                           child: Icon(
                             Icons.favorite,
                             size: 25,
-                            color: _isFavorite
+                            color: isFavorite
                                 ? colorScheme.error
                                 : Colors.white70,
                           ),
@@ -1068,8 +1083,8 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                                 position: position,
                                 mediaType: ContextMenuMediaType.album,
                                 item: widget.album,
-                                isFavorite: _isFavorite,
-                                isInLibrary: _isInLibrary,
+                                isFavorite: isFavorite,
+                                isInLibrary: isInLibrary,
                                 onToggleFavorite: _toggleFavorite,
                                 onToggleLibrary: _toggleLibrary,
                                 adaptiveColorScheme: adaptiveScheme,

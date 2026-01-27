@@ -193,6 +193,33 @@ class DatabaseService {
     return db.markItemsDeleted(itemType, [itemId]);
   }
 
+  /// Mark a cached item as deleted by searching for library ID in the data
+  /// This handles cases where itemId is different from library ID
+  Future<void> markCachedItemDeletedByLibraryId(String itemType, String libraryId) async {
+    // First try direct match (for provider=library items)
+    await db.markItemsDeleted(itemType, [libraryId]);
+
+    // Also search through cached items to find any with matching library mapping
+    final items = await db.getCachedItems(itemType);
+    for (final item in items) {
+      try {
+        // Check if this item's data contains a library mapping with this ID
+        if (item.data.contains('"provider_instance":"library"') &&
+            item.data.contains('"item_id":"$libraryId"')) {
+          // Found a match - extract the actual cache key's itemId
+          final cacheKey = item.cacheKey;
+          final parts = cacheKey.split('_');
+          if (parts.length >= 2) {
+            final actualItemId = parts.sublist(1).join('_');
+            await db.markItemsDeleted(itemType, [actualItemId]);
+          }
+        }
+      } catch (_) {
+        // Ignore parse errors, continue checking other items
+      }
+    }
+  }
+
   /// Batch cache multiple items efficiently
   /// Uses drift's batch API for much better performance on large datasets.
   /// Items are automatically chunked into batches of 500.
