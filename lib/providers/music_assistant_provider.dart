@@ -4694,19 +4694,32 @@ class MusicAssistantProvider with ChangeNotifier {
           );
         }
       } else {
-        // No track data available - show player name placeholder for active players
+        // No queue data available from API
         final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
         final isBuiltinPlayer = builtinPlayerId != null && _selectedPlayer!.playerId == builtinPlayerId;
 
-        if (_currentTrack != null) {
+        // For builtin player, try to preserve cached track data since queue API doesn't return it
+        // The cached track was set in selectPlayer() and contains valid data
+        if (isBuiltinPlayer && _currentTrack == null) {
+          final cachedTrack = getCachedTrackForPlayer(_selectedPlayer!.playerId);
+          if (cachedTrack != null) {
+            _currentTrack = cachedTrack;
+            stateChanged = true;
+            _logger.log('🎵 Restored cached track for builtin player: ${cachedTrack.name}');
+          }
+        }
+
+        // Only clear track if we have no cached data to fall back on
+        // Don't clear for builtin player - it maintains its own playback state
+        if (_currentTrack != null && !isBuiltinPlayer) {
           _currentTrack = null;
           stateChanged = true;
           // Persist cleared track state
           _persistPlaybackState();
         }
 
-        // Show player name placeholder so notification shows correct player
-        if (_selectedPlayer!.state == 'playing' || _selectedPlayer!.state == 'paused') {
+        // Show player name placeholder only if we have no track data
+        if (_currentTrack == null && (_selectedPlayer!.state == 'playing' || _selectedPlayer!.state == 'paused')) {
           final mediaItem = audio_service.MediaItem(
             id: 'player_${_selectedPlayer!.playerId}',
             title: _selectedPlayer!.name,
@@ -4728,7 +4741,22 @@ class MusicAssistantProvider with ChangeNotifier {
               duration: Duration.zero,
             );
           }
-        } else {
+        } else if (_currentTrack != null && isBuiltinPlayer) {
+          // Builtin player has track data - update notification with it
+          final track = _currentTrack!;
+          final mediaItem = audio_service.MediaItem(
+            id: track.uri ?? track.itemId,
+            title: track.name,
+            artist: track.artistsString,
+            album: track.album?.name,
+            artUri: _api != null ? Uri.tryParse(_api!.getImageUrl(track, size: 512) ?? '') : null,
+            duration: track.duration,
+          );
+          audioHandler.updateLocalModeNotification(
+            item: mediaItem,
+            playing: _selectedPlayer!.state == 'playing',
+          );
+        } else if (_selectedPlayer!.state != 'playing' && _selectedPlayer!.state != 'paused') {
           audioHandler.clearRemotePlaybackState();
           _startIdleServiceTimer();
           _positionTracker.clear();
