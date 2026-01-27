@@ -1,4 +1,4 @@
-package com.musicassistant.music_assistant
+package com.collotsspot.ensemble
 
 import android.util.Log
 import android.view.KeyEvent
@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 // while also intercepting volume button events
 class MainActivity: AudioServiceActivity() {
     private val TAG = "EnsembleVolume"
-    private val CHANNEL = "com.musicassistant.music_assistant/volume_buttons"
+    private val CHANNEL = "com.collotsspot.ensemble/volume_buttons"
     private var methodChannel: MethodChannel? = null
     private var isListening = false
 

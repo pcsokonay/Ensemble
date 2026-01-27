@@ -29,7 +29,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "com.musicassistant.music_assistant"
+    namespace "com.collotsspot.ensemble"
     compileSdk 35
     ndkVersion flutter.ndkVersion
 
@@ -58,7 +58,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.musicassistant.music_assistant"
+        applicationId "com.collotsspot.ensemble"
         minSdkVersion flutter.minSdkVersion
         targetSdk 35
         versionCode flutterVersionCode.toInteger()

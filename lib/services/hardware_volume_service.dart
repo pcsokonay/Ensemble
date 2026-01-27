@@ -12,7 +12,7 @@ class HardwareVolumeService {
   factory HardwareVolumeService() => _instance;
   HardwareVolumeService._internal();
 
-  static const _channel = MethodChannel('com.musicassistant.music_assistant/volume_buttons');
+  static const _channel = MethodChannel('com.collotsspot.ensemble/volume_buttons');
   final _logger = DebugLogger();
 
   final _volumeUpController = StreamController<void>.broadcast();
