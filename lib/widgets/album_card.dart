@@ -276,8 +276,13 @@ class _AlbumCardState extends State<AlbumCard> {
           if (_isNavigating) return;
           _isNavigating = true;
 
-          // PERF: Color extraction deferred to detail screen's initState
-          // to avoid competing with Hero animation for GPU resources
+          // Start color extraction immediately (fire-and-forget)
+          // Runs in isolate so won't block Hero animation
+          // Results are cached, so detail screen gets them instantly
+          if (imageUrl != null) {
+            updateAdaptiveColorsFromImage(context, imageUrl);
+          }
+
           Navigator.push(
             context,
             FadeSlidePageRoute(
