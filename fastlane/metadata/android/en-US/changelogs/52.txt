@@ -1,0 +1,2 @@
+New package ID (com.collotsspot.ensemble) - reinstall required.
+Prepares for F-Droid and Play Store submission.

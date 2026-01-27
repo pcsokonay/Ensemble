@@ -1,0 +1,13 @@
+Ensemble is an unofficial, community-built mobile client for Music Assistant, providing both local playback and remote control of your music library.
+
+Features:
+* Stream music directly to your phone with background playback
+* Control any speaker or device connected to Music Assistant
+* Multi-room grouping capabilities
+* Queue management with drag-to-reorder
+* Background playback with media notifications
+* Fast ~300ms response for play/pause controls
+
+Ensemble supports both local playback (streaming to your phone) and remote control of any Music Assistant player in your home.
+
+Note: Requires a running Music Assistant server. This is a community project and is not affiliated with the official Music Assistant team.
