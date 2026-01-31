@@ -17,6 +17,12 @@ This application was built with AI-assisted development using **Claude Code** an
 
 ---
 
+## Also See
+
+**[Ensemble TV](https://github.com/CollotsSpot/ensemble-tv)** - A simple Android TV client for Music Assistant that displays what's currently playing on your TV with remote control support.
+
+---
+
 ## Features
 
 ### Local Playback
