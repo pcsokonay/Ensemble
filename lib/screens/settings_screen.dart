@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../l10n/app_localizations.dart';
+import '../models/recommendation_folder.dart';
 import '../providers/locale_provider.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/music_assistant_api.dart';
@@ -30,7 +31,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _showRecentAlbums = true;
   bool _showDiscoverArtists = true;
   bool _showDiscoverAlbums = true;
-  bool _showDiscoveryFolders = false;
   // Favorites rows (default off)
   bool _showFavoriteAlbums = false;
   bool _showFavoriteArtists = false;
@@ -51,6 +51,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _showHints = true;
   // Display settings
   bool _showProviderIcons = true;
+  // Discovery folders state
+  List<RecommendationFolder> _discoveryFolders = [];
+  Map<String, bool> _discoveryRowEnabled = {};
+  bool _isLoadingDiscoveryFolders = false;
+
+  /// Filtered row order for the draggable list (excludes discovery-mixes)
+  /// Shows rows in home order, plus any discovery rows from provider that aren't in home order yet
+  List<String> get _filteredRowOrder {
+    final rows = <String>[];
+
+    // First, add all rows from home order (excluding discovery-mixes)
+    for (final rowId in _homeRowOrder) {
+      if (rowId == 'discovery-mixes') continue;
+      rows.add(rowId);
+    }
+
+    // Then, add any discovery rows from provider that aren't in home order yet
+    for (final folder in _discoveryFolders) {
+      final discoveryRowId = 'discovery:${folder.itemId}';
+      if (!_homeRowOrder.contains(discoveryRowId)) {
+        rows.add(discoveryRowId);
+      }
+    }
+
+    return rows;
+  }
 
   @override
   void initState() {
@@ -83,7 +109,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final showRecent = await SettingsService.getShowRecentAlbums();
     final showDiscArtists = await SettingsService.getShowDiscoverArtists();
     final showDiscAlbums = await SettingsService.getShowDiscoverAlbums();
-    final showDiscFolders = await SettingsService.getShowDiscoveryFolders();
     final showFavAlbums = await SettingsService.getShowFavoriteAlbums();
     final showFavArtists = await SettingsService.getShowFavoriteArtists();
     final showFavTracks = await SettingsService.getShowFavoriteTracks();
@@ -109,12 +134,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Load display settings
     final showProviderIcons = await SettingsService.getShowProviderIcons();
 
+    // Load discovery row preferences
+    final discoveryRowPrefs = await SettingsService.getDiscoveryRowPreferences();
+
     if (mounted) {
       setState(() {
         _showRecentAlbums = showRecent;
         _showDiscoverArtists = showDiscArtists;
         _showDiscoverAlbums = showDiscAlbums;
-        _showDiscoveryFolders = showDiscFolders;
         _showFavoriteAlbums = showFavAlbums;
         _showFavoriteArtists = showFavArtists;
         _showFavoriteTracks = showFavTracks;
@@ -129,8 +156,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _volumePrecisionMode = volumePrecision;
         _showHints = showHints;
         _showProviderIcons = showProviderIcons;
+        _discoveryRowEnabled = discoveryRowPrefs;
       });
     }
+
+    // Load discovery folders after initial state is set
+    _loadDiscoveryFolders();
   }
 
   @override
@@ -140,9 +171,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
+  /// Load discovery folders from Music Assistant
+  Future<void> _loadDiscoveryFolders() async {
+    if (_discoveryFolders.isEmpty && mounted) {
+      setState(() {
+        _isLoadingDiscoveryFolders = true;
+      });
+    }
+
+    final provider = context.read<MusicAssistantProvider>();
+    try {
+      final folders = await provider.getDiscoveryFoldersWithCache();
+      // Also reload discovery row preferences to ensure they're up to date
+      final discoveryRowPrefs = await SettingsService.getDiscoveryRowPreferences();
+      if (mounted) {
+        setState(() {
+          _discoveryFolders = folders;
+          _discoveryRowEnabled = discoveryRowPrefs;
+          _isLoadingDiscoveryFolders = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDiscoveryFolders = false;
+        });
+      }
+    }
+  }
+
+  /// Refresh discovery folders from Music Assistant
+  Future<void> _refreshDiscoveryFolders() async {
+    final provider = context.read<MusicAssistantProvider>();
+    try {
+      setState(() {
+        _isLoadingDiscoveryFolders = true;
+      });
+      await provider.refreshDiscoveryFolders();
+      final folders = provider.getCachedDiscoveryFolders() ?? [];
+      if (mounted) {
+        setState(() {
+          _discoveryFolders = folders;
+          _isLoadingDiscoveryFolders = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDiscoveryFolders = false;
+        });
+      }
+    }
+  }
+
+  /// Toggle a specific discovery row on/off
+  Future<void> _toggleDiscoveryRow(String itemId, bool enabled) async {
+    setState(() {
+      _discoveryRowEnabled[itemId] = enabled;
+    });
+    await SettingsService.setDiscoveryRowPreference(itemId, enabled);
+  }
+
   // Helper to get row display info
   Map<String, String> _getRowInfo(String rowId) {
     final s = S.of(context)!;
+    // Handle dynamic discovery folders
+    if (rowId.startsWith('discovery:')) {
+      final itemId = rowId.substring('discovery:'.length);
+      final folder = _discoveryFolders.firstWhere(
+        (f) => f.itemId == itemId,
+        orElse: () => RecommendationFolder(
+          itemId: itemId,
+          provider: 'unknown',
+          name: rowId,
+          items: [],
+        ),
+      );
+      return {'title': folder.name, 'subtitle': 'Discovery row from Music Assistant'};
+    }
     switch (rowId) {
       case 'recent-albums':
         return {'title': s.recentlyPlayed, 'subtitle': s.showRecentlyPlayedAlbums};
@@ -177,6 +283,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Helper to get row enabled state
   bool _getRowEnabled(String rowId) {
+    // Handle dynamic discovery folders
+    if (rowId.startsWith('discovery:')) {
+      final itemId = rowId.substring('discovery:'.length);
+      return _discoveryRowEnabled[itemId] ?? false;
+    }
     switch (rowId) {
       case 'recent-albums':
         return _showRecentAlbums;
@@ -202,8 +313,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return _showFavoriteRadioStations;
       case 'favorite-podcasts':
         return _showFavoritePodcasts;
-      case 'discovery-mixes':
-        return _showDiscoveryFolders;
       default:
         return false;
     }
@@ -212,6 +321,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Helper to set row enabled state
   void _setRowEnabled(String rowId, bool value) {
     setState(() {
+      // Handle dynamic discovery folders
+      if (rowId.startsWith('discovery:')) {
+        final itemId = rowId.substring('discovery:'.length);
+        _discoveryRowEnabled[itemId] = value;
+        SettingsService.setDiscoveryRowPreference(itemId, value);
+        return;
+      }
+
       switch (rowId) {
         case 'recent-albums':
           _showRecentAlbums = value;
@@ -224,10 +341,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         case 'discover-albums':
           _showDiscoverAlbums = value;
           SettingsService.setShowDiscoverAlbums(value);
-          break;
-        case 'discovery-mixes':
-          _showDiscoveryFolders = value;
-          SettingsService.setShowDiscoveryFolders(value);
           break;
         case 'continue-listening':
           _showContinueListeningAudiobooks = value;
@@ -870,7 +983,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Reorderable home rows list
+            // Reorderable home rows list (exclude discovery-mixes from list)
             Container(
               decoration: BoxDecoration(
                 color: colorScheme.surfaceVariant.withOpacity(0.3),
@@ -881,24 +994,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 buildDefaultDragHandles: false,
-                itemCount: _homeRowOrder.length,
+                itemCount: _filteredRowOrder.length,
                 onReorder: (oldIndex, newIndex) {
+                  // Create a mutable copy of the filtered list for reordering
+                  final displayRows = List<String>.from(_filteredRowOrder);
+                  if (newIndex > oldIndex) newIndex--;
+                  final item = displayRows.removeAt(oldIndex);
+                  displayRows.insert(newIndex, item);
+
                   setState(() {
-                    if (newIndex > oldIndex) newIndex--;
-                    final item = _homeRowOrder.removeAt(oldIndex);
-                    _homeRowOrder.insert(newIndex, item);
+                    // Update _homeRowOrder with the new order
+                    _homeRowOrder.clear();
+
+                    // Add discovery rows that are enabled
+                    for (final rowId in displayRows) {
+                      if (rowId.startsWith('discovery:')) {
+                        // Only add enabled discovery rows to home order
+                        final itemId = rowId.substring('discovery:'.length);
+                        if (_discoveryRowEnabled[itemId] ?? false) {
+                          _homeRowOrder.add(rowId);
+                        }
+                      } else {
+                        _homeRowOrder.add(rowId);
+                      }
+                    }
                   });
                   SettingsService.setHomeRowOrder(_homeRowOrder);
                 },
                 itemBuilder: (context, index) {
-                  final rowId = _homeRowOrder[index];
+                  final rowId = _filteredRowOrder[index];
                   final rowInfo = _getRowInfo(rowId);
                   final isEnabled = _getRowEnabled(rowId);
 
                   return Container(
                     key: ValueKey(rowId),
                     decoration: BoxDecoration(
-                      border: index < _homeRowOrder.length - 1
+                      border: index < _filteredRowOrder.length - 1
                           ? Border(bottom: BorderSide(color: colorScheme.outline.withOpacity(0.2)))
                           : null,
                     ),
@@ -1254,6 +1385,111 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  /// Build the discovery section with individual row toggles
+  Widget _buildDiscoverySection(ColorScheme colorScheme, TextTheme textTheme) {
+    final s = S.of(context)!;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with title and refresh button
+          Row(
+            children: [
+              Icon(
+                Icons.explore_outlined,
+                color: colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  s.discoveryRows,
+                  style: textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onBackground,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (_isLoadingDiscoveryFolders)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      colorScheme.primary.withOpacity(0.7),
+                    ),
+                  ),
+                )
+              else
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20),
+                  onPressed: _refreshDiscoveryFolders,
+                  tooltip: s.refreshDiscoveryRows,
+                  color: colorScheme.onSurfaceVariant,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Discovery rows list
+          if (_discoveryFolders.isEmpty && !_isLoadingDiscoveryFolders)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                s.noDiscoveryRows,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+            )
+          else
+            ..._discoveryFolders.map((folder) {
+              final itemId = folder.itemId;
+              final isEnabled = _discoveryRowEnabled[itemId] ?? false;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: SwitchListTile(
+                  title: Text(
+                    folder.name,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontSize: 14,
+                    ),
+                  ),
+                  subtitle: folder.provider.isNotEmpty
+                      ? Text(
+                          folder.provider,
+                          style: TextStyle(
+                            color: colorScheme.onSurface.withOpacity(0.6),
+                            fontSize: 11,
+                          ),
+                        )
+                      : null,
+                  value: isEnabled,
+                  onChanged: (value) => _toggleDiscoveryRow(itemId, value),
+                  activeColor: colorScheme.primary,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  dense: true,
+                ),
+              );
+            }).toList(),
+        ],
+      ),
+    );
   }
 }
 

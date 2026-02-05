@@ -107,21 +107,11 @@ class SettingsService {
   static const String _keyShowOnlyArtistsWithAlbums = 'show_only_artists_with_albums'; // Library artists filter
   static const String _keyHomeRowOrder = 'home_row_order'; // JSON list of row IDs
 
-  // Default row order
+  // Default row order (only these 3 rows enabled by default on first launch)
   static const List<String> defaultHomeRowOrder = [
     'recent-albums',
     'discover-artists',
     'discover-albums',
-    'discovery-mixes',
-    'continue-listening',
-    'discover-audiobooks',
-    'discover-series',
-    'favorite-albums',
-    'favorite-artists',
-    'favorite-tracks',
-    'favorite-playlists',
-    'favorite-radio-stations',
-    'favorite-podcasts',
   ];
 
   // View Mode Settings
@@ -178,6 +168,9 @@ class SettingsService {
 
   // Podcast Cover Cache (iTunes URLs for high-res artwork)
   static const String _keyPodcastCoverCache = 'podcast_cover_cache';
+
+  // Discovery Row Preferences (per-row settings for Music Assistant recommendations)
+  static const String _keyDiscoveryRowPreferences = 'discovery_row_preferences';
 
   static Future<String?> getServerUrl() async {
     final prefs = await _getPrefs();
@@ -981,5 +974,47 @@ class SettingsService {
     final cache = await getPodcastCoverCache();
     cache[podcastId] = url;
     await setPodcastCoverCache(cache);
+  }
+
+  // Discovery Row Preferences (per-row settings for Music Assistant recommendations)
+
+  /// Get all discovery row preferences as a map (itemId -> enabled)
+  /// Defaults to all enabled (true) if not set
+  static Future<Map<String, bool>> getDiscoveryRowPreferences() async {
+    final prefs = await _getPrefs();
+    final json = prefs.getString(_keyDiscoveryRowPreferences);
+    if (json == null) return {}; // Empty map = all enabled by default
+    try {
+      final decoded = jsonDecode(json) as Map<String, dynamic>;
+      return decoded.map((key, value) => MapEntry(key, value as bool));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Set all discovery row preferences at once
+  static Future<void> setDiscoveryRowPreferences(Map<String, bool> prefs) async {
+    final sharedPrefs = await _getPrefs();
+    await sharedPrefs.setString(_keyDiscoveryRowPreferences, jsonEncode(prefs));
+  }
+
+  /// Get whether a specific discovery row is enabled
+  /// Returns false if not explicitly set (default off)
+  static Future<bool> getDiscoveryRowPreference(String itemId) async {
+    final allPrefs = await getDiscoveryRowPreferences();
+    return allPrefs[itemId] ?? false; // Default to disabled
+  }
+
+  /// Set whether a specific discovery row is enabled
+  static Future<void> setDiscoveryRowPreference(String itemId, bool enabled) async {
+    final allPrefs = await getDiscoveryRowPreferences();
+    allPrefs[itemId] = enabled;
+    await setDiscoveryRowPreferences(allPrefs);
+  }
+
+  /// Clear all discovery row preferences (reverts to all enabled)
+  static Future<void> clearDiscoveryRowPreferences() async {
+    final prefs = await _getPrefs();
+    await prefs.remove(_keyDiscoveryRowPreferences);
   }
 }

@@ -231,6 +231,26 @@
     "description": "Description for discovery mixes setting"
   },
 
+  "discoveryRows": "Discovery rows from Music Assistant",
+  "@discoveryRows": {
+    "description": "Label for discovery rows section"
+  },
+
+  "refreshDiscoveryRows": "Refresh available rows",
+  "@refreshDiscoveryRows": {
+    "description": "Button to refresh discovery rows"
+  },
+
+  "noDiscoveryRows": "No discovery rows available",
+  "@noDiscoveryRows": {
+    "description": "Empty state when no discovery rows available"
+  },
+
+  "discoveryRowBadge": "Music Assistant",
+  "@discoveryRowBadge": {
+    "description": "Badge label for discovery rows"
+  },
+
   "continueListening": "Continue Listening",
   "@continueListening": {
     "description": "Home screen section title"

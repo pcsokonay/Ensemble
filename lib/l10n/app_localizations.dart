@@ -371,6 +371,30 @@ abstract class S {
   /// **'Show provider recommendation mixes (e.g., Tidal Daily Mixes, Discover Weekly) on home screen'**
   String get discoveryMixesDescription;
 
+  /// Label for discovery rows section
+  ///
+  /// In en, this message translates to:
+  /// **'Discovery rows from Music Assistant'**
+  String get discoveryRows;
+
+  /// Button to refresh discovery rows
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh available rows'**
+  String get refreshDiscoveryRows;
+
+  /// Empty state when no discovery rows available
+  ///
+  /// In en, this message translates to:
+  /// **'No discovery rows available'**
+  String get noDiscoveryRows;
+
+  /// Badge label for discovery rows
+  ///
+  /// In en, this message translates to:
+  /// **'Music Assistant'**
+  String get discoveryRowBadge;
+
   /// Home screen section title
   ///
   /// In en, this message translates to:

@@ -15,6 +15,10 @@ class RecommendationFolder {
     required this.items,
   });
 
+  /// Unique ID for use in row ordering and settings
+  /// Uses 'discovery:' prefix to distinguish from static row IDs
+  String get rowId => 'discovery:$itemId';
+
   factory RecommendationFolder.fromJson(Map<String, dynamic> json) {
     final itemsJson = json['items'] as List<dynamic>?;
     final parsedItems = itemsJson

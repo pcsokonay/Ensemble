@@ -3230,6 +3230,12 @@ class MusicAssistantProvider with ChangeNotifier {
     return folder.items.isEmpty ? null : folder.items;
   }
 
+  /// Refresh discovery folders by clearing cache and refetching from API
+  Future<void> refreshDiscoveryFolders() async {
+    _cacheService.invalidateHomeCache();
+    await getDiscoveryFoldersWithCache(forceRefresh: true);
+  }
+
   List<RecommendationFolder> _extractDiscoveryFolders(List<RecommendationFolder> folders) {
     final result = <RecommendationFolder>[];
 

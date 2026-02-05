@@ -36,7 +36,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   bool _showRecentAlbums = true;
   bool _showDiscoverArtists = true;
   bool _showDiscoverAlbums = true;
-  bool _showDiscoveryFolders = false;
   // Favorites rows (default off)
   bool _showFavoriteAlbums = false;
   bool _showFavoriteArtists = false;
@@ -53,6 +52,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   // Discovery folders (dynamic rows from provider recommendations)
   List<RecommendationFolder> _discoveryFolders = [];
   bool _isLoadingDiscoveryFolders = false;
+  // Discovery row preferences (itemId -> enabled)
+  Map<String, bool> _discoveryRowEnabled = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -152,7 +153,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     final showRecent = await SettingsService.getShowRecentAlbums();
     final showDiscArtists = await SettingsService.getShowDiscoverArtists();
     final showDiscAlbums = await SettingsService.getShowDiscoverAlbums();
-    final showDiscFolders = await SettingsService.getShowDiscoveryFolders();
     final showFavAlbums = await SettingsService.getShowFavoriteAlbums();
     final showFavArtists = await SettingsService.getShowFavoriteArtists();
     final showFavTracks = await SettingsService.getShowFavoriteTracks();
@@ -163,12 +163,12 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     final showDiscAudiobooks = await SettingsService.getShowDiscoverAudiobooks();
     final showDiscSeries = await SettingsService.getShowDiscoverSeries();
     final rowOrder = await SettingsService.getHomeRowOrder();
+    final discoveryRowPrefs = await SettingsService.getDiscoveryRowPreferences();
     if (mounted) {
       setState(() {
         _showRecentAlbums = showRecent;
         _showDiscoverArtists = showDiscArtists;
         _showDiscoverAlbums = showDiscAlbums;
-        _showDiscoveryFolders = showDiscFolders;
         _showFavoriteAlbums = showFavAlbums;
         _showFavoriteArtists = showFavArtists;
         _showFavoriteTracks = showFavTracks;
@@ -179,19 +179,21 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         _showDiscoverAudiobooks = showDiscAudiobooks;
         _showDiscoverSeries = showDiscSeries;
         _homeRowOrder = rowOrder;
+        _discoveryRowEnabled = discoveryRowPrefs;
       });
     }
 
     // Load discovery folders dynamically (after settings load)
-    await _loadDiscoveryFolders();
+    // This will add enabled discovery rows to the home order
+    await _loadDiscoveryFolders(forceRefresh: false);
   }
 
-  Future<void> _loadDiscoveryFolders() async {
+  Future<void> _loadDiscoveryFolders({bool forceRefresh = false}) async {
     if (!mounted) return;
     final provider = context.read<MusicAssistantProvider>();
 
-    // Set loading state if discovery folders are enabled and not already loaded
-    if (_showDiscoveryFolders && _discoveryFolders.isEmpty && mounted) {
+    // Set loading state if not already loaded
+    if (_discoveryFolders.isEmpty && mounted) {
       setState(() {
         _isLoadingDiscoveryFolders = true;
       });
@@ -199,11 +201,17 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
 
     try {
       final folders = await provider.getDiscoveryFoldersWithCache();
+      final discoveryRowPrefs = await SettingsService.getDiscoveryRowPreferences();
       if (mounted) {
         setState(() {
           _discoveryFolders = folders;
+          _discoveryRowEnabled = discoveryRowPrefs;
           _isLoadingDiscoveryFolders = false;
         });
+      }
+      // Add enabled discovery rows to home row order if not already present
+      if (mounted) {
+        _addDiscoveryRowsToHomeOrder(folders);
       }
     } catch (e) {
       _logger.log('⚠️ Failed to load discovery folders: $e');
@@ -211,6 +219,44 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         setState(() {
           _isLoadingDiscoveryFolders = false;
         });
+      }
+    }
+  }
+
+  /// Add discovery rows to the home row order (at the end, like static rows)
+  void _addDiscoveryRowsToHomeOrder(List<RecommendationFolder> folders) {
+    if (!mounted) return;
+
+    bool didModify = false;
+
+    _logger.log('🔍 Discovery: Processing ${folders.length} folders, prefs: $_discoveryRowEnabled');
+
+    for (final folder in folders) {
+      final discoveryRowId = 'discovery:${folder.itemId}';
+      // Check if this discovery row is enabled (default to false)
+      final isEnabled = _discoveryRowEnabled[folder.itemId] ?? false;
+
+      _logger.log('🔍 Discovery: ${folder.name} (${folder.itemId}) enabled=$isEnabled, inOrder=${_homeRowOrder.contains(discoveryRowId)}');
+
+      if (isEnabled && !_homeRowOrder.contains(discoveryRowId)) {
+        // Add at the end (consistent with static rows behavior)
+        _homeRowOrder.add(discoveryRowId);
+        _logger.log('✅ Discovery: Adding $discoveryRowId to home order at end');
+        didModify = true;
+      } else if (!isEnabled && _homeRowOrder.contains(discoveryRowId)) {
+        // Remove disabled discovery row from order
+        _homeRowOrder.remove(discoveryRowId);
+        _logger.log('❌ Discovery: Removing $discoveryRowId from home order');
+        didModify = true;
+      }
+    }
+
+    // Save the updated row order to settings and trigger rebuild
+    if (didModify) {
+      _logger.log('💾 Discovery: Saving updated home row order: $_homeRowOrder');
+      SettingsService.setHomeRowOrder(_homeRowOrder);
+      if (mounted) {
+        setState(() {}); // Trigger rebuild to show new row order
       }
     }
   }
@@ -366,12 +412,20 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     for (final rowId in _homeRowOrder) {
       if (_isRowEnabled(rowId)) count++;
     }
-    // Add discovery folders if enabled (count as at least 1 if loading to enable refresh)
-    if (_showDiscoveryFolders) {
-      if (_discoveryFolders.isNotEmpty) {
-        count += _discoveryFolders.length;
-      } else if (_isLoadingDiscoveryFolders) {
-        // Count as 1 row when loading so RefreshIndicator works
+    // Count discovery folders that are NOT in the main row order yet (legacy support during load)
+    // This handles the brief moment between when discovery folders load and when they're added to the order
+    if (_discoveryFolders.isNotEmpty) {
+      for (final folder in _discoveryFolders) {
+        final discoveryRowId = 'discovery:${folder.itemId}';
+        if (!_homeRowOrder.contains(discoveryRowId) && (_discoveryRowEnabled[folder.itemId] ?? false)) {
+          count++;
+        }
+      }
+    } else if (_isLoadingDiscoveryFolders && _discoveryFolders.isEmpty) {
+      // Count as 1 row when loading so RefreshIndicator works
+      // Only if no discovery rows are in the main order
+      final hasDiscoveryRowsInOrder = _homeRowOrder.any((id) => id.startsWith('discovery:'));
+      if (!hasDiscoveryRowsInOrder) {
         count += 1;
       }
     }
@@ -380,9 +434,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
 
   /// Check if a specific row is enabled
   bool _isRowEnabled(String rowId) {
-    // Discovery folders use the pattern 'discovery-{folderId}'
-    if (rowId.startsWith('discovery-')) {
-      return _showDiscoveryFolders;
+    // Discovery folders use the pattern 'discovery:{itemId}'
+    if (rowId.startsWith('discovery:')) {
+      final itemId = rowId.substring('discovery:'.length);
+      // Default to true if not explicitly set
+      return _discoveryRowEnabled[itemId] ?? false;
     }
     switch (rowId) {
       case 'recent-albums': return _showRecentAlbums;
@@ -552,6 +608,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
       return rows;
     }
 
+    // Track which discovery folders have been rendered (from main row order)
+    final renderedDiscoveryFolders = <String>{};
+
     for (final rowId in _homeRowOrder) {
       final widget = _buildRowWidget(rowId, provider, rowHeight);
       if (widget != null) {
@@ -560,26 +619,38 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           rows.add(const SizedBox(height: 2.0));
         }
         rows.add(widget);
+        // Track discovery folders that were rendered from main row order
+        if (rowId.startsWith('discovery:')) {
+          renderedDiscoveryFolders.add(rowId.substring('discovery:'.length));
+        }
       }
     }
 
-    // Add discovery folders after regular rows
-    if (_showDiscoveryFolders) {
-      if (_discoveryFolders.isNotEmpty) {
-        for (final folder in _discoveryFolders) {
-          final rowId = 'discovery-${folder.itemId}';
-          final widget = _buildRowWidget(rowId, provider, rowHeight);
-          if (widget != null) {
-            // Add spacing between rows
-            if (rows.isNotEmpty) {
-              rows.add(const SizedBox(height: 2.0));
+    // Add legacy discovery folders that aren't in the main row order yet
+    // This ensures existing discovery folders still show even if not yet in _homeRowOrder
+    if (_discoveryFolders.isNotEmpty) {
+      for (final folder in _discoveryFolders) {
+        if (!renderedDiscoveryFolders.contains(folder.itemId)) {
+          final discoveryRowId = 'discovery:${folder.itemId}';
+          // Check if this specific discovery row is enabled
+          final isEnabled = _discoveryRowEnabled[folder.itemId] ?? false;
+          if (isEnabled) {
+            final widget = _buildRowWidget(discoveryRowId, provider, rowHeight);
+            if (widget != null) {
+              // Add spacing between rows
+              if (rows.isNotEmpty) {
+                rows.add(const SizedBox(height: 2.0));
+              }
+              rows.add(widget);
             }
-            rows.add(widget);
           }
         }
-      } else if (_isLoadingDiscoveryFolders) {
-        // Show loading placeholder when discovery folders are enabled but loading
-        // Add spacing before loading placeholder
+      }
+    } else if (_isLoadingDiscoveryFolders && _discoveryFolders.isEmpty) {
+      // Show loading placeholder when discovery folders are loading
+      // Only if no discovery rows are in the main order
+      final hasDiscoveryRowsInOrder = _homeRowOrder.any((id) => id.startsWith('discovery:'));
+      if (!hasDiscoveryRowsInOrder) {
         if (rows.isNotEmpty) {
           rows.add(const SizedBox(height: 2.0));
         }
@@ -700,8 +771,12 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         );
       default:
         // Handle dynamic discovery folders
-        if (rowId.startsWith('discovery-') && _showDiscoveryFolders) {
-          final folderId = rowId.substring('discovery-'.length);
+        if (rowId.startsWith('discovery:')) {
+          final folderId = rowId.substring('discovery:'.length);
+          // Check per-row preference
+          final isEnabled = _discoveryRowEnabled[folderId] ?? false;
+          if (!isEnabled) return null;
+
           try {
             final folder = _discoveryFolders.firstWhere(
               (f) => f.itemId == folderId,

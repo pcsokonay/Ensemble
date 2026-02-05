@@ -160,6 +160,18 @@ class SEs extends S {
       'Show provider recommendation mixes (e.g., Tidal Daily Mixes, Discover Weekly) on home screen';
 
   @override
+  String get discoveryRows => 'Discovery rows from Music Assistant';
+
+  @override
+  String get refreshDiscoveryRows => 'Refresh available rows';
+
+  @override
+  String get noDiscoveryRows => 'No discovery rows available';
+
+  @override
+  String get discoveryRowBadge => 'Music Assistant';
+
+  @override
   String get continueListening => 'Continuar escuchando';
 
   @override
