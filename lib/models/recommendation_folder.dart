@@ -50,8 +50,6 @@ MediaItem _parseMediaItemJson(Map<String, dynamic> json) {
   switch (mediaType) {
     case 'playlist':
       return Playlist.fromJson(json);
-    case 'radio':
-      return RadioStation.fromJson(json);
     case 'album':
       return Album.fromJson(json);
     case 'artist':
@@ -60,11 +58,8 @@ MediaItem _parseMediaItemJson(Map<String, dynamic> json) {
       return Track.fromJson(json);
     case 'audiobook':
       return Audiobook.fromJson(json);
-    case 'podcast':
-      return Podcast.fromJson(json);
-    case 'podcast_episode':
-      return PodcastEpisode.fromJson(json);
     default:
+      // For radio, podcast, podcast_episode - use MediaItem base class
       return MediaItem.fromJson(json);
   }
 }

@@ -220,7 +220,7 @@ class _DiscoveryRowState extends State<DiscoveryRow> with AutomaticKeepAliveClie
         return Icons.book;
       case MediaType.podcast:
         return Icons.podcasts;
-      case MediaType.podcast_episode:
+      case MediaType.podcastEpisode:
         return Icons.podcasts;
       default:
         return Icons.audiotrack;
