@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
+import '../models/recommendation_folder.dart';
 import '../providers/music_assistant_provider.dart';
 import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
@@ -50,7 +51,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   // Row order (loaded from settings)
   List<String> _homeRowOrder = List.from(SettingsService.defaultHomeRowOrder);
   // Discovery folders (dynamic rows from provider recommendations)
-  List<dynamic> _discoveryFolders = [];
+  List<RecommendationFolder> _discoveryFolders = [];
 
   @override
   bool get wantKeepAlive => true;
@@ -575,11 +576,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         // Handle dynamic discovery folders
         if (rowId.startsWith('discovery-') && _showDiscoveryFolders) {
           final folderId = rowId.substring('discovery-'.length);
-          final folder = _discoveryFolders.firstWhere(
-            (f) => f.itemId == folderId,
-            orElse: () => null,
-          );
-          if (folder != null) {
+          try {
+            final folder = _discoveryFolders.firstWhere(
+              (f) => f.itemId == folderId,
+            );
             return DiscoveryRow(
               key: ValueKey(rowId),
               title: folder.name,
@@ -588,6 +588,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
               heroTagSuffix: 'home',
               rowHeight: rowHeight,
             );
+          } catch (e) {
+            // Folder not found, skip this row
           }
         }
         return null;
