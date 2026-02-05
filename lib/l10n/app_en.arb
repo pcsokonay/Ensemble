@@ -1738,5 +1738,15 @@
   "reportABug": "Report a Bug",
   "@reportABug": {
     "description": "Link to report issues"
+  },
+
+  "noRowsEnabled": "No rows enabled",
+  "@noRowsEnabled": {
+    "description": "Empty state when no home screen rows are enabled"
+  },
+
+  "pullToRefreshHint": "Pull down to refresh or enable rows in settings",
+  "@pullToRefreshHint": {
+    "description": "Hint when home screen is empty"
   }
 }

@@ -1238,4 +1238,11 @@ class SFr extends S {
 
   @override
   String get reportABug => 'Signaler un Bug';
+
+  @override
+  String get noRowsEnabled => 'No rows enabled';
+
+  @override
+  String get pullToRefreshHint =>
+      'Pull down to refresh or enable rows in settings';
 }

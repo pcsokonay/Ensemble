@@ -150,6 +150,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return {'title': s.discoverArtists, 'subtitle': s.showRandomArtists};
       case 'discover-albums':
         return {'title': s.discoverAlbums, 'subtitle': s.showRandomAlbums};
+      case 'discovery-mixes':
+        return {'title': s.discoveryMixes, 'subtitle': s.discoveryMixesDescription};
       case 'continue-listening':
         return {'title': s.continueListening, 'subtitle': s.showAudiobooksInProgress};
       case 'discover-audiobooks':
@@ -200,6 +202,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return _showFavoriteRadioStations;
       case 'favorite-podcasts':
         return _showFavoritePodcasts;
+      case 'discovery-mixes':
+        return _showDiscoveryFolders;
       default:
         return false;
     }
@@ -221,7 +225,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _showDiscoverAlbums = value;
           SettingsService.setShowDiscoverAlbums(value);
           break;
-        case 'discovery-folders':
+        case 'discovery-mixes':
           _showDiscoveryFolders = value;
           SettingsService.setShowDiscoveryFolders(value);
           break;
@@ -931,29 +935,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // Discovery folders toggle (separate from reorderable list since they're dynamic)
-            SwitchListTile(
-              title: Text(
-                S.of(context)!.discoveryMixes,
-                style: TextStyle(color: colorScheme.onSurface),
-              ),
-              subtitle: Text(
-                S.of(context)!.discoveryMixesDescription,
-                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-              ),
-              value: _showDiscoveryFolders,
-              onChanged: (value) {
-                setState(() {
-                  _showDiscoveryFolders = value;
-                });
-                SettingsService.setShowDiscoveryFolders(value);
-              },
-              activeColor: colorScheme.primary,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             ),
 
             const SizedBox(height: 32),

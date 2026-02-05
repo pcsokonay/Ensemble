@@ -419,10 +419,14 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.only(bottom: BottomSpacing.withMiniPlayer),
-              child: Column(
-                key: _refreshKey,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: _buildOrderedRows(provider, rowHeight),
+              child: SizedBox(
+                // Ensure minimum height for pull-to-refresh when empty
+                height: enabledRows == 0 ? availableHeight : null,
+                child: Column(
+                  key: _refreshKey,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _buildOrderedRows(provider, rowHeight, enabledRows == 0),
+                ),
               ),
             ),
           ),
@@ -432,8 +436,50 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   }
 
   /// Build rows in the user's configured order
-  List<Widget> _buildOrderedRows(MusicAssistantProvider provider, double rowHeight) {
+  List<Widget> _buildOrderedRows(MusicAssistantProvider provider, double rowHeight, bool isEmpty) {
     final rows = <Widget>[];
+
+    // Show empty state with refresh hint when no rows are enabled
+    if (isEmpty) {
+      final colorScheme = Theme.of(context).colorScheme;
+      final textTheme = Theme.of(context).textTheme;
+      rows.add(
+        SizedBox.expand(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.home_rounded,
+                    size: 64,
+                    color: colorScheme.onSurface.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    S.of(context)!.noRowsEnabled,
+                    style: textTheme.titleMedium?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    S.of(context)!.pullToRefreshHint,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.4),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      return rows;
+    }
 
     for (final rowId in _homeRowOrder) {
       final widget = _buildRowWidget(rowId, provider, rowHeight);

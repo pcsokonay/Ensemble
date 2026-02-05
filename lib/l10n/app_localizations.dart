@@ -2248,6 +2248,18 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Report a Bug'**
   String get reportABug;
+
+  /// Empty state when no home screen rows are enabled
+  ///
+  /// In en, this message translates to:
+  /// **'No rows enabled'**
+  String get noRowsEnabled;
+
+  /// Hint when home screen is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Pull down to refresh or enable rows in settings'**
+  String get pullToRefreshHint;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

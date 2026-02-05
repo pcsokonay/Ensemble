@@ -1212,4 +1212,11 @@ class SEn extends S {
 
   @override
   String get reportABug => 'Report a Bug';
+
+  @override
+  String get noRowsEnabled => 'No rows enabled';
+
+  @override
+  String get pullToRefreshHint =>
+      'Pull down to refresh or enable rows in settings';
 }

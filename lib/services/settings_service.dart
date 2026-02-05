@@ -112,6 +112,7 @@ class SettingsService {
     'recent-albums',
     'discover-artists',
     'discover-albums',
+    'discovery-mixes',
     'continue-listening',
     'discover-audiobooks',
     'discover-series',
