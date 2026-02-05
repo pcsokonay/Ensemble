@@ -115,7 +115,7 @@ class _DiscoveryRowState extends State<DiscoveryRow> with AutomaticKeepAliveClie
 
     // Card layout: square artwork + text below
     // Text area: 8px gap + ~18px title + ~18px subtitle = ~44px
-    const textAreaHeight = 52.0;
+    const textAreaHeight = 44.0;
     final artworkSize = contentHeight - textAreaHeight;
     final cardWidth = artworkSize; // Card width = artwork width (square)
     final itemExtent = cardWidth + 12; // width + horizontal margins
