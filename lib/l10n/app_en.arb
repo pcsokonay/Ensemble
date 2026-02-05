@@ -221,6 +221,16 @@
     "description": "Home screen section title"
   },
 
+  "discoveryMixes": "Discovery Mixes",
+  "@discoveryMixes": {
+    "description": "Provider discovery mixes (e.g., Tidal playlists)"
+  },
+
+  "discoveryMixesDescription": "Show provider recommendation mixes (e.g., Tidal Daily Mixes, Discover Weekly) on home screen",
+  "@discoveryMixesDescription": {
+    "description": "Description for discovery mixes setting"
+  },
+
   "continueListening": "Continue Listening",
   "@continueListening": {
     "description": "Home screen section title"

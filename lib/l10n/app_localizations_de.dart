@@ -152,6 +152,13 @@ class SDe extends S {
   String get discoverAlbums => 'Alben entdecken';
 
   @override
+  String get discoveryMixes => 'Discovery Mixes';
+
+  @override
+  String get discoveryMixesDescription =>
+      'Show provider recommendation mixes (e.g., Tidal Daily Mixes, Discover Weekly) on home screen';
+
+  @override
   String get continueListening => 'Weiterhoren';
 
   @override

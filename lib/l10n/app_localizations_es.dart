@@ -153,6 +153,13 @@ class SEs extends S {
   String get discoverAlbums => 'Descubrir álbumes';
 
   @override
+  String get discoveryMixes => 'Discovery Mixes';
+
+  @override
+  String get discoveryMixesDescription =>
+      'Show provider recommendation mixes (e.g., Tidal Daily Mixes, Discover Weekly) on home screen';
+
+  @override
   String get continueListening => 'Continuar escuchando';
 
   @override

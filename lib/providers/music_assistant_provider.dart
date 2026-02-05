@@ -9,6 +9,7 @@ import '../models/media_item.dart';
 import '../models/player.dart';
 import '../models/provider_instance.dart';
 import '../models/provider_manifest.dart';
+import '../models/recommendation_folder.dart';
 import '../services/music_assistant_api.dart';
 import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
@@ -3174,6 +3175,116 @@ class MusicAssistantProvider with ChangeNotifier {
       _logger.log('❌ Failed to fetch discover albums: $e');
       return _cacheService.getCachedDiscoverAlbums() ?? [];
     }
+  }
+
+  Future<List<RecommendationFolder>> getDiscoveryFoldersWithCache({bool forceRefresh = false}) async {
+    if (_cacheService.isDiscoveryFoldersCacheValid(forceRefresh: forceRefresh)) {
+      _logger.log('📦 Using cached discovery folders');
+      return _cacheService.getCachedDiscoveryFolders()!;
+    }
+
+    if (_api == null) return _cacheService.getCachedDiscoveryFolders() ?? [];
+
+    try {
+      _logger.log('🔄 Fetching discovery folders...');
+      final recommendations = await _api!.getRecommendations();
+      final filteredFolders = _extractDiscoveryFolders(recommendations);
+      _cacheService.setCachedDiscoveryFolders(filteredFolders);
+      return filteredFolders;
+    } catch (e) {
+      _logger.log('❌ Failed to fetch discovery folders: $e');
+      return _cacheService.getCachedDiscoveryFolders() ?? [];
+    }
+  }
+
+  List<RecommendationFolder>? getCachedDiscoveryFolders() => _cacheService.getCachedDiscoveryFolders();
+
+  /// Get items for a specific discovery folder (for individual row rendering)
+  Future<List<MediaItem>> getDiscoveryFolderItems(String folderId, {bool forceRefresh = false}) async {
+    final folders = await getDiscoveryFoldersWithCache(forceRefresh: forceRefresh);
+    final folder = folders.firstWhere(
+      (f) => f.itemId == folderId,
+      orElse: () => RecommendationFolder(
+        itemId: folderId,
+        provider: 'unknown',
+        name: '',
+        items: [],
+      ),
+    );
+    return folder.items;
+  }
+
+  /// Get cached items for a specific discovery folder (for instant display)
+  List<MediaItem>? getCachedDiscoveryFolderItems(String folderId) {
+    final folders = getCachedDiscoveryFolders();
+    if (folders == null) return null;
+    final folder = folders.firstWhere(
+      (f) => f.itemId == folderId,
+      orElse: () => RecommendationFolder(
+        itemId: folderId,
+        provider: 'unknown',
+        name: '',
+        items: [],
+      ),
+    );
+    return folder.items.isEmpty ? null : folder.items;
+  }
+
+  List<RecommendationFolder> _extractDiscoveryFolders(List<RecommendationFolder> folders) {
+    final result = <RecommendationFolder>[];
+
+    for (final folder in folders) {
+      // Filter out "recently played" (duplicate of MA's recently played)
+      final name = folder.name.trim().toLowerCase();
+      final id = folder.itemId.trim().toLowerCase();
+      final isRecentlyPlayed = name == 'recently played' || id.contains('recently_played');
+      if (isRecentlyPlayed) continue;
+
+      // Filter items by provider and type
+      final providerFiltered = filterByProvider(folder.items);
+      final filteredItems = providerFiltered
+          .where((item) => item.mediaType == MediaType.playlist || item.mediaType == MediaType.radio)
+          .where(_isExternalMixItem)
+          .toList();
+
+      if (filteredItems.isEmpty) continue;
+
+      result.add(RecommendationFolder(
+        itemId: folder.itemId,
+        provider: folder.provider,
+        name: folder.name,
+        uri: folder.uri,
+        items: _deduplicateItems(filteredItems),
+      ));
+    }
+
+    return result;
+  }
+
+  bool _isExternalMixItem(MediaItem item) {
+    final provider = item.provider.toLowerCase();
+    if (provider != 'library' && provider != 'filesystem') {
+      return true;
+    }
+
+    final mappings = item.providerMappings;
+    if (mappings != null) {
+      return mappings.any((m) {
+        final domain = m.providerDomain.toLowerCase();
+        return domain.isNotEmpty && domain != 'library' && domain != 'filesystem';
+      });
+    }
+
+    return false;
+  }
+
+  List<MediaItem> _deduplicateItems(List<MediaItem> items) {
+    final Map<String, MediaItem> deduped = {};
+    for (final item in items) {
+      final key = '${item.provider}:${item.itemId}';
+      deduped.putIfAbsent(key, () => item);
+    }
+    return deduped.values.toList();
   }
 
   void invalidateHomeCache() {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../models/media_item.dart';
 import '../models/player.dart';
+import '../models/recommendation_folder.dart';
 import '../services/debug_logger.dart';
 import '../services/database_service.dart';
 import '../constants/timings.dart';
@@ -20,12 +21,14 @@ class CacheService {
   List<Album>? _cachedRecentAlbums;
   List<Artist>? _cachedDiscoverArtists;
   List<Album>? _cachedDiscoverAlbums;
+  List<RecommendationFolder>? _cachedDiscoveryFolders;
   List<Audiobook>? _cachedInProgressAudiobooks;
   List<Audiobook>? _cachedDiscoverAudiobooks;
   List<AudiobookSeries>? _cachedDiscoverSeries;
   DateTime? _recentAlbumsLastFetched;
   DateTime? _discoverArtistsLastFetched;
   DateTime? _discoverAlbumsLastFetched;
+  DateTime? _discoveryFoldersLastFetched;
   DateTime? _inProgressAudiobooksLastFetched;
   DateTime? _discoverAudiobooksLastFetched;
   DateTime? _discoverSeriesLastFetched;
@@ -118,6 +121,27 @@ class CacheService {
     _persistHomeRowToDatabase('discover_albums', albums.map((a) => a.toJson()).toList());
   }
 
+  /// Check if discovery folders cache is valid
+  bool isDiscoveryFoldersCacheValid({bool forceRefresh = false}) {
+    if (forceRefresh) return false;
+    final now = DateTime.now();
+    return _cachedDiscoveryFolders != null &&
+        _discoveryFoldersLastFetched != null &&
+        now.difference(_discoveryFoldersLastFetched!) < Timings.homeRowCacheDuration;
+  }
+
+  /// Get cached discovery folders
+  List<RecommendationFolder>? getCachedDiscoveryFolders() => _cachedDiscoveryFolders;
+
+  /// Set cached discovery folders
+  void setCachedDiscoveryFolders(List<RecommendationFolder> folders) {
+    _cachedDiscoveryFolders = folders;
+    _discoveryFoldersLastFetched = DateTime.now();
+    _logger.log('✅ Cached ${folders.length} discovery folders');
+    // Persist to database for instant load on next launch
+    _persistHomeRowToDatabase('discovery_folders', folders.map((f) => f.toJson()).toList());
+  }
+
   /// Check if in-progress audiobooks cache is valid
   bool isInProgressAudiobooksCacheValid({bool forceRefresh = false}) {
     if (forceRefresh) return false;
@@ -191,6 +215,7 @@ class CacheService {
     _recentAlbumsLastFetched = null;
     _discoverArtistsLastFetched = null;
     _discoverAlbumsLastFetched = null;
+    _discoveryFoldersLastFetched = null;
     _inProgressAudiobooksLastFetched = null;
     _discoverAudiobooksLastFetched = null;
     _discoverSeriesLastFetched = null;
@@ -497,6 +522,21 @@ class CacheService {
           _logger.log('📦 Loaded ${items.length} discover albums from database');
         } catch (e) {
           _logger.log('⚠️ Failed to parse discover albums: $e');
+        }
+      }
+
+      // Load discovery folders
+      final foldersData = await DatabaseService.instance.getHomeRowCache('discovery_folders');
+      if (foldersData != null) {
+        try {
+          final items = (jsonDecode(foldersData.itemsJson) as List)
+              .map((json) => RecommendationFolder.fromJson(json as Map<String, dynamic>))
+              .toList();
+          _cachedDiscoveryFolders = items;
+          _discoveryFoldersLastFetched = foldersData.lastUpdated;
+          _logger.log('📦 Loaded ${items.length} discovery folders from database');
+        } catch (e) {
+          _logger.log('⚠️ Failed to parse discovery folders: $e');
         }
       }
     } catch (e) {

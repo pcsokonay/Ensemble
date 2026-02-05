@@ -30,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _showRecentAlbums = true;
   bool _showDiscoverArtists = true;
   bool _showDiscoverAlbums = true;
+  bool _showDiscoveryFolders = false;
   // Favorites rows (default off)
   bool _showFavoriteAlbums = false;
   bool _showFavoriteArtists = false;
@@ -82,6 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final showRecent = await SettingsService.getShowRecentAlbums();
     final showDiscArtists = await SettingsService.getShowDiscoverArtists();
     final showDiscAlbums = await SettingsService.getShowDiscoverAlbums();
+    final showDiscFolders = await SettingsService.getShowDiscoveryFolders();
     final showFavAlbums = await SettingsService.getShowFavoriteAlbums();
     final showFavArtists = await SettingsService.getShowFavoriteArtists();
     final showFavTracks = await SettingsService.getShowFavoriteTracks();
@@ -112,6 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _showRecentAlbums = showRecent;
         _showDiscoverArtists = showDiscArtists;
         _showDiscoverAlbums = showDiscAlbums;
+        _showDiscoveryFolders = showDiscFolders;
         _showFavoriteAlbums = showFavAlbums;
         _showFavoriteArtists = showFavArtists;
         _showFavoriteTracks = showFavTracks;
@@ -217,6 +220,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         case 'discover-albums':
           _showDiscoverAlbums = value;
           SettingsService.setShowDiscoverAlbums(value);
+          break;
+        case 'discovery-folders':
+          _showDiscoveryFolders = value;
+          SettingsService.setShowDiscoveryFolders(value);
           break;
         case 'continue-listening':
           _showContinueListeningAudiobooks = value;
@@ -924,6 +931,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Discovery folders toggle (separate from reorderable list since they're dynamic)
+            SwitchListTile(
+              title: Text(
+                S.of(context)!.discoveryMixes,
+                style: TextStyle(color: colorScheme.onSurface),
+              ),
+              subtitle: Text(
+                S.of(context)!.discoveryMixesDescription,
+                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+              ),
+              value: _showDiscoveryFolders,
+              onChanged: (value) {
+                setState(() {
+                  _showDiscoveryFolders = value;
+                });
+                SettingsService.setShowDiscoveryFolders(value);
+              },
+              activeColor: colorScheme.primary,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             ),
 
             const SizedBox(height: 32),

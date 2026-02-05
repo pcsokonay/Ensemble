@@ -359,6 +359,18 @@ abstract class S {
   /// **'Discover Albums'**
   String get discoverAlbums;
 
+  /// Provider discovery mixes (e.g., Tidal playlists)
+  ///
+  /// In en, this message translates to:
+  /// **'Discovery Mixes'**
+  String get discoveryMixes;
+
+  /// Description for discovery mixes setting
+  ///
+  /// In en, this message translates to:
+  /// **'Show provider recommendation mixes (e.g., Tidal Daily Mixes, Discover Weekly) on home screen'**
+  String get discoveryMixesDescription;
+
   /// Home screen section title
   ///
   /// In en, this message translates to:

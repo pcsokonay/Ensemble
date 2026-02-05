@@ -16,6 +16,7 @@ import '../widgets/series_row.dart';
 import '../widgets/playlist_row.dart';
 import '../widgets/radio_station_row.dart';
 import '../widgets/podcast_row.dart';
+import '../widgets/discovery_row.dart';
 import '../widgets/common/disconnected_state.dart';
 import 'settings_screen.dart';
 import 'search_screen.dart';
@@ -34,6 +35,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   bool _showRecentAlbums = true;
   bool _showDiscoverArtists = true;
   bool _showDiscoverAlbums = true;
+  bool _showDiscoveryFolders = false;
   // Favorites rows (default off)
   bool _showFavoriteAlbums = false;
   bool _showFavoriteArtists = false;
@@ -47,6 +49,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   bool _showDiscoverSeries = false;
   // Row order (loaded from settings)
   List<String> _homeRowOrder = List.from(SettingsService.defaultHomeRowOrder);
+  // Discovery folders (dynamic rows from provider recommendations)
+  List<dynamic> _discoveryFolders = [];
 
   @override
   bool get wantKeepAlive => true;
@@ -146,6 +150,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     final showRecent = await SettingsService.getShowRecentAlbums();
     final showDiscArtists = await SettingsService.getShowDiscoverArtists();
     final showDiscAlbums = await SettingsService.getShowDiscoverAlbums();
+    final showDiscFolders = await SettingsService.getShowDiscoveryFolders();
     final showFavAlbums = await SettingsService.getShowFavoriteAlbums();
     final showFavArtists = await SettingsService.getShowFavoriteArtists();
     final showFavTracks = await SettingsService.getShowFavoriteTracks();
@@ -161,6 +166,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         _showRecentAlbums = showRecent;
         _showDiscoverArtists = showDiscArtists;
         _showDiscoverAlbums = showDiscAlbums;
+        _showDiscoveryFolders = showDiscFolders;
         _showFavoriteAlbums = showFavAlbums;
         _showFavoriteArtists = showFavArtists;
         _showFavoriteTracks = showFavTracks;
@@ -172,6 +178,24 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         _showDiscoverSeries = showDiscSeries;
         _homeRowOrder = rowOrder;
       });
+    }
+
+    // Load discovery folders dynamically (after settings load)
+    await _loadDiscoveryFolders();
+  }
+
+  Future<void> _loadDiscoveryFolders() async {
+    if (!mounted) return;
+    final provider = context.read<MusicAssistantProvider>();
+    try {
+      final folders = await provider.getDiscoveryFoldersWithCache();
+      if (mounted) {
+        setState(() {
+          _discoveryFolders = folders;
+        });
+      }
+    } catch (e) {
+      _logger.log('⚠️ Failed to load discovery folders: $e');
     }
   }
 
@@ -326,11 +350,19 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     for (final rowId in _homeRowOrder) {
       if (_isRowEnabled(rowId)) count++;
     }
+    // Add discovery folders if enabled
+    if (_showDiscoveryFolders && _discoveryFolders.isNotEmpty) {
+      count += _discoveryFolders.length;
+    }
     return count;
   }
 
   /// Check if a specific row is enabled
   bool _isRowEnabled(String rowId) {
+    // Discovery folders use the pattern 'discovery-{folderId}'
+    if (rowId.startsWith('discovery-')) {
+      return _showDiscoveryFolders;
+    }
     switch (rowId) {
       case 'recent-albums': return _showRecentAlbums;
       case 'discover-artists': return _showDiscoverArtists;
@@ -410,6 +442,21 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           rows.add(const SizedBox(height: 2.0));
         }
         rows.add(widget);
+      }
+    }
+
+    // Add discovery folders after regular rows
+    if (_showDiscoveryFolders && _discoveryFolders.isNotEmpty) {
+      for (final folder in _discoveryFolders) {
+        final rowId = 'discovery-${folder.itemId}';
+        final widget = _buildRowWidget(rowId, provider, rowHeight);
+        if (widget != null) {
+          // Add spacing between rows
+          if (rows.isNotEmpty) {
+            rows.add(const SizedBox(height: 2.0));
+          }
+          rows.add(widget);
+        }
       }
     }
 
@@ -525,6 +572,24 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           rowHeight: rowHeight,
         );
       default:
+        // Handle dynamic discovery folders
+        if (rowId.startsWith('discovery-') && _showDiscoveryFolders) {
+          final folderId = rowId.substring('discovery-'.length);
+          final folder = _discoveryFolders.firstWhere(
+            (f) => f.itemId == folderId,
+            orElse: () => null,
+          );
+          if (folder != null) {
+            return DiscoveryRow(
+              key: ValueKey(rowId),
+              title: folder.name,
+              loadItems: () => provider.getDiscoveryFolderItems(folderId),
+              getCachedItems: () => provider.getCachedDiscoveryFolderItems(folderId),
+              heroTagSuffix: 'home',
+              rowHeight: rowHeight,
+            );
+          }
+        }
         return null;
     }
   }

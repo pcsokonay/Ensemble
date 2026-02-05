@@ -94,6 +94,7 @@ class SettingsService {
   static const String _keyShowRecentAlbums = 'show_recent_albums';
   static const String _keyShowDiscoverArtists = 'show_discover_artists';
   static const String _keyShowDiscoverAlbums = 'show_discover_albums';
+  static const String _keyShowDiscoveryFolders = 'show_discovery_folders';
   static const String _keyShowContinueListeningAudiobooks = 'show_continue_listening_audiobooks';
   static const String _keyShowDiscoverAudiobooks = 'show_discover_audiobooks';
   static const String _keyShowDiscoverSeries = 'show_discover_series';
@@ -390,6 +391,10 @@ class SettingsService {
 
   static Future<bool> getShowDiscoverAlbums() => _getBool(_keyShowDiscoverAlbums, defaultValue: true);
   static Future<void> setShowDiscoverAlbums(bool show) => _setBool(_keyShowDiscoverAlbums, show);
+
+  // Home Screen Discovery Folders (default off - provider mixes like Tidal)
+  static Future<bool> getShowDiscoveryFolders() => _getBool(_keyShowDiscoveryFolders, defaultValue: false);
+  static Future<void> setShowDiscoveryFolders(bool show) => _setBool(_keyShowDiscoveryFolders, show);
 
   // Home Screen Audiobook Rows (default off - optional)
   static Future<bool> getShowContinueListeningAudiobooks() => _getBool(_keyShowContinueListeningAudiobooks, defaultValue: false);
