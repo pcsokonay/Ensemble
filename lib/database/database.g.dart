@@ -2996,7 +2996,8 @@ final class $$ProfilesTableReferences
 
   $$RecentlyPlayedTableProcessedTableManager get recentlyPlayedRefs {
     final manager = $$RecentlyPlayedTableTableManager($_db, $_db.recentlyPlayed)
-        .filter((f) => f.profileUsername.username($_item.username));
+        .filter((f) => f.profileUsername.username
+            .sqlEquals($_itemColumn<String>('username')!));
 
     final cache = $_typedResult.readTableOrNull(_recentlyPlayedRefsTable($_db));
     return ProcessedTableManager(
@@ -3189,7 +3190,8 @@ class $$ProfilesTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (recentlyPlayedRefs)
-                    await $_getPrefetchedData(
+                    await $_getPrefetchedData<Profile, $ProfilesTable,
+                            RecentlyPlayedData>(
                         currentTable: table,
                         referencedTable: $$ProfilesTableReferences
                             ._recentlyPlayedRefsTable(db),
@@ -3254,8 +3256,10 @@ final class $$RecentlyPlayedTableReferences extends BaseReferences<
           db.recentlyPlayed.profileUsername, db.profiles.username));
 
   $$ProfilesTableProcessedTableManager get profileUsername {
+    final $_column = $_itemColumn<String>('profile_username')!;
+
     final manager = $$ProfilesTableTableManager($_db, $_db.profiles)
-        .filter((f) => f.username($_item.profileUsername));
+        .filter((f) => f.username.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_profileUsernameTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(

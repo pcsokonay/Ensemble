@@ -52,6 +52,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   List<String> _homeRowOrder = List.from(SettingsService.defaultHomeRowOrder);
   // Discovery folders (dynamic rows from provider recommendations)
   List<RecommendationFolder> _discoveryFolders = [];
+  bool _isLoadingDiscoveryFolders = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -188,15 +189,29 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   Future<void> _loadDiscoveryFolders() async {
     if (!mounted) return;
     final provider = context.read<MusicAssistantProvider>();
+
+    // Set loading state if discovery folders are enabled and not already loaded
+    if (_showDiscoveryFolders && _discoveryFolders.isEmpty && mounted) {
+      setState(() {
+        _isLoadingDiscoveryFolders = true;
+      });
+    }
+
     try {
       final folders = await provider.getDiscoveryFoldersWithCache();
       if (mounted) {
         setState(() {
           _discoveryFolders = folders;
+          _isLoadingDiscoveryFolders = false;
         });
       }
     } catch (e) {
       _logger.log('⚠️ Failed to load discovery folders: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingDiscoveryFolders = false;
+        });
+      }
     }
   }
 
@@ -351,9 +366,14 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     for (final rowId in _homeRowOrder) {
       if (_isRowEnabled(rowId)) count++;
     }
-    // Add discovery folders if enabled
-    if (_showDiscoveryFolders && _discoveryFolders.isNotEmpty) {
-      count += _discoveryFolders.length;
+    // Add discovery folders if enabled (count as at least 1 if loading to enable refresh)
+    if (_showDiscoveryFolders) {
+      if (_discoveryFolders.isNotEmpty) {
+        count += _discoveryFolders.length;
+      } else if (_isLoadingDiscoveryFolders) {
+        // Count as 1 row when loading so RefreshIndicator works
+        count += 1;
+      }
     }
     return count;
   }
@@ -379,6 +399,57 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
       case 'favorite-podcasts': return _showFavoritePodcasts;
       default: return false;
     }
+  }
+
+  /// Build a loading placeholder for discovery rows
+  Widget _buildDiscoveryLoadingPlaceholder(double rowHeight) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return SizedBox(
+      height: rowHeight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 8.0),
+            child: Text(
+              S.of(context)!.discoveryMixes,
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onBackground,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colorScheme.primary.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    S.of(context)!.loading,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildConnectedView(
@@ -493,17 +564,26 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     }
 
     // Add discovery folders after regular rows
-    if (_showDiscoveryFolders && _discoveryFolders.isNotEmpty) {
-      for (final folder in _discoveryFolders) {
-        final rowId = 'discovery-${folder.itemId}';
-        final widget = _buildRowWidget(rowId, provider, rowHeight);
-        if (widget != null) {
-          // Add spacing between rows
-          if (rows.isNotEmpty) {
-            rows.add(const SizedBox(height: 2.0));
+    if (_showDiscoveryFolders) {
+      if (_discoveryFolders.isNotEmpty) {
+        for (final folder in _discoveryFolders) {
+          final rowId = 'discovery-${folder.itemId}';
+          final widget = _buildRowWidget(rowId, provider, rowHeight);
+          if (widget != null) {
+            // Add spacing between rows
+            if (rows.isNotEmpty) {
+              rows.add(const SizedBox(height: 2.0));
+            }
+            rows.add(widget);
           }
-          rows.add(widget);
         }
+      } else if (_isLoadingDiscoveryFolders) {
+        // Show loading placeholder when discovery folders are enabled but loading
+        // Add spacing before loading placeholder
+        if (rows.isNotEmpty) {
+          rows.add(const SizedBox(height: 2.0));
+        }
+        rows.add(_buildDiscoveryLoadingPlaceholder(rowHeight));
       }
     }
 
