@@ -295,5 +295,15 @@
   "showHintsDescription": "Hilfreiche Tipps zum Entdecken von Funktionen anzeigen",
   "pullToSelectPlayers": "Ziehen um Geräte auszuwählen",
   "holdToSync": "Gedrückt halten zum Sync",
-  "swipeToAdjustVolume": "Wischen für Lautstärke"
+  "swipeToAdjustVolume": "Wischen für Lautstärke",
+
+  "aboutAndSupport": "Über & Unterstützung",
+  "supportDevelopment": "Entwicklung unterstützen",
+  "ensembleIsUnofficial": "Ensemble ist ein inoffizieller, von der Community erstellter Client. Erwäge, die Entwicklung zu unterstützen.",
+  "sponsorOnGitHub": "Auf GitHub sponsoren",
+  "buyMeAKoFi": "Kauf mir einen Ko-fi",
+  "aboutEnsemble": "Über Ensemble",
+  "version": "Version",
+  "visitGitHubRepo": "GitHub-Repository besuchen",
+  "reportABug": "Einen Fehler melden"
 }

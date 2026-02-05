@@ -491,5 +491,15 @@
   "showHintsDescription": "Mostrar consejos útiles para descubrir funciones",
   "pullToSelectPlayers": "Desliza para seleccionar dispositivos",
   "holdToSync": "Mantén presionado para sync",
-  "swipeToAdjustVolume": "Desliza para ajustar volumen"
+  "swipeToAdjustVolume": "Desliza para ajustar volumen",
+
+  "aboutAndSupport": "Acerca de y Soporte",
+  "supportDevelopment": "Apoyar el Desarrollo",
+  "ensembleIsUnofficial": "Ensemble es un cliente no oficial creado por la comunidad. Considera apoyar su desarrollo.",
+  "sponsorOnGitHub": "Patrocina en GitHub",
+  "buyMeAKoFi": "Cómprame un Ko-fi",
+  "aboutEnsemble": "Acerca de Ensemble",
+  "version": "Versión",
+  "visitGitHubRepo": "Visitar Repositorio GitHub",
+  "reportABug": "Reportar un Error"
 }

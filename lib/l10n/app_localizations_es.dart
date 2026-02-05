@@ -1194,4 +1194,32 @@ class SEs extends S {
 
   @override
   String get selectPlayerToAddToQueue => 'Select player to add to queue';
+
+  @override
+  String get aboutAndSupport => 'Acerca de y Soporte';
+
+  @override
+  String get supportDevelopment => 'Apoyar el Desarrollo';
+
+  @override
+  String get ensembleIsUnofficial =>
+      'Ensemble es un cliente no oficial creado por la comunidad. Considera apoyar su desarrollo.';
+
+  @override
+  String get sponsorOnGitHub => 'Patrocina en GitHub';
+
+  @override
+  String get buyMeAKoFi => 'Cómprame un Ko-fi';
+
+  @override
+  String get aboutEnsemble => 'Acerca de Ensemble';
+
+  @override
+  String get version => 'Versión';
+
+  @override
+  String get visitGitHubRepo => 'Visitar Repositorio GitHub';
+
+  @override
+  String get reportABug => 'Reportar un Error';
 }

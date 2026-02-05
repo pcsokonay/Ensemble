@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/locale_provider.dart';
 import '../providers/music_assistant_provider.dart';
@@ -22,6 +25,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _lastFmApiKeyController = TextEditingController();
   final _audioDbApiKeyController = TextEditingController();
+  String _appVersion = '';
   // Main rows (default on)
   bool _showRecentAlbums = true;
   bool _showDiscoverArtists = true;
@@ -51,6 +55,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadSettings();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _appVersion = '${info.version}+${info.buildNumber}';
+      });
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -1004,6 +1018,149 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 32),
 
+            // About & Support section
+            Text(
+              S.of(context)!.aboutAndSupport,
+              style: textTheme.titleMedium?.copyWith(
+                color: colorScheme.onBackground,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Support Development banner
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFFEA4AAA).withOpacity(0.15),
+                    Color(0xFF1F6FEB).withOpacity(0.15),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.outline.withOpacity(0.2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.favorite_rounded,
+                        color: Color(0xFFEA4AAA),
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          S.of(context)!.supportDevelopment,
+                          style: textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onBackground,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    S.of(context)!.ensembleIsUnofficial,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onBackground.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      // GitHub Sponsors button
+                      Expanded(
+                        child: _DonationButton(
+                          label: S.of(context)!.sponsorOnGitHub,
+                          color: Color(0xFF1F6FEB),
+                          iconWidget: Icon(MdiIcons.github, size: 20),
+                          onTap: () => _launchUrl('https://github.com/sponsors/CollotsSpot'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Ko-fi button
+                      Expanded(
+                        child: _DonationButton(
+                          icon: null,
+                          label: S.of(context)!.buyMeAKoFi,
+                          color: Color(0xFFFF5E5B),
+                          iconWidget: Icon(Icons.coffee_rounded, color: Colors.white),
+                          onTap: () => _launchUrl('https://ko-fi.com/collotsspot'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // About Ensemble card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceVariant.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    S.of(context)!.aboutEnsemble,
+                    style: textTheme.titleSmall?.copyWith(
+                      color: colorScheme.onBackground,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        S.of(context)!.version,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onBackground.withOpacity(0.7),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _appVersion,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _LinkButton(
+                    icon: Icons.code_rounded,
+                    label: S.of(context)!.visitGitHubRepo,
+                    onTap: () => _launchUrl('https://github.com/CollotsSpot/Ensemble'),
+                  ),
+                  const SizedBox(height: 8),
+                  _LinkButton(
+                    icon: Icons.bug_report_outlined,
+                    label: S.of(context)!.reportABug,
+                    onTap: () => _launchUrl('https://github.com/CollotsSpot/Ensemble/issues'),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -1081,4 +1238,122 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+}
+
+// Custom donation button widget
+class _DonationButton extends StatelessWidget {
+  final String? icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final Widget? iconWidget;
+
+  const _DonationButton({
+    this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.iconWidget,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (iconWidget != null)
+                iconWidget!
+              else if (icon != null)
+                Image.asset(
+                  icon!,
+                  width: 20,
+                  height: 20,
+                ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Custom link button widget
+class _LinkButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _LinkButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.open_in_new,
+                size: 14,
+                color: colorScheme.primary.withOpacity(0.7),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

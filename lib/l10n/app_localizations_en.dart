@@ -1177,4 +1177,32 @@ class SEn extends S {
 
   @override
   String get selectPlayerToAddToQueue => 'Select player to add to queue';
+
+  @override
+  String get aboutAndSupport => 'About & Support';
+
+  @override
+  String get supportDevelopment => 'Support Development';
+
+  @override
+  String get ensembleIsUnofficial =>
+      'Ensemble is an unofficial, community-built client. Consider supporting its development.';
+
+  @override
+  String get sponsorOnGitHub => 'Sponsor on GitHub';
+
+  @override
+  String get buyMeAKoFi => 'Buy me a Ko-fi';
+
+  @override
+  String get aboutEnsemble => 'About Ensemble';
+
+  @override
+  String get version => 'Version';
+
+  @override
+  String get visitGitHubRepo => 'Visit GitHub Repository';
+
+  @override
+  String get reportABug => 'Report a Bug';
 }

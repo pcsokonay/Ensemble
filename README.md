@@ -1,6 +1,9 @@
 <div align="center">
   <img src="assets/images/ensemble_logo.png" alt="Ensemble Logo" height="200">
 
+  [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?logo=GitHub%20Sponsors&logoColor=white)](https://github.com/sponsors/CollotsSpot)
+  [![Ko-fi](https://img.shields.io/badge/Ko--fi-FF5E5B?logo=Ko-fi&logoColor=white)](https://ko-fi.com/collotsspot)
+
 ---
 
   <p><strong>An unofficial mobile client for Music Assistant</strong></p>

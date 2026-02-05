@@ -1396,5 +1396,15 @@
         "type": "String"
       }
     }
-  }
+  },
+
+  "aboutAndSupport": "À propos et Support",
+  "supportDevelopment": "Soutenir le Développement",
+  "ensembleIsUnofficial": "Ensemble est un client non officiel créé par la communauté. Envisagez de soutenir son développement.",
+  "sponsorOnGitHub": "Sponsoriser sur GitHub",
+  "buyMeAKoFi": "Offrez-moi un Ko-fi",
+  "aboutEnsemble": "À propos d'Ensemble",
+  "version": "Version",
+  "visitGitHubRepo": "Visiter le Dépôt GitHub",
+  "reportABug": "Signaler un Bug"
 }

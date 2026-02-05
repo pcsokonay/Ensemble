@@ -1683,5 +1683,50 @@
   "selectPlayerToAddToQueue": "Select player to add to queue",
   "@selectPlayerToAddToQueue": {
     "description": "Hint for selecting player to add to queue"
+  },
+
+  "aboutAndSupport": "About & Support",
+  "@aboutAndSupport": {
+    "description": "About and support section title"
+  },
+
+  "supportDevelopment": "Support Development",
+  "@supportDevelopment": {
+    "description": "Support development section"
+  },
+
+  "ensembleIsUnofficial": "Ensemble is an unofficial, community-built client. Consider supporting its development.",
+  "@ensembleIsUnofficial": {
+    "description": "Description about Ensemble being unofficial"
+  },
+
+  "sponsorOnGitHub": "Sponsor on GitHub",
+  "@sponsorOnGitHub": {
+    "description": "GitHub Sponsors button label"
+  },
+
+  "buyMeAKoFi": "Buy me a Ko-fi",
+  "@buyMeAKoFi": {
+    "description": "Ko-fi donation button label"
+  },
+
+  "aboutEnsemble": "About Ensemble",
+  "@aboutEnsemble": {
+    "description": "About Ensemble section"
+  },
+
+  "version": "Version",
+  "@version": {
+    "description": "Version label"
+  },
+
+  "visitGitHubRepo": "Visit GitHub Repository",
+  "@visitGitHubRepo": {
+    "description": "Link to GitHub repo"
+  },
+
+  "reportABug": "Report a Bug",
+  "@reportABug": {
+    "description": "Link to report issues"
   }
 }

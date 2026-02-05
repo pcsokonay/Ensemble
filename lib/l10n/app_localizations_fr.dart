@@ -1203,4 +1203,32 @@ class SFr extends S {
 
   @override
   String get selectPlayerToAddToQueue => 'Select player to add to queue';
+
+  @override
+  String get aboutAndSupport => 'À propos et Support';
+
+  @override
+  String get supportDevelopment => 'Soutenir le Développement';
+
+  @override
+  String get ensembleIsUnofficial =>
+      'Ensemble est un client non officiel créé par la communauté. Envisagez de soutenir son développement.';
+
+  @override
+  String get sponsorOnGitHub => 'Sponsoriser sur GitHub';
+
+  @override
+  String get buyMeAKoFi => 'Offrez-moi un Ko-fi';
+
+  @override
+  String get aboutEnsemble => 'À propos d\'Ensemble';
+
+  @override
+  String get version => 'Version';
+
+  @override
+  String get visitGitHubRepo => 'Visiter le Dépôt GitHub';
+
+  @override
+  String get reportABug => 'Signaler un Bug';
 }

@@ -1186,4 +1186,32 @@ class SDe extends S {
 
   @override
   String get selectPlayerToAddToQueue => 'Select player to add to queue';
+
+  @override
+  String get aboutAndSupport => 'Über & Unterstützung';
+
+  @override
+  String get supportDevelopment => 'Entwicklung unterstützen';
+
+  @override
+  String get ensembleIsUnofficial =>
+      'Ensemble ist ein inoffizieller, von der Community erstellter Client. Erwäge, die Entwicklung zu unterstützen.';
+
+  @override
+  String get sponsorOnGitHub => 'Auf GitHub sponsoren';
+
+  @override
+  String get buyMeAKoFi => 'Kauf mir einen Ko-fi';
+
+  @override
+  String get aboutEnsemble => 'Über Ensemble';
+
+  @override
+  String get version => 'Version';
+
+  @override
+  String get visitGitHubRepo => 'GitHub-Repository besuchen';
+
+  @override
+  String get reportABug => 'Einen Fehler melden';
 }

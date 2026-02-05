@@ -2182,6 +2182,60 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Select player to add to queue'**
   String get selectPlayerToAddToQueue;
+
+  /// About and support section title
+  ///
+  /// In en, this message translates to:
+  /// **'About & Support'**
+  String get aboutAndSupport;
+
+  /// Support development section
+  ///
+  /// In en, this message translates to:
+  /// **'Support Development'**
+  String get supportDevelopment;
+
+  /// Description about Ensemble being unofficial
+  ///
+  /// In en, this message translates to:
+  /// **'Ensemble is an unofficial, community-built client. Consider supporting its development.'**
+  String get ensembleIsUnofficial;
+
+  /// GitHub Sponsors button label
+  ///
+  /// In en, this message translates to:
+  /// **'Sponsor on GitHub'**
+  String get sponsorOnGitHub;
+
+  /// Ko-fi donation button label
+  ///
+  /// In en, this message translates to:
+  /// **'Buy me a Ko-fi'**
+  String get buyMeAKoFi;
+
+  /// About Ensemble section
+  ///
+  /// In en, this message translates to:
+  /// **'About Ensemble'**
+  String get aboutEnsemble;
+
+  /// Version label
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get version;
+
+  /// Link to GitHub repo
+  ///
+  /// In en, this message translates to:
+  /// **'Visit GitHub Repository'**
+  String get visitGitHubRepo;
+
+  /// Link to report issues
+  ///
+  /// In en, this message translates to:
+  /// **'Report a Bug'**
+  String get reportABug;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {
