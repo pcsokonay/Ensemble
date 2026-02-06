@@ -108,6 +108,9 @@ class SearchScreenState extends State<SearchScreen> {
   };
   bool _isSearching = false;
   bool _hasSearched = false;
+  // Race condition fix: Track the active search request ID
+  int _currentSearchId = 0;
+  bool _hasPendingSearch = false;
   // PERF: Use ValueNotifier to avoid full screen rebuild on filter change
   final ValueNotifier<String> _activeFilterNotifier = ValueNotifier('all');
   String? _searchError;
@@ -359,6 +362,8 @@ class SearchScreenState extends State<SearchScreen> {
   void _onSearchChanged(String query) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(Timings.searchDebounce, () {
+      // Race condition fix: Check mounted before proceeding
+      if (!mounted) return;
       _performSearch(query, keepFocus: true);
     });
   }
@@ -374,6 +379,10 @@ class SearchScreenState extends State<SearchScreen> {
       });
       return;
     }
+
+    // Race condition fix: Generate unique ID for this search
+    final searchId = ++_currentSearchId;
+    _hasPendingSearch = true;
 
     setState(() {
       _isSearching = true;
@@ -399,6 +408,11 @@ class SearchScreenState extends State<SearchScreen> {
           globalRadios = await provider.api?.searchRadioStations(query) ?? [];
         } catch (e) {
           _logger.log('Global radio search failed: $e');
+        }
+        // Race condition fix: Abort if a newer search has started
+        if (!mounted || searchId != _currentSearchId) {
+          _logger.log('⏭️ Ignoring stale radio search results for "$query"');
+          return;
         }
       }
 
@@ -428,6 +442,11 @@ class SearchScreenState extends State<SearchScreen> {
         } catch (e) {
           _logger.log('Global podcast search failed: $e');
         }
+        // Race condition fix: Abort if a newer search has started
+        if (!mounted || searchId != _currentSearchId) {
+          _logger.log('⏭️ Ignoring stale podcast search results for "$query"');
+          return;
+        }
       }
 
       // 3. Combine and deduplicate by name
@@ -442,46 +461,55 @@ class SearchScreenState extends State<SearchScreen> {
         }
       }
 
-      if (mounted) {
-        // Combine all results
-        var combinedResults = {
-          ...results,
-          'radios': allRadios.values.toList(),
-          'podcasts': allPodcasts.values.toList(),
-        };
+      // Race condition fix: Only update results if this is still the latest search
+      if (!mounted) return;
+      if (searchId != _currentSearchId) {
+        _logger.log('⏭️ Ignoring stale search results for "$query"');
+        return;
+      }
 
-        // When "in library" mode is on, also filter by enabled providers
-        if (_libraryOnly) {
-          final enabledProviders = provider.enabledProviderIds.toSet();
-          combinedResults = _filterByEnabledProviders(combinedResults, enabledProviders);
-        }
+      // Combine all results
+      var combinedResults = {
+        ...results,
+        'radios': allRadios.values.toList(),
+        'podcasts': allPodcasts.values.toList(),
+      };
 
-        setState(() {
-          _searchResults = combinedResults;
-          _isSearching = false;
-          _hasSearched = true;
-          _cachedListItems.clear(); // PERF: Clear cache on new results
-          _cachedAvailableFilters = null;
-        });
+      // When "in library" mode is on, also filter by enabled providers
+      if (_libraryOnly) {
+        final enabledProviders = provider.enabledProviderIds.toSet();
+        combinedResults = _filterByEnabledProviders(combinedResults, enabledProviders);
+      }
 
-        // Save to search history if we got results
-        final hasResults = results.values.any((list) => list.isNotEmpty);
-        if (hasResults && DatabaseService.instance.isInitialized) {
-          DatabaseService.instance.saveSearchQuery(query);
-          _loadRecentSearches(); // Refresh the list
-        }
+      setState(() {
+        _searchResults = combinedResults;
+        _isSearching = false;
+        _hasSearched = true;
+        _hasPendingSearch = false;
+        _cachedListItems.clear(); // PERF: Clear cache on new results
+        _cachedAvailableFilters = null;
+      });
 
-        // Keep keyboard open if user is still typing
-        if (keepFocus && _focusNode.hasFocus) {
-          _focusNode.requestFocus();
-        }
+      // Save to search history if we got results
+      final hasResults = results.values.any((list) => list.isNotEmpty);
+      if (hasResults && DatabaseService.instance.isInitialized) {
+        DatabaseService.instance.saveSearchQuery(query);
+        _loadRecentSearches(); // Refresh the list
+      }
+
+      // Keep keyboard open if user is still typing
+      if (keepFocus && _focusNode.hasFocus) {
+        _focusNode.requestFocus();
       }
     } catch (e) {
       _logger.log('Search error: $e');
-      if (mounted) {
+      if (!mounted) return;
+      // Race condition fix: Only update error state if this is still the latest search
+      if (searchId == _currentSearchId) {
         setState(() {
           _isSearching = false;
           _hasSearched = true;
+          _hasPendingSearch = false;
           _searchError = S.of(context)!.searchFailed;
         });
         if (keepFocus && _focusNode.hasFocus) {
