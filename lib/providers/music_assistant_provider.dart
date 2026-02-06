@@ -87,6 +87,9 @@ class MusicAssistantProvider with ChangeNotifier {
   bool _isLocalPlayerPowered = true;
   int _localPlayerVolume = 100; // Tracked MA volume for builtin player (0-100)
   bool _builtinPlayerAvailable = true; // False on MA 2.7.0b20+ (uses Sendspin instead)
+
+  // Home refresh counter - increments to signal home screen to refresh all rows
+  int _homeRefreshCounter = 0;
   StreamSubscription? _connectionStateSubscription;
   StreamSubscription? _localPlayerEventSubscription;
   StreamSubscription? _playerUpdatedEventSubscription;
@@ -573,6 +576,9 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Whether we have cached players available (for instant UI display on app resume)
   bool get hasCachedPlayers => _cacheService.hasCachedPlayers;
+
+  /// Home refresh counter - increments when home rows should refresh their data
+  int get homeRefreshCounter => _homeRefreshCounter;
 
   /// Currently playing audiobook context (with chapters) - set when playing an audiobook
   Audiobook? get currentAudiobook => _currentAudiobook;
@@ -1335,6 +1341,19 @@ class MusicAssistantProvider with ChangeNotifier {
       await _loadAndSelectPlayers(coldStart: true);
 
       loadLibrary();
+
+      // Only invalidate home cache if it was empty (no cached recent albums = empty cache)
+      // This prevents jarring double-load when cache is already valid
+      if (_cacheService.getCachedRecentAlbums() == null) {
+        _logger.log('🔄 Home cache was empty, invalidating after auth...');
+        _cacheService.invalidateHomeCache();
+        _homeRefreshCounter++;
+      } else {
+        _logger.log('✅ Home cache has valid data, skipping refresh');
+      }
+
+      // Notify listeners to trigger UI refresh - home rows will re-fetch with valid authentication
+      notifyListeners();
 
       // Process any queued offline actions now that we're connected
       await _processOfflineQueue();
@@ -3103,6 +3122,9 @@ class MusicAssistantProvider with ChangeNotifier {
   // ============================================================================
 
   Future<List<Album>> getRecentAlbumsWithCache({bool forceRefresh = false}) async {
+    // Ensure home rows are loaded from database before checking cache
+    await _cacheService.ensureHomeRowsLoaded();
+
     // Always fetch from API to ensure we have full album data with images
     // Local/cached data is used by getCachedRecentAlbums() for instant display
     if (_api == null) {
@@ -3134,6 +3156,9 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   Future<List<Artist>> getDiscoverArtistsWithCache({bool forceRefresh = false}) async {
+    // Ensure home rows are loaded from database before checking cache
+    await _cacheService.ensureHomeRowsLoaded();
+
     if (_cacheService.isDiscoverArtistsCacheValid(forceRefresh: forceRefresh)) {
       _logger.log('📦 Using cached discover artists');
       return _cacheService.getCachedDiscoverArtists()!;
@@ -3156,6 +3181,9 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   Future<List<Album>> getDiscoverAlbumsWithCache({bool forceRefresh = false}) async {
+    // Ensure home rows are loaded from database before checking cache
+    await _cacheService.ensureHomeRowsLoaded();
+
     if (_cacheService.isDiscoverAlbumsCacheValid(forceRefresh: forceRefresh)) {
       _logger.log('📦 Using cached discover albums');
       return _cacheService.getCachedDiscoverAlbums()!;
@@ -3178,6 +3206,9 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   Future<List<RecommendationFolder>> getDiscoveryFoldersWithCache({bool forceRefresh = false}) async {
+    // Ensure home rows are loaded from database before checking cache
+    await _cacheService.ensureHomeRowsLoaded();
+
     if (_cacheService.isDiscoveryFoldersCacheValid(forceRefresh: forceRefresh)) {
       _logger.log('📦 Using cached discovery folders');
       return _cacheService.getCachedDiscoveryFolders()!;
@@ -3409,6 +3440,9 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Get audiobooks that have progress (continue listening) with caching
   Future<List<Audiobook>> getInProgressAudiobooksWithCache({bool forceRefresh = false}) async {
+    // Ensure home rows are loaded from database before checking cache
+    await _cacheService.ensureHomeRowsLoaded();
+
     // Check cache first
     if (!forceRefresh && _cacheService.isInProgressAudiobooksCacheValid()) {
       _logger.log('📦 Using cached in-progress audiobooks');
@@ -3448,6 +3482,9 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Get random audiobooks for discovery with caching
   Future<List<Audiobook>> getDiscoverAudiobooksWithCache({bool forceRefresh = false}) async {
+    // Ensure home rows are loaded from database before checking cache
+    await _cacheService.ensureHomeRowsLoaded();
+
     // Check cache first
     if (!forceRefresh && _cacheService.isDiscoverAudiobooksCacheValid()) {
       _logger.log('📦 Using cached discover audiobooks');
@@ -3484,6 +3521,9 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Get random series for discovery with caching
   Future<List<AudiobookSeries>> getDiscoverSeriesWithCache({bool forceRefresh = false}) async {
+    // Ensure home rows are loaded from database before checking cache
+    await _cacheService.ensureHomeRowsLoaded();
+
     // Check cache first
     if (!forceRefresh && _cacheService.isDiscoverSeriesCacheValid()) {
       _logger.log('📦 Using cached discover series');

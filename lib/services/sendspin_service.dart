@@ -657,7 +657,10 @@ class SendspinService {
   void _updateState(SendspinConnectionState newState) {
     if (_state != newState) {
       _state = newState;
-      _stateController.add(newState);
+      // Don't try to emit if disposed or controller is closed
+      if (!_isDisposed && !_stateController.isClosed) {
+        _stateController.add(newState);
+      }
     }
   }
 

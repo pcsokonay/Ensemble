@@ -63,6 +63,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   SyncStatus? _lastSyncStatus;
   int _lastArtistCount = 0;
   MusicAssistantProvider? _providerListeningTo;
+  int _lastHomeRefreshCounter = 0;  // Track home refresh counter to force row refreshes
 
   @override
   void initState() {
@@ -73,12 +74,18 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     SyncService.instance.addListener(_onSyncChanged);
     _lastSyncStatus = SyncService.instance.status;
     _checkInitialFavoriteState();
+
+    // Always listen to provider for home refresh counter changes
+    final provider = context.read<MusicAssistantProvider>();
+    _lastHomeRefreshCounter = provider.homeRefreshCounter;
+    _providerListeningTo = provider;
+    provider.addListener(_onProviderChanged);
   }
 
   @override
   void dispose() {
     SyncService.instance.removeListener(_onSyncChanged);
-    // Clean up provider listener if attached
+    // Clean up provider listener
     _providerListeningTo?.removeListener(_onProviderChanged);
     _providerListeningTo = null;
     WidgetsBinding.instance.removeObserver(this);
@@ -103,21 +110,35 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     });
   }
 
-  /// Called when MusicAssistantProvider changes (for cache load detection)
+  /// Called when MusicAssistantProvider changes (for cache load detection and home refresh)
   void _onProviderChanged() {
-    if (!mounted || !_hadEmptyFavoritesOnLoad || _providerListeningTo == null) return;
-    final currentCount = _providerListeningTo!.artists.length;
-    // If artists went from 0 to non-zero, refresh
-    if (_lastArtistCount == 0 && currentCount > 0) {
-      _logger.log('🔄 Home: artists loaded from cache ($currentCount), refreshing rows');
-      _hadEmptyFavoritesOnLoad = false;
-      _providerListeningTo!.removeListener(_onProviderChanged);
-      _providerListeningTo = null;
+    if (!mounted || _providerListeningTo == null) return;
+
+    final provider = _providerListeningTo!;
+    final currentRefreshCounter = provider.homeRefreshCounter;
+
+    // Check if home refresh counter changed (indicates authentication completed and cache was invalidated)
+    if (currentRefreshCounter != _lastHomeRefreshCounter) {
+      _logger.log('🔄 Home: refresh counter changed ($_lastHomeRefreshCounter -> $currentRefreshCounter), refreshing all rows');
+      _lastHomeRefreshCounter = currentRefreshCounter;
       setState(() {
-        _refreshKey = UniqueKey();
+        _refreshKey = UniqueKey();  // Forces all rows to rebuild and re-fetch data
       });
+      return;  // Don't process other refresh conditions in this cycle
     }
-    _lastArtistCount = currentCount;
+
+    // Check for artists cache load (when favorites were empty on load)
+    if (_hadEmptyFavoritesOnLoad) {
+      final currentCount = provider.artists.length;
+      if (_lastArtistCount == 0 && currentCount > 0) {
+        _logger.log('🔄 Home: artists loaded from cache ($currentCount), refreshing rows');
+        _hadEmptyFavoritesOnLoad = false;
+        setState(() {
+          _refreshKey = UniqueKey();
+        });
+      }
+      _lastArtistCount = currentCount;
+    }
   }
 
   /// Called when SyncService status changes
@@ -200,7 +221,12 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     }
 
     try {
-      final folders = await provider.getDiscoveryFoldersWithCache();
+      var folders = await provider.getDiscoveryFoldersWithCache();
+      // If cached result is empty, force a refresh to get from API/database
+      if (folders.isEmpty && !forceRefresh) {
+        _logger.log('🔄 Discovery: Cached folders empty, forcing refresh...');
+        folders = await provider.getDiscoveryFoldersWithCache(forceRefresh: true);
+      }
       final discoveryRowPrefs = await SettingsService.getDiscoveryRowPreferences();
       if (mounted) {
         setState(() {

@@ -11,6 +11,7 @@ import '../constants/timings.dart';
 class CacheService {
   final DebugLogger _logger = DebugLogger();
   bool _homeRowsLoaded = false;
+  Future<void>? _homeRowsLoadFuture;
 
   // Cache size limits to prevent unbounded memory growth
   static const int _maxDetailCacheSize = 50; // Max albums/playlists/artists cached
@@ -58,6 +59,14 @@ class CacheService {
   // HOME SCREEN ROW CACHING
   // ============================================================================
 
+  /// Ensure home rows are loaded from database before accessing cache
+  /// This ensures the cache is populated on first access if not already loaded
+  Future<void> ensureHomeRowsLoaded() async {
+    if (!_homeRowsLoaded) {
+      await loadHomeRowsFromDatabase();
+    }
+  }
+
   /// Check if recent albums cache is valid
   bool isRecentAlbumsCacheValid({bool forceRefresh = false}) {
     if (forceRefresh) return false;
@@ -72,6 +81,11 @@ class CacheService {
 
   /// Set cached recent albums
   void setCachedRecentAlbums(List<Album> albums) {
+    // Don't cache empty results (prevents persisting "not authenticated" errors)
+    if (albums.isEmpty) {
+      _logger.log('⚠️ Not caching empty recent albums result');
+      return;
+    }
     _cachedRecentAlbums = albums;
     _recentAlbumsLastFetched = DateTime.now();
     _logger.log('✅ Cached ${albums.length} recent albums');
@@ -93,6 +107,11 @@ class CacheService {
 
   /// Set cached discover artists
   void setCachedDiscoverArtists(List<Artist> artists) {
+    // Don't cache empty results (prevents persisting "not authenticated" errors)
+    if (artists.isEmpty) {
+      _logger.log('⚠️ Not caching empty discover artists result');
+      return;
+    }
     _cachedDiscoverArtists = artists;
     _discoverArtistsLastFetched = DateTime.now();
     _logger.log('✅ Cached ${artists.length} discover artists');
@@ -114,6 +133,11 @@ class CacheService {
 
   /// Set cached discover albums
   void setCachedDiscoverAlbums(List<Album> albums) {
+    // Don't cache empty results (prevents persisting "not authenticated" errors)
+    if (albums.isEmpty) {
+      _logger.log('⚠️ Not caching empty discover albums result');
+      return;
+    }
     _cachedDiscoverAlbums = albums;
     _discoverAlbumsLastFetched = DateTime.now();
     _logger.log('✅ Cached ${albums.length} discover albums');
@@ -135,6 +159,11 @@ class CacheService {
 
   /// Set cached discovery folders
   void setCachedDiscoveryFolders(List<RecommendationFolder> folders) {
+    // Don't cache empty results (prevents persisting "not authenticated" errors)
+    if (folders.isEmpty) {
+      _logger.log('⚠️ Not caching empty discovery folders result');
+      return;
+    }
     _cachedDiscoveryFolders = folders;
     _discoveryFoldersLastFetched = DateTime.now();
     _logger.log('✅ Cached ${folders.length} discovery folders');
@@ -156,6 +185,11 @@ class CacheService {
 
   /// Set cached in-progress audiobooks
   void setCachedInProgressAudiobooks(List<Audiobook> audiobooks) {
+    // Don't cache empty results
+    if (audiobooks.isEmpty) {
+      _logger.log('⚠️ Not caching empty in-progress audiobooks result');
+      return;
+    }
     _cachedInProgressAudiobooks = audiobooks;
     _inProgressAudiobooksLastFetched = DateTime.now();
     _logger.log('✅ Cached ${audiobooks.length} in-progress audiobooks');
@@ -175,6 +209,11 @@ class CacheService {
 
   /// Set cached discover audiobooks
   void setCachedDiscoverAudiobooks(List<Audiobook> audiobooks) {
+    // Don't cache empty results
+    if (audiobooks.isEmpty) {
+      _logger.log('⚠️ Not caching empty discover audiobooks result');
+      return;
+    }
     _cachedDiscoverAudiobooks = audiobooks;
     _discoverAudiobooksLastFetched = DateTime.now();
     _logger.log('✅ Cached ${audiobooks.length} discover audiobooks');
@@ -194,6 +233,11 @@ class CacheService {
 
   /// Set cached discover series
   void setCachedDiscoverSeries(List<AudiobookSeries> series) {
+    // Don't cache empty results
+    if (series.isEmpty) {
+      _logger.log('⚠️ Not caching empty discover series result');
+      return;
+    }
     _cachedDiscoverSeries = series;
     _discoverSeriesLastFetched = DateTime.now();
     _logger.log('✅ Cached ${series.length} discover series');
@@ -473,10 +517,22 @@ class CacheService {
   // ============================================================================
 
   /// Load home row data from database for instant display on startup
+  /// Returns the existing future if already loading, to prevent duplicate loads
   Future<void> loadHomeRowsFromDatabase() async {
+    if (_homeRowsLoadFuture != null) {
+      // Already loading, return the existing future
+      return _homeRowsLoadFuture!;
+    }
     if (_homeRowsLoaded) return;
-    _homeRowsLoaded = true;
 
+    // Create the load future
+    _homeRowsLoadFuture = _doLoadHomeRowsFromDatabase();
+    await _homeRowsLoadFuture;
+    _homeRowsLoadFuture = null; // Clear after completion
+  }
+
+  /// Internal implementation of home row loading
+  Future<void> _doLoadHomeRowsFromDatabase() async {
     try {
       if (!DatabaseService.instance.isInitialized) return;
 
@@ -541,6 +597,8 @@ class CacheService {
       }
     } catch (e) {
       _logger.log('⚠️ Error loading home rows from database: $e');
+    } finally {
+      _homeRowsLoaded = true;
     }
   }
 

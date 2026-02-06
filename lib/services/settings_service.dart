@@ -938,7 +938,7 @@ class SettingsService {
   /// for fine-grained control (10x more precise)
   static Future<bool> getVolumePrecisionMode() async {
     final prefs = await _getPrefs();
-    return prefs.getBool(_keyVolumePrecisionMode) ?? true;
+    return prefs.getBool(_keyVolumePrecisionMode) ?? false;
   }
 
   /// Set whether volume precision mode is enabled

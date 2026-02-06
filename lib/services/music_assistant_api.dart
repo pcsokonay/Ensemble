@@ -215,6 +215,7 @@ class MusicAssistantAPI {
         },
         onDone: () {
           _logger.log('WebSocket connection closed');
+          _isAuthenticated = false; // Reset auth state on disconnect
           _updateConnectionState(MAConnectionState.disconnected);
           if (_connectionCompleter != null && !_connectionCompleter!.isCompleted) {
             _connectionCompleter!.completeError(Exception('Connection closed'));
