@@ -14,6 +14,7 @@ import '../services/debug_logger.dart';
 import '../utils/page_transitions.dart';
 import '../constants/hero_tags.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/design_tokens.dart';
 import 'audiobook_detail_screen.dart';
 import '../widgets/provider_icon.dart';
 
@@ -297,9 +298,9 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
         backgroundColor: colorScheme.surface,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            // Responsive cover size: 70% of screen width, clamped between 160-280 (same as artist detail)
-            final coverSize = (constraints.maxWidth * 0.7).clamp(160.0, 280.0);
-            final expandedHeight = coverSize + 100;
+            // Responsive cover size: 50% of screen width, clamped between 140-200 (matches artist detail)
+            final coverSize = (constraints.maxWidth * 0.5).clamp(140.0, 200.0);
+            final expandedHeight = coverSize + 60;
 
             return CustomScrollView(
           slivers: [
@@ -315,49 +316,6 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
                 },
                 color: colorScheme.onSurface,
               ),
-              actions: [
-                // Three-dot menu with sort/view options
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: SizedBox(
-                    height: 40,
-                    width: 40,
-                    child: Builder(
-                      builder: (buttonContext) => FilledButton.tonal(
-                        onPressed: () {
-                          final RenderBox box = buttonContext.findRenderObject() as RenderBox;
-                          final Offset position = box.localToGlobal(Offset(box.size.width / 2, box.size.height));
-                          MediaContextMenu.show(
-                            context: context,
-                            position: position,
-                            mediaType: ContextMenuMediaType.audiobook,
-                            item: _audiobooks.isNotEmpty ? _audiobooks.first : null,
-                            isFavorite: false,
-                            isInLibrary: false,
-                            adaptiveColorScheme: adaptiveScheme,
-                            showTopRow: false,
-                            sortOrder: _sortOrder,
-                            onToggleSort: _toggleSortOrder,
-                            viewMode: _viewMode,
-                            onCycleView: _cycleViewMode,
-                          );
-                        },
-                        style: FilledButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.more_vert,
-                          size: 20,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
               flexibleSpace: FlexibleSpaceBar(
                 background: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -410,22 +368,68 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
+                padding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 24.0),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      widget.authorName,
-                      style: textTheme.headlineMedium?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
+                    // Author info on the left
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.authorName,
+                            style: textTheme.headlineMedium?.copyWith(
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            S.of(context)!.audiobookCount(_audiobooks.length),
+                            style: textTheme.bodyLarge?.copyWith(
+                              color: colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      S.of(context)!.audiobookCount(_audiobooks.length),
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.7),
+                    // Three-dot Menu Button on the right
+                    SizedBox(
+                      height: 50,
+                      width: 50,
+                      child: Builder(
+                        builder: (buttonContext) => FilledButton.tonal(
+                          onPressed: () {
+                            final RenderBox box = buttonContext.findRenderObject() as RenderBox;
+                            final Offset position = box.localToGlobal(Offset(box.size.width / 2, box.size.height));
+                            MediaContextMenu.show(
+                              context: context,
+                              position: position,
+                              mediaType: ContextMenuMediaType.audiobook,
+                              item: _audiobooks.isNotEmpty ? _audiobooks.first : null,
+                              isFavorite: false,
+                              isInLibrary: false,
+                              adaptiveColorScheme: adaptiveScheme,
+                              showTopRow: false,
+                              sortOrder: _sortOrder,
+                              onToggleSort: _toggleSortOrder,
+                              viewMode: _viewMode,
+                              onCycleView: _cycleViewMode,
+                            );
+                          },
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.more_vert,
+                            size: 25,
+                            color: Colors.white70,
+                          ),
+                        ),
                       ),
                     ),
                   ],

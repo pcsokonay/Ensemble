@@ -736,7 +736,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [

@@ -330,7 +330,7 @@ class _PodcastEpisodeDetailScreenState extends State<PodcastEpisodeDetailScreen>
                 // Header content with title, podcast name, metadata, and actions
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(24.0),
+                    padding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 24.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

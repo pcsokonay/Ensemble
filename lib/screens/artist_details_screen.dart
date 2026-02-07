@@ -882,9 +882,9 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> with LibraryS
         backgroundColor: colorScheme.background,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            // Responsive cover size: 70% of screen width, clamped between 160-280 (smaller for circular artist image)
-            final coverSize = (constraints.maxWidth * 0.7).clamp(160.0, 280.0);
-            final expandedHeight = coverSize + 100;
+            // Responsive cover size: 50% of screen width, clamped between 140-200 (smaller for circular artist image)
+            final coverSize = (constraints.maxWidth * 0.5).clamp(140.0, 200.0);
+            final expandedHeight = coverSize + 80;
 
             return CustomScrollView(
           slivers: [
@@ -942,7 +942,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> with LibraryS
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -959,7 +959,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> with LibraryS
                       ),
                     ),
                   ),
-                  Spacing.vGap16,
+                  Spacing.vGap8,
                   if (_artistDescription != null && _artistDescription!.isNotEmpty) ...[
                     InkWell(
                       onTap: () {
