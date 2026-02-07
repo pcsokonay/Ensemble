@@ -173,7 +173,9 @@ class SyncService with ChangeNotifier {
     }
 
     // Check if sync is needed (default: every 5 minutes)
-    if (!force) {
+    // Always sync if cache is empty (no albums AND no artists loaded)
+    final cacheEmpty = _cachedAlbums.isEmpty && _cachedArtists.isEmpty;
+    if (!force && !cacheEmpty) {
       final albumsNeedSync = await _db.needsSync('albums', maxAge: const Duration(minutes: 5));
       final artistsNeedSync = await _db.needsSync('artists', maxAge: const Duration(minutes: 5));
       final audiobooksNeedSync = await _db.needsSync('audiobooks', maxAge: const Duration(minutes: 5));
