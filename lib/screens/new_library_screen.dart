@@ -3410,15 +3410,26 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ PODCASTS TAB ============
+  // Consumer wrapper avoids using context.select inside PageView.builder's
+  // sliver context, which would rebuild the entire list instead of individual items.
   Widget _buildPodcastsTab(BuildContext context, S l10n) {
+    return Consumer<MusicAssistantProvider>(
+      builder: (context, maProvider, _) {
+        return _buildPodcastsTabContent(context, l10n, maProvider);
+      },
+    );
+  }
+
+  Widget _buildPodcastsTabContent(BuildContext context, S l10n, MusicAssistantProvider maProvider) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    // PERF: Use watch() - cannot use select() inside PageView.builder
+    // PERF: Use select() to only rebuild when podcasts, loading state, or enabled providers changes
     // Use podcastsUnfiltered to avoid double-filtering with MA's provider filter
-    final maProvider = context.watch<MusicAssistantProvider>();
-    final allPodcasts = maProvider.podcastsUnfiltered;
-    final isLoading = maProvider.isLoadingPodcasts;
-    final enabledProviders = maProvider.enabledProviderIds.toSet();
+    final (allPodcasts, isLoading, enabledProviders) = context.select<MusicAssistantProvider, (List<MediaItem>, bool, Set<String>)>(
+      (p) => (p.podcastsUnfiltered, p.isLoadingPodcasts, p.enabledProviderIds.toSet()),
+    );
+    // Use read() for methods that don't need reactive updates
+    final maProvider = context.read<MusicAssistantProvider>();
 
     if (isLoading) {
       return Center(child: CircularProgressIndicator(color: colorScheme.primary));
@@ -3713,15 +3724,26 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ RADIO TAB ============
+  // Consumer wrapper avoids using context.select inside PageView.builder's
+  // sliver context, which would rebuild the entire list instead of individual items.
   Widget _buildRadioStationsTab(BuildContext context, S l10n) {
+    return Consumer<MusicAssistantProvider>(
+      builder: (context, maProvider, _) {
+        return _buildRadioTabContent(context, l10n, maProvider);
+      },
+    );
+  }
+
+  Widget _buildRadioTabContent(BuildContext context, S l10n, MusicAssistantProvider maProvider) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    // PERF: Use watch() - cannot use select() inside PageView.builder
+    // PERF: Use select() to only rebuild when radio stations, loading state, or enabled providers changes
     // Use radioStationsUnfiltered to avoid double-filtering with MA's provider filter
-    final maProvider = context.watch<MusicAssistantProvider>();
-    final allRadioStations = maProvider.radioStationsUnfiltered;
-    final isLoading = maProvider.isLoadingRadio;
-    final enabledProviders = maProvider.enabledProviderIds.toSet();
+    final (allRadioStations, isLoading, enabledProviders) = context.select<MusicAssistantProvider, (List<MediaItem>, bool, Set<String>)>(
+      (p) => (p.radioStationsUnfiltered, p.isLoadingRadio, p.enabledProviderIds.toSet()),
+    );
+    // Use read() for methods that don't need reactive updates
+    final maProvider = context.read<MusicAssistantProvider>();
 
     if (isLoading) {
       return Center(child: CircularProgressIndicator(color: colorScheme.primary));
@@ -3962,12 +3984,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ ARTISTS TAB ============
+  // Consumer wrapper avoids using context.select inside PageView.builder's
+  // sliver context, which would rebuild the entire list instead of individual items.
   Widget _buildArtistsTab(BuildContext context, S l10n) {
-    // Use watch instead of select - cannot use select inside PageView.builder
+    // Use select to only rebuild when specific fields change
     // SyncService changes are handled by _onSyncServiceChanged listener
-    final provider = context.watch<MusicAssistantProvider>();
-    final isLoading = provider.isLoading;
-    final enabledProviders = provider.enabledProviderIds.toSet();
+    final (isLoading, enabledProviders) = context.select<MusicAssistantProvider, (bool, Set<String>)>(
+      (p) => (p.isLoading, p.enabledProviderIds.toSet()),
+    );
     final colorScheme = Theme.of(context).colorScheme;
     final syncService = SyncService.instance;
 
@@ -4199,12 +4223,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   }
 
   // ============ ALBUMS TAB ============
+  // Consumer wrapper avoids using context.select inside PageView.builder's
+  // sliver context, which would rebuild the entire list instead of individual items.
   Widget _buildAlbumsTab(BuildContext context, S l10n) {
-    // Use watch instead of select - cannot use select inside PageView.builder
+    // Use select to only rebuild when specific fields change
     // SyncService changes are handled by _onSyncServiceChanged listener
-    final provider = context.watch<MusicAssistantProvider>();
-    final isLoading = provider.isLoading;
-    final enabledProviders = provider.enabledProviderIds.toSet();
+    final (isLoading, enabledProviders) = context.select<MusicAssistantProvider, (bool, Set<String>)>(
+      (p) => (p.isLoading, p.enabledProviderIds.toSet()),
+    );
     final colorScheme = Theme.of(context).colorScheme;
     final syncService = SyncService.instance;
 
