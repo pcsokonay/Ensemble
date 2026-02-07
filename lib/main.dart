@@ -31,82 +31,85 @@ late MassivAudioHandler audioHandler;
 // Global debug logger instance
 final _logger = DebugLogger();
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize SharedPreferences cache early for performance
-  await SettingsService.initialize();
-  _logger.log('⚡ SharedPreferences cached');
-
-  // Initialize local database
-  await DatabaseService.instance.initialize();
-  _logger.log('💾 Database initialized');
-
-  // Migrate existing ownerName to profile (one-time for existing users)
-  await ProfileService.instance.migrateFromOwnerName();
-
-  // Migrate credentials to secure storage (one-time for existing users)
-  await SettingsService.migrateToSecureStorage();
-  _logger.log('🔐 Secure storage migration complete');
-
-  // Load library from cache for instant startup
-  await SyncService.instance.loadFromCache();
-  _logger.log('📦 Library cache loaded');
-
-  // Create auth manager for streaming headers
-  final authManager = AuthManager();
-
-  // Initialize audio_service with our custom handler
-  audioHandler = await AudioService.init(
-    builder: () => MassivAudioHandler(authManager: authManager),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'io.github.collotsspot.massiv.audio',
-      androidNotificationChannelName: 'Ensemble Audio',
-      androidNotificationOngoing: false,  // Must be false when androidStopForegroundOnPause is false
-      androidNotificationIcon: 'drawable/ic_notification',
-      androidShowNotificationBadge: false,
-      androidStopForegroundOnPause: false,  // Keep service alive when paused for background playback
-    ),
-  );
-  _logger.log('🎵 AudioService initialized - background playback and media notifications ENABLED');
-
-  // Set preferred orientations
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
-  // Set initial system UI overlay style based on platform brightness
-  // SystemUIWrapper will update this dynamically when theme changes
-  final platformBrightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
-  final isDark = platformBrightness == Brightness.dark;
-  SystemChrome.setSystemUIOverlayStyle(
-    SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-      systemNavigationBarColor: isDark ? const Color(0xFF1a1a1a) : const Color(0xFFF5F5F5),
-      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-    ),
-  );
-
-  // Set up Flutter error boundary to catch and log widget build errors
-  FlutterError.onError = (FlutterErrorDetails details) {
-    _logger.error('Flutter error: ${details.exceptionAsString()}', context: 'FlutterError');
-    _logger.error('Stack trace:\n${details.stack}', context: 'FlutterError');
-    // Still report to Flutter's default handler in debug mode
-    FlutterError.presentError(details);
-  };
-
-  // Catch errors from the platform dispatcher (platform channel errors)
-  PlatformDispatcher.instance.onError = (error, stack) {
-    _logger.error('Platform error: $error', context: 'PlatformDispatcher');
-    _logger.error('Stack trace:\n$stack', context: 'PlatformDispatcher');
-    return true; // Handled
-  };
-
-  // Wrap app in zone to catch async errors
+void main() {
+  // All initialization must run inside the same zone as runApp() to avoid
+  // "Zone mismatch" errors from Flutter's binding system
   runZonedGuarded(
-    () => runApp(const MusicAssistantApp()),
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // Initialize SharedPreferences cache early for performance
+      await SettingsService.initialize();
+      _logger.log('⚡ SharedPreferences cached');
+
+      // Initialize local database
+      await DatabaseService.instance.initialize();
+      _logger.log('💾 Database initialized');
+
+      // Migrate existing ownerName to profile (one-time for existing users)
+      await ProfileService.instance.migrateFromOwnerName();
+
+      // Migrate credentials to secure storage (one-time for existing users)
+      await SettingsService.migrateToSecureStorage();
+      _logger.log('🔐 Secure storage migration complete');
+
+      // Load library from cache for instant startup
+      await SyncService.instance.loadFromCache();
+      _logger.log('📦 Library cache loaded');
+
+      // Create auth manager for streaming headers
+      final authManager = AuthManager();
+
+      // Initialize audio_service with our custom handler
+      audioHandler = await AudioService.init(
+        builder: () => MassivAudioHandler(authManager: authManager),
+        config: const AudioServiceConfig(
+          androidNotificationChannelId: 'io.github.collotsspot.massiv.audio',
+          androidNotificationChannelName: 'Ensemble Audio',
+          androidNotificationOngoing: false,  // Must be false when androidStopForegroundOnPause is false
+          androidNotificationIcon: 'drawable/ic_notification',
+          androidShowNotificationBadge: false,
+          androidStopForegroundOnPause: false,  // Keep service alive when paused for background playback
+        ),
+      );
+      _logger.log('🎵 AudioService initialized - background playback and media notifications ENABLED');
+
+      // Set preferred orientations
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+
+      // Set initial system UI overlay style based on platform brightness
+      // SystemUIWrapper will update this dynamically when theme changes
+      final platformBrightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+      final isDark = platformBrightness == Brightness.dark;
+      SystemChrome.setSystemUIOverlayStyle(
+        SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          systemNavigationBarColor: isDark ? const Color(0xFF1a1a1a) : const Color(0xFFF5F5F5),
+          systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        ),
+      );
+
+      // Set up Flutter error boundary to catch and log widget build errors
+      FlutterError.onError = (FlutterErrorDetails details) {
+        _logger.error('Flutter error: ${details.exceptionAsString()}', context: 'FlutterError');
+        _logger.error('Stack trace:\n${details.stack}', context: 'FlutterError');
+        // Still report to Flutter's default handler in debug mode
+        FlutterError.presentError(details);
+      };
+
+      // Catch errors from the platform dispatcher (platform channel errors)
+      PlatformDispatcher.instance.onError = (error, stack) {
+        _logger.error('Platform error: $error', context: 'PlatformDispatcher');
+        _logger.error('Stack trace:\n$stack', context: 'PlatformDispatcher');
+        return true; // Handled
+      };
+
+      runApp(const MusicAssistantApp());
+    },
     (error, stackTrace) {
       _logger.error('Uncaught async error: $error', context: 'ZoneError');
       _logger.error('Stack trace:\n$stackTrace', context: 'ZoneError');
