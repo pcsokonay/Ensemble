@@ -5821,16 +5821,23 @@ class MusicAssistantProvider with ChangeNotifier {
 
   Future<void> setVolume(String playerId, int volumeLevel) async {
     try {
-      final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
-      if (builtinPlayerId != null && playerId == builtinPlayerId) {
-        _localPlayerVolume = volumeLevel;
-        await FlutterVolumeController.setVolume(volumeLevel / 100.0);
+      // Optimistically update the selected player's volume BEFORE any async calls.
+      // This prevents slider snapback: without this, clearing _pendingVolume on drag
+      // end causes the slider to read the stale player.volume until player_updated arrives.
+      if (_selectedPlayer != null && _selectedPlayer!.playerId == playerId) {
+        _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: volumeLevel);
+        notifyListeners();
       }
       // Cache volume for group players to prevent slider snap-back
       // (MA API returns null for group player volume_level)
       final player = _availablePlayers.where((p) => p.playerId == playerId).firstOrNull;
       if (player != null && _groupVolumeManager.isGroupPlayer(player)) {
         _groupVolumeManager.onVolumeSet(playerId, volumeLevel);
+      }
+      final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
+      if (builtinPlayerId != null && playerId == builtinPlayerId) {
+        _localPlayerVolume = volumeLevel;
+        await FlutterVolumeController.setVolume(volumeLevel / 100.0);
       }
       await _api?.setVolume(playerId, volumeLevel);
     } catch (e) {
