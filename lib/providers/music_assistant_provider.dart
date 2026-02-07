@@ -21,6 +21,7 @@ import '../services/sync_service.dart';
 import '../services/local_player_service.dart';
 import '../services/metadata_service.dart';
 import '../services/position_tracker.dart';
+import '../services/group_volume_manager.dart';
 import '../services/sendspin_service.dart';
 import '../services/pcm_audio_player.dart';
 import '../services/offline_action_queue.dart';
@@ -45,6 +46,7 @@ class MusicAssistantProvider with ChangeNotifier {
   final DebugLogger _logger = DebugLogger();
   final CacheService _cacheService = CacheService();
   final PositionTracker _positionTracker = PositionTracker();
+  final GroupVolumeManager _groupVolumeManager = GroupVolumeManager();
 
   MAConnectionState _connectionState = MAConnectionState.disconnected;
   String? _serverUrl;
@@ -495,6 +497,9 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Raw unfiltered players list (for internal use)
   List<Player> get availablePlayersUnfiltered => _availablePlayers;
+
+  /// Group volume manager for resolving group player volumes
+  GroupVolumeManager get groupVolumeManager => _groupVolumeManager;
 
   /// Check if a player should show the "manually synced" indicator (yellow border)
   /// Returns true for BOTH the leader AND children of a manually created sync group
@@ -1870,6 +1875,7 @@ class MusicAssistantProvider with ChangeNotifier {
     _tracks = [];
     _currentTrack = null;
     _cacheService.clearAll();
+    _groupVolumeManager.clear();
     _logger.log('🗑️ Cleared all data on logout');
     notifyListeners();
   }
@@ -4475,6 +4481,17 @@ class MusicAssistantProvider with ChangeNotifier {
       );
 
       _selectedPlayer = updatedPlayer;
+
+      // For group players, inject the effective volume (average of members)
+      // since MA API returns null for group player volume_level
+      if (_groupVolumeManager.isGroupPlayer(updatedPlayer)) {
+        final effectiveVolume = _groupVolumeManager.getEffectiveVolumeLevel(
+            updatedPlayer, _availablePlayers);
+        if (effectiveVolume != null) {
+          _selectedPlayer = updatedPlayer.copyWith(volumeLevel: effectiveVolume);
+        }
+      }
+
       stateChanged = true;
 
       // Handle external sources (Spotify Connect, TV optical, etc.)
@@ -4823,6 +4840,15 @@ class MusicAssistantProvider with ChangeNotifier {
         }
 
         _selectedPlayer = updatedPlayer;
+
+        // Inject effective volume for group players
+        if (_groupVolumeManager.isGroupPlayer(updatedPlayer)) {
+          final effectiveVolume = _groupVolumeManager.getEffectiveVolumeLevel(
+              updatedPlayer, _availablePlayers);
+          if (effectiveVolume != null) {
+            _selectedPlayer = updatedPlayer.copyWith(volumeLevel: effectiveVolume);
+          }
+        }
       } catch (e) {
         stateChanged = true;
       }
@@ -5799,6 +5825,12 @@ class MusicAssistantProvider with ChangeNotifier {
       if (builtinPlayerId != null && playerId == builtinPlayerId) {
         _localPlayerVolume = volumeLevel;
         await FlutterVolumeController.setVolume(volumeLevel / 100.0);
+      }
+      // Cache volume for group players to prevent slider snap-back
+      // (MA API returns null for group player volume_level)
+      final player = _availablePlayers.where((p) => p.playerId == playerId).firstOrNull;
+      if (player != null && _groupVolumeManager.isGroupPlayer(player)) {
+        _groupVolumeManager.onVolumeSet(playerId, volumeLevel);
       }
       await _api?.setVolume(playerId, volumeLevel);
     } catch (e) {

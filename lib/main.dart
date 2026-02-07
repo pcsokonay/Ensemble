@@ -128,6 +128,7 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
   final _hardwareVolumeService = HardwareVolumeService();
   StreamSubscription? _volumeUpSub;
   StreamSubscription? _volumeDownSub;
+  StreamSubscription? _absoluteVolumeSub;
   String? _lastSelectedPlayerId;
   String? _builtinPlayerId;
 
@@ -158,6 +159,12 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
       _volumeDownSub = _hardwareVolumeService.onVolumeDown.listen((_) {
         _adjustVolume(-_volumeStep);
       });
+
+      // Listen for absolute volume changes from lockscreen/background
+      // (ContentObserver on system STREAM_MUSIC volume)
+      _absoluteVolumeSub = _hardwareVolumeService.onAbsoluteVolumeChange.listen((volume) {
+        _setAbsoluteVolume(volume);
+      });
     } catch (e, stack) {
       _logger.error('Hardware volume init failed', context: 'VolumeInit', error: e, stackTrace: stack);
     }
@@ -173,18 +180,41 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
   }
 
   /// Enable/disable volume button interception based on selected player.
+  /// Also manages the volume observer for lockscreen volume routing.
   Future<void> _updateVolumeInterception() async {
+    final player = _musicProvider.selectedPlayer;
     final isBuiltinPlayer = _builtinPlayerId != null &&
-        _musicProvider.selectedPlayer?.playerId == _builtinPlayerId;
+        player?.playerId == _builtinPlayerId;
     await _hardwareVolumeService.setIntercepting(!isBuiltinPlayer);
+
+    // Start/stop volume observer for lockscreen volume changes.
+    // When a remote/group player is active, observe system volume changes
+    // so lockscreen hardware buttons route to the MA player.
+    if (!isBuiltinPlayer && player != null) {
+      // Get the effective volume to sync the system volume HUD
+      final effectiveVolume = _musicProvider.groupVolumeManager.isGroupPlayer(player)
+          ? (_musicProvider.groupVolumeManager.getEffectiveVolumeLevel(
+                  player, _musicProvider.availablePlayersUnfiltered) ?? player.volume)
+          : player.volume;
+      await _hardwareVolumeService.startVolumeObserver(initialVolume: effectiveVolume);
+    } else {
+      await _hardwareVolumeService.stopVolumeObserver();
+    }
   }
 
   Future<void> _adjustVolume(int delta) async {
     final player = _musicProvider.selectedPlayer;
     if (player == null) return;
 
-    final newVolume = (player.volume + delta).clamp(0, 100);
-    if (newVolume != player.volume) {
+    // Use effective volume for group players (player.volume returns 0
+    // because MA API returns null for group player volume_level)
+    final currentVolume = _musicProvider.groupVolumeManager.isGroupPlayer(player)
+        ? (_musicProvider.groupVolumeManager.getEffectiveVolumeLevel(
+                player, _musicProvider.availablePlayersUnfiltered) ?? player.volume)
+        : player.volume;
+
+    final newVolume = (currentVolume + delta).clamp(0, 100);
+    if (newVolume != currentVolume) {
       try {
         await _musicProvider.setVolume(player.playerId, newVolume);
       } catch (e) {
@@ -193,11 +223,29 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
     }
   }
 
+  /// Handle absolute volume change from lockscreen/background.
+  /// Called when the ContentObserver detects a system volume change
+  /// while a remote/group player is active.
+  Future<void> _setAbsoluteVolume(int volume) async {
+    final player = _musicProvider.selectedPlayer;
+    if (player == null) return;
+
+    // Don't route to builtin player - that's handled by the system directly
+    if (_builtinPlayerId != null && player.playerId == _builtinPlayerId) return;
+
+    try {
+      await _musicProvider.setVolume(player.playerId, volume.clamp(0, 100));
+    } catch (e) {
+      _logger.error('Lockscreen volume change failed', context: 'VolumeControl', error: e);
+    }
+  }
+
   @override
   void dispose() {
     _musicProvider.removeListener(_onProviderChanged);
     _volumeUpSub?.cancel();
     _volumeDownSub?.cancel();
+    _absoluteVolumeSub?.cancel();
     _hardwareVolumeService.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
