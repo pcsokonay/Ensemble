@@ -329,8 +329,17 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
                   theme: AppTheme.lightTheme(colorScheme: lightColorScheme),
                   darkTheme: AppTheme.darkTheme(colorScheme: darkColorScheme),
                   builder: (context, child) {
-                    // Wrap entire app with global player overlay
-                    return GlobalPlayerOverlay(child: child ?? const SizedBox.shrink());
+                    // Wrap entire app with global player overlay.
+                    // Provide an Overlay ancestor so BottomNavigationBar/Tooltip can render safely.
+                    return Overlay(
+                      initialEntries: [
+                        OverlayEntry(
+                          builder: (context) => GlobalPlayerOverlay(
+                            child: child ?? const SizedBox.shrink(),
+                          ),
+                        ),
+                      ],
+                    );
                   },
                   home: const AppStartup(),
                 ),
@@ -475,6 +484,9 @@ class _AppStartupState extends State<AppStartup> {
   Future<void> _checkAndConnect() async {
     final serverUrl = await SettingsService.getServerUrl();
 
+    // DEBUG: Log where server URL is coming from
+    _logger.log('🐛 DEBUG: Server URL from SharedPreferences: $serverUrl');
+
     if (!mounted) return;
 
     setState(() {
@@ -483,6 +495,7 @@ class _AppStartupState extends State<AppStartup> {
 
     // If we have a saved server URL, attempt auto-connection
     if (serverUrl != null && serverUrl.isNotEmpty) {
+      _logger.log('🐛 DEBUG: Auto-connecting because server URL exists');
       setState(() {
         _isConnecting = true;
       });
