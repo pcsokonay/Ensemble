@@ -300,7 +300,7 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
           builder: (context, constraints) {
             // Responsive cover size: 50% of screen width, clamped between 140-200 (matches artist detail)
             final coverSize = (constraints.maxWidth * 0.5).clamp(140.0, 200.0);
-            final expandedHeight = coverSize + 20;
+            final expandedHeight = coverSize + 25;
 
             return CustomScrollView(
           slivers: [

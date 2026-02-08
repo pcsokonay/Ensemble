@@ -884,7 +884,7 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> with LibraryS
           builder: (context, constraints) {
             // Responsive cover size: 50% of screen width, clamped between 140-200 (smaller for circular artist image)
             final coverSize = (constraints.maxWidth * 0.5).clamp(140.0, 200.0);
-            final expandedHeight = coverSize + 40;
+            final expandedHeight = coverSize + 45;
 
             return CustomScrollView(
           slivers: [
