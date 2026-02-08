@@ -167,12 +167,6 @@ class GroupVolumeManager {
     _pendingTimestamps[playerId] = DateTime.now();
   }
 
-  /// Clear the pending volume for a player.
-  void clearPending(String playerId) {
-    _pendingVolumes.remove(playerId);
-    _pendingTimestamps.remove(playerId);
-  }
-
   /// Clear all cached state (e.g., on disconnect)
   void clear() {
     _pendingVolumes.clear();

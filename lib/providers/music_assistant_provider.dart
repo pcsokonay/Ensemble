@@ -4445,6 +4445,40 @@ class MusicAssistantProvider with ChangeNotifier {
     }
   }
 
+  /// Apply volume protection for the selected player.
+  /// Injects effective volume for group players (whose API volume is null)
+  /// and protects optimistic volume updates from stale API data.
+  void _applyVolumeProtection(Player updatedPlayer, List<Player> allPlayers) {
+    if (_groupVolumeManager.isGroupPlayer(updatedPlayer)) {
+      final effectiveVolume = _groupVolumeManager.getEffectiveVolumeLevel(
+          updatedPlayer, allPlayers);
+      if (effectiveVolume != null) {
+        _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: effectiveVolume);
+      }
+    }
+
+    final pendingVol = _pendingVolumes[updatedPlayer.playerId];
+    final pendingTs = _pendingVolumeTimestamps[updatedPlayer.playerId];
+    if (pendingVol != null && pendingTs != null) {
+      final elapsed = DateTime.now().millisecondsSinceEpoch - pendingTs;
+      final isGroup = _groupVolumeManager.isGroupPlayer(updatedPlayer);
+      final timeoutMs = isGroup ? _pendingVolumeTimeoutGroupMs : _pendingVolumeTimeoutMs;
+      if (elapsed >= timeoutMs) {
+        _pendingVolumes.remove(updatedPlayer.playerId);
+        _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
+      } else {
+        final currentEffective = _selectedPlayer?.volumeLevel;
+        if (currentEffective != null &&
+            (currentEffective - pendingVol).abs() <= _pendingVolumeTolerancePoints) {
+          _pendingVolumes.remove(updatedPlayer.playerId);
+          _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
+        } else {
+          _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: pendingVol);
+        }
+      }
+    }
+  }
+
   Future<void> _updatePlayerState() async {
     if (_selectedPlayer == null || _api == null) return;
 
@@ -4530,45 +4564,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
       _selectedPlayer = updatedPlayer;
 
-      // For group players, inject the effective volume (average of members or
-      // cached pending) since MA API returns null for group player volume_level.
-      // Do this BEFORE the pending check so the group manager can also protect.
-      // Use allPlayers (fresh from API) instead of _availablePlayers so member
-      // volumes are always current — _availablePlayers was stale between
-      // refreshPlayers() calls, causing snapback to 0 after pending expired.
-      if (_groupVolumeManager.isGroupPlayer(updatedPlayer)) {
-        final effectiveVolume = _groupVolumeManager.getEffectiveVolumeLevel(
-            updatedPlayer, allPlayers);
-        if (effectiveVolume != null) {
-          _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: effectiveVolume);
-        }
-      }
-
-      // Protect optimistic volume from stale API data.
-      // If we recently called setVolume(), the API may still return the old value.
-      // Use the pending volume until the server confirms or the timeout expires.
-      {
-        final pendingVol = _pendingVolumes[updatedPlayer.playerId];
-        final pendingTs = _pendingVolumeTimestamps[updatedPlayer.playerId];
-        if (pendingVol != null && pendingTs != null) {
-          final elapsed = DateTime.now().millisecondsSinceEpoch - pendingTs;
-          final isGroup = _groupVolumeManager.isGroupPlayer(updatedPlayer);
-          final timeoutMs = isGroup ? _pendingVolumeTimeoutGroupMs : _pendingVolumeTimeoutMs;
-          if (elapsed >= timeoutMs) {
-            _pendingVolumes.remove(updatedPlayer.playerId);
-            _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
-          } else {
-            final currentEffective = _selectedPlayer?.volumeLevel;
-            if (currentEffective != null &&
-                (currentEffective - pendingVol).abs() <= _pendingVolumeTolerancePoints) {
-              _pendingVolumes.remove(updatedPlayer.playerId);
-              _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
-            } else {
-              _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: pendingVol);
-            }
-          }
-        }
-      }
+      _applyVolumeProtection(updatedPlayer, allPlayers);
 
       stateChanged = true;
 
@@ -4919,38 +4915,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
         _selectedPlayer = updatedPlayer;
 
-        // Inject effective volume for group players first
-        if (_groupVolumeManager.isGroupPlayer(updatedPlayer)) {
-          final effectiveVolume = _groupVolumeManager.getEffectiveVolumeLevel(
-              updatedPlayer, _availablePlayers);
-          if (effectiveVolume != null) {
-            _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: effectiveVolume);
-          }
-        }
-
-        // Protect optimistic volume from stale API data in refreshPlayers()
-        {
-          final pendingVol = _pendingVolumes[updatedPlayer.playerId];
-          final pendingTs = _pendingVolumeTimestamps[updatedPlayer.playerId];
-          if (pendingVol != null && pendingTs != null) {
-            final elapsed = DateTime.now().millisecondsSinceEpoch - pendingTs;
-            final isGroup = _groupVolumeManager.isGroupPlayer(updatedPlayer);
-            final timeoutMs = isGroup ? _pendingVolumeTimeoutGroupMs : _pendingVolumeTimeoutMs;
-            if (elapsed >= timeoutMs) {
-              _pendingVolumes.remove(updatedPlayer.playerId);
-              _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
-            } else {
-              final currentEffective = _selectedPlayer?.volumeLevel;
-              if (currentEffective != null &&
-                  (currentEffective - pendingVol).abs() <= _pendingVolumeTolerancePoints) {
-                _pendingVolumes.remove(updatedPlayer.playerId);
-                _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
-              } else {
-                _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: pendingVol);
-              }
-            }
-          }
-        }
+        _applyVolumeProtection(updatedPlayer, _availablePlayers);
       } catch (e) {
         stateChanged = true;
       }
