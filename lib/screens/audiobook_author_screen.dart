@@ -300,7 +300,7 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
           builder: (context, constraints) {
             // Responsive cover size: 50% of screen width, clamped between 140-200 (matches artist detail)
             final coverSize = (constraints.maxWidth * 0.5).clamp(140.0, 200.0);
-            final expandedHeight = coverSize + 60;
+            final expandedHeight = coverSize + 20;
 
             return CustomScrollView(
           slivers: [
@@ -370,7 +370,7 @@ class _AudiobookAuthorScreenState extends State<AudiobookAuthorScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 24.0),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // Author info on the left
                     Expanded(
