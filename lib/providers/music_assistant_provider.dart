@@ -68,6 +68,16 @@ class MusicAssistantProvider with ChangeNotifier {
   List<Player> _availablePlayers = [];
   bool _selectPlayerInProgress = false; // Reentrancy guard for selectPlayer()
   Map<String, String> _castToSendspinIdMap = {}; // Maps regular Cast IDs to Sendspin IDs for grouping
+
+  // Pending volume cache: prevents stale API data from overwriting optimistic
+  // volume updates in _updatePlayerState() and refreshPlayers().
+  // Key: playerId, Value: volume level (0-100)
+  final Map<String, int> _pendingVolumes = {};
+  final Map<String, int> _pendingVolumeTimestamps = {}; // millisecondsSinceEpoch
+  static const int _pendingVolumeTimeoutMs = 8000; // 8s for non-group players
+  static const int _pendingVolumeTimeoutGroupMs = 30000; // 30s for group players (API returns null)
+  static const int _pendingVolumeTolerancePoints = 3; // Confirm if within ±3 points
+
   Track? _currentTrack;
   Audiobook? _currentAudiobook; // Currently playing audiobook context (with chapters)
   String? _currentPodcastName; // Currently playing podcast's name (set when playing episode)
@@ -1876,6 +1886,8 @@ class MusicAssistantProvider with ChangeNotifier {
     _currentTrack = null;
     _cacheService.clearAll();
     _groupVolumeManager.clear();
+    _pendingVolumes.clear();
+    _pendingVolumeTimestamps.clear();
     _logger.log('🗑️ Cleared all data on logout');
     notifyListeners();
   }
@@ -2726,6 +2738,24 @@ class MusicAssistantProvider with ChangeNotifier {
             _castToSendspinIdMap[selectedId] == playerId;
         if (isMatch) {
           _updatePlayerState();
+        }
+      }
+
+      // Update member volume in _availablePlayers for accurate group volume
+      // computation. When MA changes a group member's volume (after setVolume
+      // on the group player), it fires player_updated for each member.
+      // Without this, _availablePlayers member volumes stay stale until the
+      // next _updatePlayerState poll, which could cause the group average
+      // to be wrong during the convergence check.
+      final rawVolume = event['volume_level'];
+      final eventVolume = rawVolume is int
+          ? rawVolume
+          : (rawVolume is double ? rawVolume.round() : null);
+      if (eventVolume != null) {
+        final idx = _availablePlayers.indexWhere((p) => p.playerId == playerId);
+        if (idx != -1 && _availablePlayers[idx].volumeLevel != eventVolume) {
+          _availablePlayers[idx] =
+              _availablePlayers[idx].copyWith(volumeLevel: eventVolume);
         }
       }
 
@@ -4447,6 +4477,24 @@ class MusicAssistantProvider with ChangeNotifier {
         return;
       }
 
+      // Update _availablePlayers with fresh volume/state data from API.
+      // This is critical for group volume computation: member players don't get
+      // individual _updatePlayerState() calls, so their volumes in _availablePlayers
+      // would go stale. Without this, after the pending timeout expires, the
+      // computed group average uses old member volumes and snaps back to 0.
+      for (final freshPlayer in allPlayers) {
+        final idx = _availablePlayers.indexWhere(
+            (p) => p.playerId == freshPlayer.playerId);
+        if (idx != -1) {
+          _availablePlayers[idx] = _availablePlayers[idx].copyWith(
+            volumeLevel: freshPlayer.volumeLevel,
+            state: freshPlayer.state,
+            powered: freshPlayer.powered,
+            available: freshPlayer.available,
+          );
+        }
+      }
+
       Player? rawPlayer = allPlayers.firstWhere(
         (p) => p.playerId == selectedId ||
                (translatedSendspinId != null && p.playerId == translatedSendspinId) ||
@@ -4482,13 +4530,43 @@ class MusicAssistantProvider with ChangeNotifier {
 
       _selectedPlayer = updatedPlayer;
 
-      // For group players, inject the effective volume (average of members)
-      // since MA API returns null for group player volume_level
+      // For group players, inject the effective volume (average of members or
+      // cached pending) since MA API returns null for group player volume_level.
+      // Do this BEFORE the pending check so the group manager can also protect.
+      // Use allPlayers (fresh from API) instead of _availablePlayers so member
+      // volumes are always current — _availablePlayers was stale between
+      // refreshPlayers() calls, causing snapback to 0 after pending expired.
       if (_groupVolumeManager.isGroupPlayer(updatedPlayer)) {
         final effectiveVolume = _groupVolumeManager.getEffectiveVolumeLevel(
-            updatedPlayer, _availablePlayers);
+            updatedPlayer, allPlayers);
         if (effectiveVolume != null) {
-          _selectedPlayer = updatedPlayer.copyWith(volumeLevel: effectiveVolume);
+          _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: effectiveVolume);
+        }
+      }
+
+      // Protect optimistic volume from stale API data.
+      // If we recently called setVolume(), the API may still return the old value.
+      // Use the pending volume until the server confirms or the timeout expires.
+      {
+        final pendingVol = _pendingVolumes[updatedPlayer.playerId];
+        final pendingTs = _pendingVolumeTimestamps[updatedPlayer.playerId];
+        if (pendingVol != null && pendingTs != null) {
+          final elapsed = DateTime.now().millisecondsSinceEpoch - pendingTs;
+          final isGroup = _groupVolumeManager.isGroupPlayer(updatedPlayer);
+          final timeoutMs = isGroup ? _pendingVolumeTimeoutGroupMs : _pendingVolumeTimeoutMs;
+          if (elapsed >= timeoutMs) {
+            _pendingVolumes.remove(updatedPlayer.playerId);
+            _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
+          } else {
+            final currentEffective = _selectedPlayer?.volumeLevel;
+            if (currentEffective != null &&
+                (currentEffective - pendingVol).abs() <= _pendingVolumeTolerancePoints) {
+              _pendingVolumes.remove(updatedPlayer.playerId);
+              _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
+            } else {
+              _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: pendingVol);
+            }
+          }
         }
       }
 
@@ -4841,12 +4919,36 @@ class MusicAssistantProvider with ChangeNotifier {
 
         _selectedPlayer = updatedPlayer;
 
-        // Inject effective volume for group players
+        // Inject effective volume for group players first
         if (_groupVolumeManager.isGroupPlayer(updatedPlayer)) {
           final effectiveVolume = _groupVolumeManager.getEffectiveVolumeLevel(
               updatedPlayer, _availablePlayers);
           if (effectiveVolume != null) {
-            _selectedPlayer = updatedPlayer.copyWith(volumeLevel: effectiveVolume);
+            _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: effectiveVolume);
+          }
+        }
+
+        // Protect optimistic volume from stale API data in refreshPlayers()
+        {
+          final pendingVol = _pendingVolumes[updatedPlayer.playerId];
+          final pendingTs = _pendingVolumeTimestamps[updatedPlayer.playerId];
+          if (pendingVol != null && pendingTs != null) {
+            final elapsed = DateTime.now().millisecondsSinceEpoch - pendingTs;
+            final isGroup = _groupVolumeManager.isGroupPlayer(updatedPlayer);
+            final timeoutMs = isGroup ? _pendingVolumeTimeoutGroupMs : _pendingVolumeTimeoutMs;
+            if (elapsed >= timeoutMs) {
+              _pendingVolumes.remove(updatedPlayer.playerId);
+              _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
+            } else {
+              final currentEffective = _selectedPlayer?.volumeLevel;
+              if (currentEffective != null &&
+                  (currentEffective - pendingVol).abs() <= _pendingVolumeTolerancePoints) {
+                _pendingVolumes.remove(updatedPlayer.playerId);
+                _pendingVolumeTimestamps.remove(updatedPlayer.playerId);
+              } else {
+                _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: pendingVol);
+              }
+            }
           }
         }
       } catch (e) {
@@ -5828,7 +5930,13 @@ class MusicAssistantProvider with ChangeNotifier {
         _selectedPlayer = _selectedPlayer!.copyWith(volumeLevel: volumeLevel);
         notifyListeners();
       }
-      // Cache volume for group players to prevent slider snap-back
+
+      // Cache pending volume for ALL players to protect optimistic updates
+      // from being overwritten by stale API data in _updatePlayerState()/refreshPlayers().
+      _pendingVolumes[playerId] = volumeLevel;
+      _pendingVolumeTimestamps[playerId] = DateTime.now().millisecondsSinceEpoch;
+
+      // Also cache for group players in GroupVolumeManager
       // (MA API returns null for group player volume_level)
       final player = _availablePlayers.where((p) => p.playerId == playerId).firstOrNull;
       if (player != null && _groupVolumeManager.isGroupPlayer(player)) {
