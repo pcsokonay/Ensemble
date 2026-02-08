@@ -1052,12 +1052,13 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                             );
                           },
                           child: ListTile(
+                            contentPadding: const EdgeInsets.only(left: 12, right: 20),
                             leading: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 // Track number
                                 SizedBox(
-                                  width: 28,
+                                  width: 24,
                                   child: Text(
                                     '${index + 1}',
                                     style: textTheme.bodyMedium?.copyWith(
@@ -1066,7 +1067,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                                     textAlign: TextAlign.right,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 16),
                                 // Track artwork
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(4),
@@ -1115,25 +1116,28 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (HiResBadge.getTooltip(track) != null) ...[
-                                  HiResBadge.fromTrack(track, primaryColor: colorScheme.primary)!,
-                                  const SizedBox(width: 12),
-                                ],
-                                if (track.duration != null)
-                                  SizedBox(
-                                    width: 40,
-                                    child: Text(
-                                      _formatDuration(track.duration!),
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurface.withOpacity(0.5),
+                            trailing: Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (HiResBadge.getTooltip(track) != null) ...[
+                                    HiResBadge.fromTrack(track, primaryColor: colorScheme.primary)!,
+                                    const SizedBox(width: 12),
+                                  ],
+                                  if (track.duration != null)
+                                    SizedBox(
+                                      width: 40,
+                                      child: Text(
+                                        _formatDuration(track.duration!),
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: colorScheme.onSurface.withOpacity(0.5),
+                                        ),
+                                        textAlign: TextAlign.right,
                                       ),
-                                      textAlign: TextAlign.right,
                                     ),
-                                  ),
-                              ],
+                                ],
+                              ),
                             ),
                             onTap: () => _playTrack(index),
                           ),

@@ -972,7 +972,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                       ),
                     ),
                   ),
-                  Spacing.vGap16,
+                  Spacing.vGap8,
                   // Album Description
                   if (_albumDescription != null && _albumDescription!.isNotEmpty) ...[
                     InkWell(
@@ -1109,7 +1109,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
