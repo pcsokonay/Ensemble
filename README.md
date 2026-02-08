@@ -151,6 +151,12 @@ For access outside your home network, you'll need to expose Music Assistant thro
 - Android device (Android 5.0+)
 - Audiobookshelf provider configured in Music Assistant (for audiobook features)
 
+## Sponsors
+
+A huge thank you to my sponsors! 💖
+
+<a href="https://github.com/pcsokonay"><img src="https://github.com/pcsokonay.png" width="60px" alt="pcsokonay" /></a>
+
 ## License
 
 MIT License
