@@ -1058,16 +1058,17 @@ class MusicAssistantProvider with ChangeNotifier {
       _connectionStateSubscription?.cancel();
       _connectionStateSubscription = _api!.connectionState.listen(
         (state) async {
-          _connectionState = state;
-          notifyListeners();
-
           if (state == MAConnectionState.connected) {
             _logger.log('🔗 WebSocket connected to MA server');
 
             if (_api!.authRequired && !_api!.isAuthenticated) {
+              // Don't broadcast 'connected' yet — AppStartup watches isConnected
+              // and would transition to HomeScreen before auth completes, causing
+              // data fetches to fail with "Not authenticated".
               _logger.log('🔐 MA auth required, attempting authentication...');
               final authenticated = await _handleMaAuthentication();
               if (!authenticated) {
+                _connectionState = MAConnectionState.error;
                 _error = 'Authentication required. Please log in again.';
                 notifyListeners();
                 return;
@@ -1077,17 +1078,26 @@ class MusicAssistantProvider with ChangeNotifier {
               return;
             }
 
-            // No auth required, initialize immediately
+            // No auth required — safe to broadcast connected and initialize
+            _connectionState = state;
+            notifyListeners();
             await _initializeAfterConnection();
           } else if (state == MAConnectionState.authenticated) {
+            _connectionState = state;
+            notifyListeners();
             _logger.log('✅ MA authentication successful');
             // Now safe to initialize since we're authenticated
             await _initializeAfterConnection();
           } else if (state == MAConnectionState.disconnected) {
+            _connectionState = state;
+            notifyListeners();
             // DON'T clear players or caches on disconnect!
             // Keep showing cached data for instant UI display on reconnect
             // Player list and state will be refreshed when connection is restored
             _logger.log('📡 Disconnected - keeping cached players and data for instant resume');
+          } else {
+            _connectionState = state;
+            notifyListeners();
           }
         },
         onError: (error) {
