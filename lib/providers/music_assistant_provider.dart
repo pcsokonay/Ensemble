@@ -5917,6 +5917,44 @@ class MusicAssistantProvider with ChangeNotifier {
       if (player != null && _groupVolumeManager.isGroupPlayer(player)) {
         _groupVolumeManager.onVolumeSet(playerId, volumeLevel);
       }
+
+      // Proportional volume propagation for in-app sync group leaders.
+      // When a user creates a group via long-press (players/cmd/group), the leader
+      // retains its own non-null volumeLevel and isGroupPlayer() returns false.
+      // We detect this via isGroupLeader and propagate volume changes to all
+      // members proportionally, preserving relative volume balance.
+      if (player != null &&
+          player.isGroupLeader &&
+          !_groupVolumeManager.isGroupPlayer(player)) {
+        final currentVol = player.volumeLevel;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        for (final memberId in player.groupMembers!) {
+          if (memberId == playerId) continue; // Skip the leader itself
+          final idx = _availablePlayers.indexWhere((p) => p.playerId == memberId);
+          if (idx == -1) continue;
+          final member = _availablePlayers[idx];
+          if (member.volumeLevel == null) continue;
+
+          final int memberNewVol;
+          if (currentVol != null && currentVol > 0) {
+            // Ratio-based: maintain relative balance between members
+            memberNewVol = (member.volumeLevel! * volumeLevel / currentVol)
+                .round()
+                .clamp(0, 100);
+          } else {
+            // Can't ratio from 0 — set all to the new absolute value
+            memberNewVol = volumeLevel;
+          }
+
+          // Protect from snap-back and update optimistically
+          _pendingVolumes[memberId] = memberNewVol;
+          _pendingVolumeTimestamps[memberId] = now;
+          _availablePlayers[idx] = member.copyWith(volumeLevel: memberNewVol);
+          // Fire-and-forget — don't await, send in parallel
+          _api?.setVolume(memberId, memberNewVol);
+        }
+      }
+
       final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
       if (builtinPlayerId != null && playerId == builtinPlayerId) {
         _localPlayerVolume = volumeLevel;
