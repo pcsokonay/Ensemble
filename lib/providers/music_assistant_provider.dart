@@ -1367,15 +1367,10 @@ class MusicAssistantProvider with ChangeNotifier {
 
       loadLibrary();
 
-      // Only invalidate home cache if it was empty (no cached recent albums = empty cache)
-      // This prevents jarring double-load when cache is already valid
-      if (_cacheService.getCachedRecentAlbums() == null) {
-        _logger.log('🔄 Home cache was empty, invalidating after auth...');
-        _cacheService.invalidateHomeCache();
-        _homeRefreshCounter++;
-      } else {
-        _logger.log('✅ Home cache has valid data, skipping refresh');
-      }
+      // Always force home refresh after auth so rows re-fetch with valid credentials.
+      // Without this, AlbumRow's initial fetch (which may have failed pre-auth) never retries.
+      _cacheService.invalidateHomeCache();
+      _homeRefreshCounter++;
 
       // Notify listeners to trigger UI refresh - home rows will re-fetch with valid authentication
       notifyListeners();

@@ -140,6 +140,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   static const double _collapsedBorderRadius = 16.0;
   static double get _collapsedArtSize => MiniPlayerLayout.artSize;
   static const double _bottomNavHeight = 56.0;
+
+  // Animation for hiding bottom nav offset on detail screens
+  late AnimationController _detailScreenController;
+  bool _lastIsOnDetailScreen = false;
   static const double _edgeDeadZone = 40.0; // Dead zone for Android back gesture
 
   // Pastel yellow for grouped players (matches PlayerCard.groupBorderColor)
@@ -318,6 +322,13 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Track lyrics scroll position for swipe-to-close (only allowed at top)
     _lyricsScrollController.addListener(_onLyricsScroll);
 
+    // Animation for transitioning mini player when entering/leaving detail screens
+    _detailScreenController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _detailScreenController.addListener(_onDetailScreenAnimation);
+
     // Slide animation for device switching - used for snap/spring animations
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 250),
@@ -354,6 +365,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
 
     // Load precision mode setting
     _loadVolumePrecisionModeSetting();
+  }
+
+  void _onDetailScreenAnimation() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadVolumePrecisionModeSetting() async {
@@ -415,6 +430,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // (Controllers remove listeners on dispose, but explicit removal is clearer)
     _controller.removeListener(_notifyExpansionProgress);
     _controller.removeListener(_recordAnimationFrame);
+    _detailScreenController.removeListener(_onDetailScreenAnimation);
     _lyricsScrollController.removeListener(_onLyricsScroll);
 
     _controller.dispose();
@@ -422,6 +438,7 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     _sleepTimerPanelController.dispose();
     _lyricsPanelController.dispose();
     _slideController.dispose();
+    _detailScreenController.dispose();
     _slideOffsetNotifier.dispose();
     _positionSubscription?.cancel();
     _queueItemsSubscription?.cancel();
@@ -1794,8 +1811,22 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
   Widget build(BuildContext context) {
     // PERF: Use select() to only rebuild when adaptive theme setting changes
     final adaptiveTheme = context.select<ThemeProvider, bool>((p) => p.adaptiveTheme);
+    // Watch detail screen state to animate mini player position
+    final isOnDetailScreen = context.select<ThemeProvider, bool>((p) => p.isOnDetailScreen);
     // Get full themeProvider for methods that need adaptive color schemes
     final themeProvider = context.read<ThemeProvider>();
+
+    // Animate bottom nav offset when entering/leaving detail screens
+    if (isOnDetailScreen != _lastIsOnDetailScreen) {
+      _lastIsOnDetailScreen = isOnDetailScreen;
+      if (isOnDetailScreen) {
+        _detailScreenController.duration = const Duration(milliseconds: 100);
+        _detailScreenController.forward();
+      } else {
+        _detailScreenController.duration = const Duration(milliseconds: 80);
+        _detailScreenController.reverse();
+      }
+    }
 
     return Consumer<MusicAssistantProvider>(
       builder: (context, maProvider, child) {
@@ -1925,7 +1956,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
         ? adaptiveScheme.onPrimaryContainer
         : colorScheme.onPrimaryContainer;
 
-    final bottomNavSpace = _bottomNavHeight + bottomPadding;
+    final effectiveNavHeight = _bottomNavHeight * (1.0 - _detailScreenController.value);
+    final bottomNavSpace = effectiveNavHeight + bottomPadding;
     final bottomOffset = bottomNavSpace + _collapsedMargin;
     final width = screenSize.width - (_collapsedMargin * 2);
 
@@ -2074,9 +2106,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     final textAlignment = Alignment.lerp(Alignment.centerLeft, Alignment.center, t)!;
     final titleFontWeight = FontWeight.lerp(MiniPlayerLayout.primaryFontWeight, FontWeight.w600, t);
 
-    // Collapsed: position above bottom nav bar
+    // Collapsed: position above bottom nav bar (or at bottom edge on detail screens)
     // Expanded: extend to very bottom (behind system nav bar) for seamless edge-to-edge
-    final bottomNavSpace = _bottomNavHeight + bottomPadding;
+    final effectiveNavHeight = _bottomNavHeight * (1.0 - _detailScreenController.value);
+    final bottomNavSpace = effectiveNavHeight + bottomPadding;
     final collapsedBottomOffset = bottomNavSpace + _collapsedMargin;
     final expandedBottomOffset = 0.0; // Extend behind system nav bar
     final expandedHeight = screenSize.height; // Full screen height for edge-to-edge

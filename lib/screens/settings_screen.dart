@@ -351,9 +351,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final itemId = rowId.substring('discovery:'.length);
         _discoveryRowEnabled[itemId] = value;
         SettingsService.setDiscoveryRowPreference(itemId, value);
+        // When enabling, add to home row order if not already present
+        if (value && !_homeRowOrder.contains(rowId)) {
+          _homeRowOrder.add(rowId);
+          SettingsService.setHomeRowOrder(_homeRowOrder);
+        }
         return;
       }
 
+      // Save the setting
       switch (rowId) {
         case 'recent-albums':
           _showRecentAlbums = value;
@@ -403,6 +409,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _showFavoritePodcasts = value;
           SettingsService.setShowFavoritePodcasts(value);
           break;
+        default:
+          break;
+      }
+
+      // When enabling a row, add it to home row order if not already present
+      if (value && !_homeRowOrder.contains(rowId)) {
+        _homeRowOrder.add(rowId);
+        SettingsService.setHomeRowOrder(_homeRowOrder);
       }
     });
   }

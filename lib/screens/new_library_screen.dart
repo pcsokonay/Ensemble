@@ -3987,6 +3987,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   // Consumer wrapper avoids using context.select inside PageView.builder's
   // sliver context, which would rebuild the entire list instead of individual items.
   Widget _buildArtistsTab(BuildContext context, S l10n) {
+    return Consumer<MusicAssistantProvider>(
+      builder: (context, maProvider, _) {
+        return _buildArtistsTabContent(context, l10n, maProvider);
+      },
+    );
+  }
+
+  Widget _buildArtistsTabContent(BuildContext context, S l10n, MusicAssistantProvider maProvider) {
     // Use select to only rebuild when specific fields change
     // SyncService changes are handled by _onSyncServiceChanged listener
     final (isLoading, enabledProviders) = context.select<MusicAssistantProvider, (bool, Set<String>)>(
@@ -4226,6 +4234,14 @@ class _NewLibraryScreenState extends State<NewLibraryScreen>
   // Consumer wrapper avoids using context.select inside PageView.builder's
   // sliver context, which would rebuild the entire list instead of individual items.
   Widget _buildAlbumsTab(BuildContext context, S l10n) {
+    return Consumer<MusicAssistantProvider>(
+      builder: (context, maProvider, _) {
+        return _buildAlbumsTabContent(context, l10n, maProvider);
+      },
+    );
+  }
+
+  Widget _buildAlbumsTabContent(BuildContext context, S l10n, MusicAssistantProvider maProvider) {
     // Use select to only rebuild when specific fields change
     // SyncService changes are handled by _onSyncServiceChanged listener
     final (isLoading, enabledProviders) = context.select<MusicAssistantProvider, (bool, Set<String>)>(

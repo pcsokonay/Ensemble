@@ -8,6 +8,7 @@ import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
 import '../services/sync_service.dart';
 import '../widgets/global_player_overlay.dart';
+import '../widgets/player/mini_player_content.dart' show MiniPlayerLayout;
 import '../widgets/player_selector.dart';
 import '../widgets/album_row.dart';
 import '../widgets/artist_row.dart';
@@ -52,6 +53,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   // Discovery folders (dynamic rows from provider recommendations)
   List<RecommendationFolder> _discoveryFolders = [];
   bool _isLoadingDiscoveryFolders = false;
+  bool _hasLoadedDiscoveryFoldersOnce = false;
   // Discovery row preferences (itemId -> enabled)
   Map<String, bool> _discoveryRowEnabled = {};
 
@@ -233,58 +235,42 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           _discoveryFolders = folders;
           _discoveryRowEnabled = discoveryRowPrefs;
           _isLoadingDiscoveryFolders = false;
+          _hasLoadedDiscoveryFoldersOnce = true;
+          _syncDiscoveryRowOrder(folders);
         });
-      }
-      // Add enabled discovery rows to home row order if not already present
-      if (mounted) {
-        _addDiscoveryRowsToHomeOrder(folders);
       }
     } catch (e) {
       _logger.log('⚠️ Failed to load discovery folders: $e');
       if (mounted) {
         setState(() {
           _isLoadingDiscoveryFolders = false;
+          _hasLoadedDiscoveryFoldersOnce = true;
         });
       }
     }
   }
 
-  /// Add discovery rows to the home row order (at the end, like static rows)
-  void _addDiscoveryRowsToHomeOrder(List<RecommendationFolder> folders) {
-    if (!mounted) return;
-
+  /// Sync discovery row order without calling setState. Returns true if modified.
+  bool _syncDiscoveryRowOrder(List<RecommendationFolder> folders) {
     bool didModify = false;
-
-    _logger.log('🔍 Discovery: Processing ${folders.length} folders, prefs: $_discoveryRowEnabled');
 
     for (final folder in folders) {
       final discoveryRowId = 'discovery:${folder.itemId}';
-      // Check if this discovery row is enabled (default to false)
       final isEnabled = _discoveryRowEnabled[folder.itemId] ?? false;
 
-      _logger.log('🔍 Discovery: ${folder.name} (${folder.itemId}) enabled=$isEnabled, inOrder=${_homeRowOrder.contains(discoveryRowId)}');
-
       if (isEnabled && !_homeRowOrder.contains(discoveryRowId)) {
-        // Add at the end (consistent with static rows behavior)
         _homeRowOrder.add(discoveryRowId);
-        _logger.log('✅ Discovery: Adding $discoveryRowId to home order at end');
         didModify = true;
       } else if (!isEnabled && _homeRowOrder.contains(discoveryRowId)) {
-        // Remove disabled discovery row from order
         _homeRowOrder.remove(discoveryRowId);
-        _logger.log('❌ Discovery: Removing $discoveryRowId from home order');
         didModify = true;
       }
     }
 
-    // Save the updated row order to settings and trigger rebuild
     if (didModify) {
-      _logger.log('💾 Discovery: Saving updated home row order: $_homeRowOrder');
       SettingsService.setHomeRowOrder(_homeRowOrder);
-      if (mounted) {
-        setState(() {}); // Trigger rebuild to show new row order
-      }
     }
+    return didModify;
   }
 
   Future<void> _onRefresh() async {
@@ -447,9 +433,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           count++;
         }
       }
-    } else if (_isLoadingDiscoveryFolders && _discoveryFolders.isEmpty) {
+    } else if (_isLoadingDiscoveryFolders && _discoveryFolders.isEmpty && !_hasLoadedDiscoveryFoldersOnce) {
       // Count as 1 row when loading so RefreshIndicator works
-      // Only if no discovery rows are in the main order
+      // Only if we haven't loaded before (prevents placeholder for users without Tidal)
       final hasDiscoveryRowsInOrder = _homeRowOrder.any((id) => id.startsWith('discovery:'));
       if (!hasDiscoveryRowsInOrder) {
         count += 1;
@@ -541,7 +527,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
       builder: (context, constraints) {
         // Each row is always 1/3 of screen height
         // 1 row = 1/3, 2 rows = 2/3, 3 rows = full screen, 4+ rows scroll
-        final availableHeight = constraints.maxHeight - BottomSpacing.withMiniPlayer;
+        // With extendBody: true, constraints include the area behind the nav bar.
+        // Only subtract mini player space (not nav bar) since nav bar is Scaffold chrome.
+        final miniPlayerSpace = MiniPlayerLayout.height + 12.0 + 22.0; // 72 + 12 + 22 = 106
+        final availableHeight = constraints.maxHeight - miniPlayerSpace;
 
         // Account for margins between rows (2px each)
         // Only adjust for margins when ≤3 rows (so they fit exactly without scroll)
@@ -571,7 +560,11 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
             behavior: const _StretchScrollBehavior(),
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.only(bottom: BottomSpacing.withMiniPlayer),
+              // For ≤3 rows: no padding needed (rows + miniPlayerSpace = viewport)
+              // For 4+ rows: pad by miniPlayerSpace so last row scrolls above mini player
+              padding: enabledRows >= 4
+                  ? EdgeInsets.only(bottom: miniPlayerSpace)
+                  : EdgeInsets.zero,
               child: SizedBox(
                 // Ensure minimum height for pull-to-refresh when empty
                 height: enabledRows == 0 ? availableHeight : null,
@@ -672,9 +665,9 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           }
         }
       }
-    } else if (_isLoadingDiscoveryFolders && _discoveryFolders.isEmpty) {
+    } else if (_isLoadingDiscoveryFolders && _discoveryFolders.isEmpty && !_hasLoadedDiscoveryFoldersOnce) {
       // Show loading placeholder when discovery folders are loading
-      // Only if no discovery rows are in the main order
+      // Only if we haven't loaded before (prevents placeholder for users without Tidal)
       final hasDiscoveryRowsInOrder = _homeRowOrder.any((id) => id.startsWith('discovery:'));
       if (!hasDiscoveryRowsInOrder) {
         if (rows.isNotEmpty) {

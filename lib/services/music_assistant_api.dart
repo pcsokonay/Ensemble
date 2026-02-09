@@ -1466,9 +1466,10 @@ class MusicAssistantAPI {
         final futures = batch.map((uri) => _sendCommand(
           'music/item_by_uri',
           args: {'uri': uri},
-        ).timeout(const Duration(seconds: 5), onTimeout: () => <String, dynamic>{'result': null}));
+        ).timeout(const Duration(seconds: 5), onTimeout: () => <String, dynamic>{'result': null})
+         .catchError((_) => <String, dynamic>{'result': null}));
 
-        final results = await Future.wait(futures, eagerError: false);
+        final results = await Future.wait(futures);
 
         for (final trackResponse in results) {
           if (albumUris.length >= limit) break;
@@ -1505,9 +1506,10 @@ class MusicAssistantAPI {
         final futures = batch.map((uri) => _sendCommand(
           'music/item_by_uri',
           args: {'uri': uri},
-        ).timeout(const Duration(seconds: 5), onTimeout: () => <String, dynamic>{'result': null}));
+        ).timeout(const Duration(seconds: 5), onTimeout: () => <String, dynamic>{'result': null})
+         .catchError((_) => <String, dynamic>{'result': null}));
 
-        final results = await Future.wait(futures, eagerError: false);
+        final results = await Future.wait(futures);
 
         for (final albumResponse in results) {
           try {
