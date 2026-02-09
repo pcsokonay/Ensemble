@@ -847,7 +847,9 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
             final coverSize = (constraints.maxWidth * 0.7).clamp(200.0, 320.0);
             final expandedHeight = coverSize + 70;
 
-            return CustomScrollView(
+            return Stack(
+              children: [
+                CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: expandedHeight,
@@ -1216,7 +1218,29 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
             ),
           SliverToBoxAdapter(child: SizedBox(height: BottomSpacing.withMiniPlayer)), // Space for bottom nav + mini player
         ],
-      );
+      ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: BottomSpacing.withMiniPlayer,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            colorScheme.background.withOpacity(0.0),
+                            colorScheme.background,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
           },
         ),
       ),

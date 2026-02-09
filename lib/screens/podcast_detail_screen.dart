@@ -654,7 +654,9 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
             final coverSize = (constraints.maxWidth * 0.7).clamp(200.0, 320.0);
             final expandedHeight = coverSize + 70;
 
-            return CustomScrollView(
+            return Stack(
+              children: [
+                CustomScrollView(
               slivers: [
                 SliverAppBar(
                   expandedHeight: expandedHeight,
@@ -1107,6 +1109,28 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
                 // Bottom padding for mini player
                 SliverToBoxAdapter(
                   child: SizedBox(height: BottomSpacing.withMiniPlayer),
+                ),
+              ],
+            ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: BottomSpacing.withMiniPlayer,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            colorScheme.surface.withOpacity(0.0),
+                            colorScheme.surface,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             );

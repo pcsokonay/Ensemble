@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/music_assistant_provider.dart';
 import '../providers/navigation_provider.dart';
+import '../theme/theme_provider.dart';
 import '../services/settings_service.dart';
 
 import 'expandable_player.dart';
@@ -623,8 +624,9 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
           PlayerRevealOverlay(
             key: _revealKey,
             onDismiss: _hidePlayerReveal,
-            // Use viewPadding to match BottomNavigationBar's height calculation
-            miniPlayerBottom: BottomSpacing.navBarHeight + MediaQuery.of(context).viewPadding.bottom + 12,
+            // Use viewPadding to match BottomNavigationBar's height calculation.
+            // On detail screens the nav bar is hidden so exclude its height.
+            miniPlayerBottom: (context.read<ThemeProvider>().isOnDetailScreen ? 0.0 : BottomSpacing.navBarHeight) + MediaQuery.of(context).viewPadding.bottom + 12,
             miniPlayerHeight: 64,
             showOnboardingHints: _isOnboardingReveal,
             // Pass pending action parameters for "Play On" functionality

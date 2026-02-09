@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/recommendation_folder.dart';
 import '../providers/music_assistant_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
 import '../services/sync_service.dart';
@@ -30,7 +31,7 @@ class NewHomeScreen extends StatefulWidget {
   State<NewHomeScreen> createState() => _NewHomeScreenState();
 }
 
-class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
+class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveClientMixin {
   static final _logger = DebugLogger();
   Key _refreshKey = UniqueKey();
   // Main rows (default on)
@@ -70,7 +71,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _loadSettings();
     // Listen to sync completion to refresh favorite rows when data becomes available
     SyncService.instance.addListener(_onSyncChanged);
@@ -82,15 +82,29 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     _lastHomeRefreshCounter = provider.homeRefreshCounter;
     _providerListeningTo = provider;
     provider.addListener(_onProviderChanged);
+
+    // Reload settings only when switching back to home from settings tab
+    navigationProvider.addListener(_onNavigationChanged);
+  }
+
+  int _lastNavIndex = 0;
+
+  void _onNavigationChanged() {
+    final newIndex = navigationProvider.selectedIndex;
+    // Reload settings when leaving settings tab (3) for home tab (0)
+    if (_lastNavIndex == 3 && newIndex == 0) {
+      _loadSettings();
+    }
+    _lastNavIndex = newIndex;
   }
 
   @override
   void dispose() {
+    navigationProvider.removeListener(_onNavigationChanged);
     SyncService.instance.removeListener(_onSyncChanged);
     // Clean up provider listener
     _providerListeningTo?.removeListener(_onProviderChanged);
     _providerListeningTo = null;
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -164,13 +178,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     _lastSyncStatus = newStatus;
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Reload settings when app resumes (coming back from settings)
-    if (state == AppLifecycleState.resumed) {
-      _loadSettings();
-    }
-  }
 
   Future<void> _loadSettings() async {
     final showRecent = await SettingsService.getShowRecentAlbums();
@@ -207,8 +214,15 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     }
 
     // Load discovery folders dynamically (after settings load)
-    // This will add enabled discovery rows to the home order
-    await _loadDiscoveryFolders(forceRefresh: false);
+    // Skip if already loaded to avoid unnecessary rebuilds on settings reload
+    if (_discoveryFolders.isEmpty) {
+      await _loadDiscoveryFolders(forceRefresh: false);
+    } else {
+      // Just re-sync the row order with current enabled state (no API call)
+      setState(() {
+        _syncDiscoveryRowOrder(_discoveryFolders);
+      });
+    }
   }
 
   Future<void> _loadDiscoveryFolders({bool forceRefresh = false}) async {
@@ -532,12 +546,12 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         final miniPlayerSpace = MiniPlayerLayout.height + 12.0 + 22.0; // 72 + 12 + 22 = 106
         final availableHeight = constraints.maxHeight - miniPlayerSpace;
 
-        // Account for margins between rows (2px each)
-        // Only adjust for margins when ≤3 rows (so they fit exactly without scroll)
-        // For 4+ rows, use original calculation so 4th row stays hidden (scrollable)
+        // Account for margins between rows (2px each, 2 margins for 3 rows).
+        // Always use the 3-row margin calculation so rowHeight stays stable
+        // regardless of how many rows are currently enabled (avoids jitter on reload).
         const marginSize = 2.0;
         final enabledRows = _countEnabledRows();
-        final marginsInView = enabledRows > 1 && enabledRows <= 3 ? (enabledRows - 1) * marginSize : 0.0;
+        const marginsInView = 2 * marginSize; // always 2 margins for 3-row layout
         final rowHeight = (availableHeight - marginsInView) / 3;
 
         // Use Android 12+ stretch overscroll effect
