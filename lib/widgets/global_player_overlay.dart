@@ -162,6 +162,9 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   // State for player reveal overlay
   bool _isRevealVisible = false;
 
+  // Blur animation for player reveal backdrop
+  late AnimationController _blurController;
+
   // State for interactive hint mode (blur backdrop + wait for user action)
   bool _isHintModeActive = false;
   Timer? _hintBounceTimer;
@@ -237,6 +240,12 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
         _bounceOffsetNotifier.value = 20.0 * ((1.0 - t) * 2);   // 20 -> 0
       }
     });
+
+    // Blur fade for player reveal backdrop
+    _blurController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
 
     // Welcome content fade-in
     _welcomeFadeController = AnimationController(
@@ -333,6 +342,7 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
     _slideController.dispose();
     _singleBounceController.dispose();
     _doubleBounceController.dispose();
+    _blurController.dispose();
     _welcomeFadeController.dispose();
     _bounceOffsetNotifier.dispose();
     _hintOpacityNotifier.dispose();
@@ -376,12 +386,15 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
       _isRevealVisible = true;
       _isOnboardingReveal = wasInHintMode;
     });
+    _blurController.forward();
   }
 
   void _hidePlayerReveal() {
     if (!_isRevealVisible) return;
     _bounceOffsetNotifier.value = 0;
     _clearPendingAction(); // Clear pending action when overlay is dismissed
+    // Blur already started fading in _dismissPlayerReveal, just clean up state
+    _blurController.reverse(); // no-op if already reversed
     setState(() {
       _isRevealVisible = false;
       _isOnboardingReveal = false;
@@ -391,6 +404,9 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
   /// Dismiss with animation (for back gesture) - calls overlay's dismiss method
   void _dismissPlayerReveal() {
     if (!_isRevealVisible) return;
+    // Start blur fade immediately (don't wait for card animation to finish)
+    _blurController.reverseDuration = const Duration(milliseconds: 120);
+    _blurController.reverse();
     // Call the overlay's dismiss method which has the slide animation
     _revealKey.currentState?.dismiss();
   }
@@ -498,18 +514,24 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
         // BottomNavigationBar is now in HomeScreen's Scaffold.bottomNavigationBar
         // for proper Navigator/Overlay ancestry
 
-        // Blur backdrop for device selector (reveal mode) - static, no animation
+        // Blur backdrop for device selector (reveal mode) - fades in/out smoothly
         if (_isRevealVisible && !_isHintModeActive)
           Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _dismissPlayerReveal,
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
-                child: Container(
-                  color: colorScheme.surface.withOpacity(0.5),
-                ),
-              ),
+            child: AnimatedBuilder(
+              animation: _blurController,
+              builder: (context, child) {
+                final t = Curves.easeOut.transform(_blurController.value);
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _dismissPlayerReveal,
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8.0 * t, sigmaY: 8.0 * t),
+                    child: Container(
+                      color: colorScheme.surface.withOpacity(0.5 * t),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
 

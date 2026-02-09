@@ -197,6 +197,31 @@ class MainActivity: AudioServiceActivity() {
         }
     }
 
+    // Pause volume interception when app goes to background so hardware buttons
+    // only control the system volume (e.g., YouTube, phone ringer) as expected.
+    private var wasListeningBeforePause = false
+    private var wasObservingBeforePause = false
+
+    override fun onPause() {
+        wasListeningBeforePause = isListening
+        wasObservingBeforePause = isObservingVolume
+        isListening = false
+        stopVolumeObserver()
+        Log.d(TAG, "onPause: suspended volume interception (wasListening=$wasListeningBeforePause, wasObserving=$wasObservingBeforePause)")
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (wasListeningBeforePause) {
+            isListening = true
+        }
+        if (wasObservingBeforePause) {
+            startVolumeObserver(null)
+        }
+        Log.d(TAG, "onResume: restored volume interception (listening=$isListening, observing=$isObservingVolume)")
+    }
+
     override fun onDestroy() {
         stopVolumeObserver()
         super.onDestroy()

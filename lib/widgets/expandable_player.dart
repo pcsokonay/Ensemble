@@ -2283,6 +2283,10 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
     // Smoothly fade out horizontal slide offset (for device switching) as animation progresses
     final miniPlayerSlideOffset = _slideOffset * collapsedWidth * offsetFade;
 
+    // Extend gesture hit area above mini player for easier swipe-down,
+    // especially on detail screens where the player sits closer to screen edge.
+    const _gestureExtension = 20.0;
+
     return Positioned(
       left: horizontalMargin,
       right: horizontalMargin,
@@ -2508,7 +2512,12 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
             });
           }
         },
-        child: Container(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Invisible gesture extension area above mini player
+            if (!isExpanded) const SizedBox(height: _gestureExtension),
+            Container(
           // PERF Phase 4: Only show shadow when meaningfully visible (t < 0.5)
           // This avoids BoxDecoration allocation for majority of animation frames
           // Shadow fades out quickly during first half of expansion
@@ -3447,6 +3456,8 @@ class ExpandablePlayerState extends State<ExpandablePlayer>
             ),
           ),
         ),
+        ),
+          ],
         ),
       ),
     );
