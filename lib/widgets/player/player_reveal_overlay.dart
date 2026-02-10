@@ -100,12 +100,12 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
       curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
     );
 
-    // Preload all player track info and extract colors
-    _preloadColorsForPlayers();
-
-    // Start reveal animation
+    // Start reveal animation first, then load colors after it settles
+    // (color extraction triggers setState which causes jitter during animation)
     _revealController.duration = const Duration(milliseconds: 200);
-    _revealController.forward();
+    _revealController.forward().then((_) {
+      if (mounted) _preloadColorsForPlayers();
+    });
 
     // Auto-refresh player data
     _refreshTimer = Timer.periodic(Timings.playerPollingInterval, (_) {
@@ -266,15 +266,23 @@ class PlayerRevealOverlayState extends State<PlayerRevealOverlay>
     final hintColor = colorScheme.onSurface.withOpacity(0.7);
 
     // Back gesture is handled at GlobalPlayerOverlay level
-    return Consumer<MusicAssistantProvider>(
-      builder: (context, maProvider, child) {
-        final allPlayers = maProvider.availablePlayers;
+    // Use Selector to only rebuild when the player list actually changes,
+    // not on every provider notification (prevents jitter during animation)
+    return Selector<MusicAssistantProvider, ({List<dynamic> players, String? selectedId, int playerCount})>(
+      selector: (_, p) => (
+        players: p.availablePlayers,
+        selectedId: p.selectedPlayer?.playerId,
+        playerCount: p.availablePlayers.length,
+      ),
+      shouldRebuild: (prev, next) => prev.playerCount != next.playerCount || prev.selectedId != next.selectedId,
+      builder: (context, data, child) {
+        final maProvider = context.read<MusicAssistantProvider>();
+        final allPlayers = data.players;
         final selectedPlayer = maProvider.selectedPlayer;
-        final currentTrack = maProvider.currentTrack;
 
         // Filter out the selected player - it's already shown in the mini player
         final players = allPlayers
-            .where((p) => p.playerId != selectedPlayer?.playerId)
+            .where((p) => p.playerId != data.selectedId)
             .toList();
 
         // Default card colors - used when player doesn't have extracted colors
