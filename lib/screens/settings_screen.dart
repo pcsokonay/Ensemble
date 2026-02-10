@@ -25,6 +25,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _scrollController = ScrollController();
   final _lastFmApiKeyController = TextEditingController();
   final _audioDbApiKeyController = TextEditingController();
   String _appVersion = '';
@@ -191,6 +192,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _lastFmApiKeyController.dispose();
     _audioDbApiKeyController.dispose();
     super.dispose();
@@ -351,8 +353,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final itemId = rowId.substring('discovery:'.length);
         _discoveryRowEnabled[itemId] = value;
         SettingsService.setDiscoveryRowPreference(itemId, value);
-        // When enabling, add to home row order if not already present
-        if (value && !_homeRowOrder.contains(rowId)) {
+        // Always add to home row order for position tracking
+        if (!_homeRowOrder.contains(rowId)) {
           _homeRowOrder.add(rowId);
           SettingsService.setHomeRowOrder(_homeRowOrder);
         }
@@ -483,6 +485,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -1048,21 +1051,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   displayRows.insert(newIndex, item);
 
                   setState(() {
-                    // Update _homeRowOrder with the new order
-                    _homeRowOrder.clear();
-
-                    // Add discovery rows that are enabled
-                    for (final rowId in displayRows) {
-                      if (rowId.startsWith('discovery:')) {
-                        // Only add enabled discovery rows to home order
-                        final itemId = rowId.substring('discovery:'.length);
-                        if (_discoveryRowEnabled[itemId] ?? false) {
-                          _homeRowOrder.add(rowId);
-                        }
-                      } else {
-                        _homeRowOrder.add(rowId);
-                      }
-                    }
+                    // Update _homeRowOrder with the new order (all rows, including discovery)
+                    _homeRowOrder = displayRows;
                   });
                   SettingsService.setHomeRowOrder(_homeRowOrder);
                 },
