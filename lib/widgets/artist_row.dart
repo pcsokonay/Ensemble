@@ -14,6 +14,8 @@ class ArtistRow extends StatefulWidget {
   final double? rowHeight;
   /// Optional: synchronous getter for cached data (for instant display)
   final List<Artist>? Function()? getCachedArtists;
+  /// Optional: signal to trigger in-place reload without destroying the widget
+  final ValueNotifier<int>? refreshSignal;
 
   const ArtistRow({
     super.key,
@@ -22,6 +24,7 @@ class ArtistRow extends StatefulWidget {
     this.heroTagSuffix,
     this.rowHeight,
     this.getCachedArtists,
+    this.refreshSignal,
   });
 
   @override
@@ -46,6 +49,19 @@ class _ArtistRowState extends State<ArtistRow> with AutomaticKeepAliveClientMixi
       _isLoading = false;
     }
     _loadArtists();
+    widget.refreshSignal?.addListener(_onRefreshSignal);
+  }
+
+  void _onRefreshSignal() {
+    if (!mounted) return;
+    _hasLoaded = false;
+    _loadArtists();
+  }
+
+  @override
+  void dispose() {
+    widget.refreshSignal?.removeListener(_onRefreshSignal);
+    super.dispose();
   }
 
   Future<void> _loadArtists() async {

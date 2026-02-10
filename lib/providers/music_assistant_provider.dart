@@ -102,7 +102,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
   // Home refresh counter - increments to signal home screen to refresh all rows
   int _homeRefreshCounter = 0;
-  bool _hadRealDisconnect = true; // Track if we had a real disconnect (not just a resume)
+  String? _lastConnectedUrl; // Track last successfully connected server URL
   StreamSubscription? _connectionStateSubscription;
   StreamSubscription? _localPlayerEventSubscription;
   StreamSubscription? _playerUpdatedEventSubscription;
@@ -1098,7 +1098,6 @@ class MusicAssistantProvider with ChangeNotifier {
             await _initializeAfterConnection();
           } else if (state == MAConnectionState.disconnected) {
             _connectionState = state;
-            _hadRealDisconnect = true;
             notifyListeners();
             // DON'T clear players or caches on disconnect!
             // Keep showing cached data for instant UI display on reconnect
@@ -1369,14 +1368,13 @@ class MusicAssistantProvider with ChangeNotifier {
 
       loadLibrary();
 
-      // Only force home refresh after a real disconnect (not routine reconnects).
-      // This prevents unnecessary row rebuilds when resuming from background.
-      // On first connect or after disconnect, rows need to re-fetch with valid credentials.
-      if (_hadRealDisconnect) {
+      // Only force home refresh when connecting to a different server (or first connect).
+      // Reconnecting to the same server after backgrounding preserves cached home data.
+      if (_serverUrl != _lastConnectedUrl) {
         _cacheService.invalidateHomeCache();
         _homeRefreshCounter++;
-        _hadRealDisconnect = false;
       }
+      _lastConnectedUrl = _serverUrl;
 
       // Notify listeners to trigger UI refresh - home rows will re-fetch with valid authentication
       notifyListeners();

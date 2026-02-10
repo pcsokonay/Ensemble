@@ -33,7 +33,8 @@ class NewHomeScreen extends StatefulWidget {
 
 class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveClientMixin {
   static final _logger = DebugLogger();
-  Key _refreshKey = UniqueKey();
+  final ValueNotifier<int> _refreshSignal = ValueNotifier<int>(0);
+  double? _cachedRowHeight; // Cached to avoid size jumps when nav bar toggles
   // Main rows (default on)
   bool _showRecentAlbums = true;
   bool _showDiscoverArtists = true;
@@ -139,6 +140,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     // Clean up provider listener
     _providerListeningTo?.removeListener(_onProviderChanged);
     _providerListeningTo = null;
+    _refreshSignal.dispose();
     super.dispose();
   }
 
@@ -171,9 +173,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     if (currentRefreshCounter != _lastHomeRefreshCounter) {
       _logger.log('🔄 Home: refresh counter changed ($_lastHomeRefreshCounter -> $currentRefreshCounter), refreshing all rows');
       _lastHomeRefreshCounter = currentRefreshCounter;
-      setState(() {
-        _refreshKey = UniqueKey();  // Forces all rows to rebuild and re-fetch data
-      });
+      _refreshSignal.value++;
       return;  // Don't process other refresh conditions in this cycle
     }
 
@@ -183,9 +183,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
       if (_lastArtistCount == 0 && currentCount > 0) {
         _logger.log('🔄 Home: artists loaded from cache ($currentCount), refreshing rows');
         _hadEmptyFavoritesOnLoad = false;
-        setState(() {
-          _refreshKey = UniqueKey();
-        });
+        _refreshSignal.value++;
       }
       _lastArtistCount = currentCount;
     }
@@ -204,9 +202,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
       _providerListeningTo?.removeListener(_onProviderChanged);
       _providerListeningTo = null;
       if (mounted) {
-        setState(() {
-          _refreshKey = UniqueKey();
-        });
+        _refreshSignal.value++;
       }
     }
     _lastSyncStatus = newStatus;
@@ -314,9 +310,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
     await _loadSettings();
 
     if (mounted) {
-      setState(() {
-        _refreshKey = UniqueKey();
-      });
+      _refreshSignal.value++;
     }
   }
 
@@ -499,7 +493,19 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         const marginSize = 2.0;
         final enabledRows = _countEnabledRows();
         const marginsInView = 2 * marginSize; // always 2 margins for 3-row layout
-        final rowHeight = (availableHeight - marginsInView) / 3;
+        final candidateRowHeight = (availableHeight - marginsInView) / 3;
+
+        // Cache rowHeight to prevent size jumps when the bottom nav bar toggles
+        // on connect/disconnect. The nav bar hides when disconnected, giving more
+        // vertical space and taller rows. When it reappears, rows shrink visibly.
+        // Fix: always ratchet down to the smaller (nav-bar-present) value, and
+        // only allow increases on large changes like screen rotation.
+        if (_cachedRowHeight == null || (candidateRowHeight - _cachedRowHeight!).abs() > 50) {
+          _cachedRowHeight = candidateRowHeight;
+        } else if (candidateRowHeight < _cachedRowHeight!) {
+          _cachedRowHeight = candidateRowHeight;
+        }
+        final rowHeight = _cachedRowHeight!;
 
         // Use Android 12+ stretch overscroll effect
         return NotificationListener<ScrollNotification>(
@@ -530,7 +536,6 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
                 // Ensure minimum height for pull-to-refresh when empty
                 height: enabledRows == 0 ? availableHeight : null,
                 child: Column(
-                  key: _refreshKey,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: _buildOrderedRows(provider, rowHeight, enabledRows == 0),
                 ),
@@ -612,6 +617,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           title: S.of(context)!.recentlyPlayed,
           loadAlbums: () => provider.getRecentAlbumsWithCache(),
           getCachedAlbums: () => provider.getCachedRecentAlbums(),
+          refreshSignal: _refreshSignal,
           rowHeight: rowHeight,
         );
       case 'discover-artists':
@@ -621,6 +627,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           title: S.of(context)!.discoverArtists,
           loadArtists: () => provider.getDiscoverArtistsWithCache(),
           getCachedArtists: () => provider.getCachedDiscoverArtists(),
+          refreshSignal: _refreshSignal,
           rowHeight: rowHeight,
         );
       case 'discover-albums':
@@ -630,6 +637,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           title: S.of(context)!.discoverAlbums,
           loadAlbums: () => provider.getDiscoverAlbumsWithCache(),
           getCachedAlbums: () => provider.getCachedDiscoverAlbums(),
+          refreshSignal: _refreshSignal,
           rowHeight: rowHeight,
         );
       case 'continue-listening':
@@ -665,6 +673,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           key: const ValueKey('favorite-albums'),
           title: S.of(context)!.favoriteAlbums,
           loadAlbums: () => provider.getFavoriteAlbums(),
+          refreshSignal: _refreshSignal,
           rowHeight: rowHeight,
         );
       case 'favorite-artists':
@@ -673,6 +682,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
           key: const ValueKey('favorite-artists'),
           title: S.of(context)!.favoriteArtists,
           loadArtists: () => provider.getFavoriteArtists(),
+          refreshSignal: _refreshSignal,
           rowHeight: rowHeight,
         );
       case 'favorite-tracks':
