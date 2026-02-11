@@ -17,14 +17,14 @@ class NavigationProvider extends ChangeNotifier {
     if (previousIndex != index) {
       _selectedIndex = index;
       notifyListeners();
+    }
 
-      // Trigger search focus callback when switching to search tab
-      if (index == 2 && onSearchTabSelected != null) {
-        // Use post-frame callback to ensure SearchScreen is built first
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          onSearchTabSelected?.call();
-        });
-      }
+    // Trigger search focus callback when switching to or re-tapping search tab
+    if (index == 2 && onSearchTabSelected != null) {
+      // Use post-frame callback to ensure SearchScreen is built first
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onSearchTabSelected?.call();
+      });
     }
   }
 

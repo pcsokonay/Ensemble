@@ -314,6 +314,10 @@ class SearchScreenState extends State<SearchScreen> {
 
   void requestFocus() {
     if (mounted) {
+      setState(() {
+        _isSearchBarVisible = true;
+        _lastVerticalScrollOffset = 0;
+      });
       _focusNode.requestFocus();
     }
   }
@@ -817,6 +821,7 @@ class SearchScreenState extends State<SearchScreen> {
                       child: ListView.builder(
                         // PERF: Use key to preserve scroll position per filter
                         key: PageStorageKey('list_$filterForPage'),
+                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                         padding: EdgeInsets.fromLTRB(16, 16, 16, BottomSpacing.navBarOnly),
                         cacheExtent: 1000,
                         addAutomaticKeepAlives: false,
@@ -1196,6 +1201,7 @@ class SearchScreenState extends State<SearchScreen> {
     return RepaintBoundary(
       child: GestureDetector(
         onLongPressStart: (details) {
+          removeFocus();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,
@@ -1238,6 +1244,7 @@ class SearchScreenState extends State<SearchScreen> {
                   style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
                 ),
           onTap: () {
+            removeFocus();
             updateAdaptiveColorsFromImage(context, imageUrl);
             Navigator.push(
               context,
@@ -1266,6 +1273,7 @@ class SearchScreenState extends State<SearchScreen> {
     return RepaintBoundary(
       child: GestureDetector(
         onLongPressStart: (details) {
+          removeFocus();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,
@@ -1344,6 +1352,7 @@ class SearchScreenState extends State<SearchScreen> {
             ),
           ),
           onTap: () {
+            removeFocus();
             updateAdaptiveColorsFromImage(context, imageUrl);
             Navigator.push(
               context,
@@ -1372,6 +1381,7 @@ class SearchScreenState extends State<SearchScreen> {
     return RepaintBoundary(
       child: GestureDetector(
         onLongPressStart: (details) {
+          removeFocus();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,
@@ -1440,7 +1450,10 @@ class SearchScreenState extends State<SearchScreen> {
                   style: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontSize: 12),
                 )
               : null,
-          onTap: () => _playTrack(track),
+          onTap: () {
+            removeFocus();
+            _playTrack(track);
+          },
         ),
       ),
     );
@@ -1458,6 +1471,7 @@ class SearchScreenState extends State<SearchScreen> {
     return RepaintBoundary(
       child: GestureDetector(
         onLongPressStart: (details) {
+          removeFocus();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,
@@ -1546,6 +1560,7 @@ class SearchScreenState extends State<SearchScreen> {
                 )
               : null,
           onTap: () {
+            removeFocus();
             updateAdaptiveColorsFromImage(context, imageUrl);
             Navigator.push(
               context,
@@ -1576,6 +1591,7 @@ class SearchScreenState extends State<SearchScreen> {
     return RepaintBoundary(
       child: GestureDetector(
         onLongPressStart: (details) {
+          removeFocus();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,
@@ -1651,7 +1667,7 @@ class SearchScreenState extends State<SearchScreen> {
                 )
               : null,
           onTap: () {
-            // Update adaptive colors before navigation
+            removeFocus();
             updateAdaptiveColorsFromImage(context, imageUrl);
             Navigator.push(
               context,
@@ -1678,6 +1694,7 @@ class SearchScreenState extends State<SearchScreen> {
     return RepaintBoundary(
       child: GestureDetector(
         onLongPressStart: (details) {
+          removeFocus();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,
@@ -1726,7 +1743,10 @@ class SearchScreenState extends State<SearchScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-          onTap: () => _playRadioStation(radio),
+          onTap: () {
+            removeFocus();
+            _playRadioStation(radio);
+          },
         ),
       ),
     );
@@ -1744,6 +1764,7 @@ class SearchScreenState extends State<SearchScreen> {
     return RepaintBoundary(
       child: GestureDetector(
         onLongPressStart: (details) {
+          removeFocus();
           MediaContextMenu.show(
             context: context,
             position: details.globalPosition,
@@ -1800,7 +1821,7 @@ class SearchScreenState extends State<SearchScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
           onTap: () {
-            // Update adaptive colors before navigation
+            removeFocus();
             updateAdaptiveColorsFromImage(context, imageUrl);
             Navigator.push(
               context,
