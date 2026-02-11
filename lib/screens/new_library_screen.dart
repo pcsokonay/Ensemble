@@ -6079,8 +6079,9 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
 
     // Position menu below and to the left of the button
     final menuWidth = 220.0;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final left = (widget.position.dx + widget.buttonSize.width - menuWidth).clamp(8.0, screenWidth - menuWidth - 8);
+    final screenSize = MediaQuery.of(context).size;
+    final bottomInset = BottomSpacing.withMiniPlayer + MediaQuery.of(context).viewPadding.bottom;
+    final left = (widget.position.dx + widget.buttonSize.width - menuWidth).clamp(8.0, screenSize.width - menuWidth - 8);
     final top = widget.position.dy + widget.buttonSize.height + 4;
 
     return Stack(
@@ -6110,7 +6111,7 @@ class _OptionsMenuOverlayState extends State<_OptionsMenuOverlay>
                 child: Container(
                   width: menuWidth,
                   constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height - top - 50,
+                    maxHeight: screenSize.height - top - bottomInset,
                   ),
                   child: SingleChildScrollView(
                     child: Column(

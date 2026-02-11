@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../widgets/global_player_overlay.dart' show GlobalPlayerOverlay, BottomSpacing;
+import '../theme/theme_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../services/debug_logger.dart';
 
@@ -500,39 +501,42 @@ class _MediaContextMenuOverlayState extends State<_MediaContextMenuOverlay>
     final screenSize = MediaQuery.of(context).size;
     final viewPadding = MediaQuery.of(context).viewPadding;
 
-    // Account for mini player and bottom nav bar
-    final bottomInset = BottomSpacing.withMiniPlayer + viewPadding.bottom;
+    // Account for mini player and bottom nav bar.
+    // On detail screens the nav bar hides and mini player drops to bottom edge.
+    final isOnDetailScreen = context.read<ThemeProvider>().isOnDetailScreen;
+    final bottomInset = isOnDetailScreen
+        ? BottomSpacing.miniPlayerHeight + 22.0 + viewPadding.bottom
+        : BottomSpacing.withMiniPlayer + viewPadding.bottom;
 
     // Position near the tap, but keep on screen
     double left = widget.position.dx - menuWidth / 2;
-    double top = widget.position.dy;
 
     // Keep menu on screen horizontally
     left = left.clamp(8.0, screenSize.width - menuWidth - 8);
 
     // Estimate menu height based on content
-    double estimatedHeight;
+    double estimatedHeight = 8.0; // vertical padding (4 top + 4 bottom)
     if (widget.mediaType == ContextMenuMediaType.podcastEpisode) {
-      // Episode menu: 4 items + divider = ~200px
-      estimatedHeight = 200.0;
+      estimatedHeight += 4 * 46.0; // 4 menu items
     } else {
-      estimatedHeight = widget.showTopRow ? 280.0 : 180.0;
-      // Add height for sort section (header + items)
+      if (widget.showTopRow) estimatedHeight += 60.0; // icon button row
+      estimatedHeight += 3 * 46.0; // Play on, Start radio, Start radio on
       if (widget.onToggleSort != null) {
-        // Podcast has 4 sort options, others have 2
-        estimatedHeight += widget.mediaType == ContextMenuMediaType.podcast ? 170.0 : 110.0;
+        estimatedHeight += 1.0 + 32.0; // divider + header
+        final sortCount = widget.mediaType == ContextMenuMediaType.podcast ? 4 : 2;
+        estimatedHeight += sortCount * 42.0; // sort items
       }
-      // Add height for view section (divider + header + 3 items)
       if (widget.onCycleView != null) {
-        estimatedHeight += 140.0;
+        estimatedHeight += 1.0 + 32.0; // divider + header
+        estimatedHeight += 3 * 42.0; // view mode items
       }
     }
 
-    // If menu would go off bottom (accounting for mini player), position above the tap point
-    if (top + estimatedHeight > screenSize.height - bottomInset) {
-      top = widget.position.dy - estimatedHeight;
-    }
-    top = top.clamp(viewPadding.top + 8, screenSize.height - estimatedHeight - bottomInset);
+    // Keep menu below the tap point but above the mini player
+    final top = widget.position.dy.clamp(
+      viewPadding.top + 8,
+      screenSize.height - estimatedHeight - bottomInset,
+    );
 
     return Stack(
       children: [

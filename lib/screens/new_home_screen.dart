@@ -9,7 +9,6 @@ import '../services/settings_service.dart';
 import '../services/debug_logger.dart';
 import '../services/sync_service.dart';
 import '../widgets/global_player_overlay.dart';
-import '../widgets/player/mini_player_content.dart' show MiniPlayerLayout;
 import '../widgets/player_selector.dart';
 import '../widgets/album_row.dart';
 import '../widgets/artist_row.dart';
@@ -34,7 +33,6 @@ class NewHomeScreen extends StatefulWidget {
 class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveClientMixin {
   static final _logger = DebugLogger();
   final ValueNotifier<int> _refreshSignal = ValueNotifier<int>(0);
-  double? _cachedRowHeight; // Cached to avoid size jumps when nav bar toggles
   // Main rows (default on)
   bool _showRecentAlbums = true;
   bool _showDiscoverArtists = true;
@@ -483,8 +481,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         // Each row is always 1/3 of screen height
         // 1 row = 1/3, 2 rows = 2/3, 3 rows = full screen, 4+ rows scroll
         // With extendBody: true, constraints include the area behind the nav bar.
-        // Only subtract mini player space (not nav bar) since nav bar is Scaffold chrome.
-        final miniPlayerSpace = MiniPlayerLayout.height + 12.0 + 22.0; // 72 + 12 + 22 = 106
+        // Subtract mini player overlay space (mini player + its margins sit above the nav bar).
+        final miniPlayerSpace = BottomSpacing.miniPlayerHeight + 22.0; // 84 + 22 = 106
         final availableHeight = constraints.maxHeight - miniPlayerSpace;
 
         // Account for margins between rows (2px each, 2 margins for 3 rows).
@@ -493,19 +491,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         const marginSize = 2.0;
         final enabledRows = _countEnabledRows();
         const marginsInView = 2 * marginSize; // always 2 margins for 3-row layout
-        final candidateRowHeight = (availableHeight - marginsInView) / 3;
-
-        // Cache rowHeight to prevent size jumps when the bottom nav bar toggles
-        // on connect/disconnect. The nav bar hides when disconnected, giving more
-        // vertical space and taller rows. When it reappears, rows shrink visibly.
-        // Fix: always ratchet down to the smaller (nav-bar-present) value, and
-        // only allow increases on large changes like screen rotation.
-        if (_cachedRowHeight == null || (candidateRowHeight - _cachedRowHeight!).abs() > 50) {
-          _cachedRowHeight = candidateRowHeight;
-        } else if (candidateRowHeight < _cachedRowHeight!) {
-          _cachedRowHeight = candidateRowHeight;
-        }
-        final rowHeight = _cachedRowHeight!;
+        final rowHeight = (availableHeight - marginsInView) / 3;
 
         // Use Android 12+ stretch overscroll effect
         return NotificationListener<ScrollNotification>(
@@ -527,8 +513,8 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
             behavior: const _StretchScrollBehavior(),
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              // For ≤3 rows: no padding needed (rows + miniPlayerSpace = viewport)
-              // For 4+ rows: pad by miniPlayerSpace so last row scrolls above mini player
+              // For ≤3 rows: no padding needed (rows fit within viewport)
+              // For 4+ rows: pad so last row scrolls above mini player
               padding: enabledRows >= 4
                   ? EdgeInsets.only(bottom: miniPlayerSpace)
                   : EdgeInsets.zero,
