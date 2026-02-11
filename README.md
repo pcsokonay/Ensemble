@@ -2,7 +2,7 @@
   <img src="assets/images/ensemble_logo.png" alt="Ensemble Logo" height="200">
 
   [![GitHub release](https://img.shields.io/badge/Release-v3.0.3-blue?style=for-the-badge&logo=github)](https://github.com/CollotsSpot/Ensemble/releases)
-  [![GitHub Downloads](https://img.shields.io/github/downloads/CollotsSpot/Ensemble/latest/total?style=for-the-badge&logo=android&label=APK%20Downloads)](https://github.com/CollotsSpot/Ensemble/releases/latest)
+  [![GitHub Downloads](https://img.shields.io/github/downloads/CollotsSpot/Ensemble/latest/total?style=for-the-badge&logo=android&label=APK%20Downloads&color=green)](https://github.com/CollotsSpot/Ensemble/releases/latest)
   [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
   [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?style=for-the-badge&logo=GitHub%20Sponsors&logoColor=white)](https://github.com/sponsors/CollotsSpot)
   [![Ko-fi](https://img.shields.io/badge/Ko--fi-FF5E5B?style=for-the-badge&logo=Ko-fi&logoColor=white)](https://ko-fi.com/collotsspot)
