@@ -148,11 +148,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Moved here from GlobalPlayerOverlay so it has proper Overlay ancestry
   /// (required by BottomNavigationBar's internal Tooltip widgets).
   Widget? _buildBottomNavigationBar(BuildContext context, ColorScheme colorScheme) {
-    // Hide nav bar when not connected
-    final isConnected = context.select<MusicAssistantProvider, bool>(
-      (p) => p.isConnected,
+    // Hide nav bar when not connected and no cached players
+    final showNavBar = context.select<MusicAssistantProvider, bool>(
+      (p) => p.isConnected || p.hasCachedPlayers,
     );
-    if (!isConnected) return null;
+    if (!showNavBar) return null;
 
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, _) {

@@ -444,8 +444,10 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
                           end: Alignment.bottomCenter,
                           colors: [
                             colorScheme.background.withOpacity(0.0),
-                            colorScheme.background,
+                            colorScheme.background.withOpacity(0.25),
+                            colorScheme.background.withOpacity(0.85),
                           ],
+                          stops: const [0.0, 0.5, 1.0],
                         ),
                       ),
                     ),

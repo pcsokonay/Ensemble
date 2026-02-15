@@ -638,15 +638,16 @@ class _GlobalPlayerOverlayState extends State<GlobalPlayerOverlay>
 
         // Global player overlay - renders ON TOP so cards slide behind it
         // Use Selector instead of Consumer to avoid rebuilds during animation
-        Selector<MusicAssistantProvider, ({bool isConnected, bool hasPlayer, bool hasTrack})>(
+        Selector<MusicAssistantProvider, ({bool isConnected, bool hasPlayer, bool hasTrack, bool hasCachedPlayers})>(
           selector: (_, provider) => (
             isConnected: provider.isConnected,
             hasPlayer: provider.selectedPlayer != null,
             hasTrack: provider.currentTrack != null,
+            hasCachedPlayers: provider.hasCachedPlayers,
           ),
           builder: (context, state, child) {
-            // Only show player if connected and has a selected player
-            if (!state.isConnected || !state.hasPlayer) {
+            // Show player if connected with a player, or if cached players exist (brief disconnect)
+            if ((!state.isConnected && !state.hasCachedPlayers) || !state.hasPlayer) {
               // Reset expansion state to prevent stale values from causing
               // invisible/non-interactive nav bar when connection restores.
               // This fixes a bug where expanded player state persisted after
