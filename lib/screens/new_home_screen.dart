@@ -430,6 +430,27 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
                       ),
                     ),
                   ),
+                // Bottom fade gradient to mask content behind mini player
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: BottomSpacing.miniPlayerHeight + 22.0,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            colorScheme.background.withOpacity(0.0),
+                            colorScheme.background,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             );
           },
@@ -491,7 +512,7 @@ class _NewHomeScreenState extends State<NewHomeScreen> with AutomaticKeepAliveCl
         const marginSize = 2.0;
         final enabledRows = _countEnabledRows();
         const marginsInView = 2 * marginSize; // always 2 margins for 3-row layout
-        final rowHeight = (availableHeight - marginsInView) / 3;
+        final rowHeight = (availableHeight - marginsInView) / 3 + 2;
 
         // Use Android 12+ stretch overscroll effect
         return NotificationListener<ScrollNotification>(
