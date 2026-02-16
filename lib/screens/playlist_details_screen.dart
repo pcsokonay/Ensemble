@@ -59,7 +59,6 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
     super.initState();
     _isFavorite = widget.playlist.favorite ?? false;
     _isInLibrary = widget.playlist.inLibrary;
-    _loadTracks();
 
     // Mark that we're on a detail screen and extract colors immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -67,6 +66,15 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> with Sing
         markDetailScreenEntered(context);
         _extractColors(); // Extract colors immediately - async so won't block
       }
+    });
+
+    // Defer track loading until after hero animation completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (mounted) {
+          _loadTracks();
+        }
+      });
     });
   }
 

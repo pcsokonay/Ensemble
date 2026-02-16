@@ -68,53 +68,70 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
         markDetailScreenEntered(context);
         _extractColors(); // Extract colors immediately - async so won't block
       }
-      // Load full audiobook details with chapters
-      _loadAudiobookDetails();
+    });
+
+    // Defer detail loading until after hero animation completes
+    // This prevents setState with new data during animation → jank
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (mounted) {
+          _loadAudiobookDetails();
+        }
+      });
     });
   }
 
   Future<void> _loadAudiobookDetails() async {
     if (_isLoadingDetails) return;
 
-    setState(() {
-      _isLoadingDetails = true;
-    });
+    final maProvider = context.read<MusicAssistantProvider>();
 
+    // 1. Show cached data immediately (if available)
+    final cached = maProvider.getCachedAudiobookDetail(
+      widget.audiobook.provider,
+      widget.audiobook.itemId,
+    );
+    if (cached != null && mounted) {
+      _logger.log('📚 Showing cached audiobook: ${cached.name}, chapters: ${cached.chapters?.length ?? 0}');
+      setState(() {
+        _fullAudiobook = cached;
+        _isLoadingDetails = false;
+      });
+    } else {
+      setState(() {
+        _isLoadingDetails = true;
+      });
+    }
+
+    // 2. Fetch fresh data in background
     try {
-      final maProvider = context.read<MusicAssistantProvider>();
+      final fullBook = await maProvider.getAudiobookDetailsWithCache(
+        widget.audiobook.provider,
+        widget.audiobook.itemId,
+        forceRefresh: cached != null,
+      );
 
-      {
-        final fullBook = await maProvider.getAudiobookDetailsWithCache(
-          widget.audiobook.provider,
-          widget.audiobook.itemId,
-        );
-
-        if (mounted && fullBook != null) {
-          _logger.log('📚 Loaded full audiobook: ${fullBook.name}, chapters: ${fullBook.chapters?.length ?? 0}');
-          setState(() {
-            _fullAudiobook = fullBook;
-          });
-        }
-      }
-
-      if (mounted) {
+      if (mounted && fullBook != null) {
+        _logger.log('📚 Loaded full audiobook: ${fullBook.name}, chapters: ${fullBook.chapters?.length ?? 0}');
         setState(() {
+          _fullAudiobook = fullBook;
           _isLoadingDetails = false;
         });
       }
     } catch (e) {
       _logger.log('Error loading audiobook details: $e');
-      if (mounted) {
-        setState(() {
-          _isLoadingDetails = false;
-        });
-      }
+    }
+
+    if (mounted && _isLoadingDetails) {
+      setState(() {
+        _isLoadingDetails = false;
+      });
     }
   }
 
   Future<void> _extractColors() async {
     final maProvider = context.read<MusicAssistantProvider>();
-    final imageUrl = maProvider.getImageUrl(widget.audiobook, size: 512);
+    final imageUrl = maProvider.getImageUrl(_audiobook, size: 512);
     if (imageUrl == null) return;
 
     try {
@@ -480,7 +497,7 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final maProvider = context.read<MusicAssistantProvider>();
-    final providerImageUrl = maProvider.getImageUrl(widget.audiobook, size: 512);
+    final providerImageUrl = maProvider.getImageUrl(_audiobook, size: 512);
     // Use initialImageUrl as fallback for seamless hero animation
     final imageUrl = providerImageUrl ?? widget.initialImageUrl;
 

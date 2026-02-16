@@ -61,7 +61,15 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
         markDetailScreenEntered(context);
         _extractColors(); // Extract colors immediately - async so won't block
       }
-      _loadEpisodes();
+    });
+
+    // Defer episode loading until after hero animation completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (mounted) {
+          _loadEpisodes();
+        }
+      });
     });
   }
 
@@ -380,50 +388,62 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
   Future<void> _loadEpisodes() async {
     if (_isLoadingEpisodes) return;
 
-    setState(() {
-      _isLoadingEpisodes = true;
-    });
+    final maProvider = context.read<MusicAssistantProvider>();
 
+    // 1. Show cached episodes immediately (if available)
+    final cached = maProvider.getCachedPodcastEpisodes(
+      widget.podcast.itemId,
+      provider: widget.podcast.provider,
+    );
+    if (cached != null && cached.isNotEmpty && mounted) {
+      _logger.log('🎙️ Showing ${cached.length} cached episodes for ${widget.podcast.name}');
+      setState(() {
+        _episodes = cached;
+        _sortEpisodes();
+        _isLoadingEpisodes = false;
+      });
+    } else {
+      setState(() {
+        _isLoadingEpisodes = true;
+      });
+    }
+
+    // 2. Fetch fresh data in background
     try {
-      final maProvider = context.read<MusicAssistantProvider>();
-      {
-        List<MediaItem> episodes = [];
+      List<MediaItem> episodes = [];
 
-        // Try loading with the podcast's own ID and provider first
-        episodes = await maProvider.getPodcastEpisodesWithCache(
-          widget.podcast.itemId,
-          provider: widget.podcast.provider,
-        );
+      // Try loading with the podcast's own ID and provider first
+      episodes = await maProvider.getPodcastEpisodesWithCache(
+        widget.podcast.itemId,
+        provider: widget.podcast.provider,
+        forceRefresh: cached != null && cached.isNotEmpty,
+      );
 
-        // If that failed and we have provider mappings, try those
-        if (episodes.isEmpty && widget.podcast.providerMappings != null) {
-          for (final mapping in widget.podcast.providerMappings!) {
-            if (mapping.itemId.isNotEmpty && mapping.providerInstance.isNotEmpty) {
-              try {
-                _logger.log('🎙️ Trying provider mapping: ${mapping.providerInstance}');
-                episodes = await maProvider.getPodcastEpisodesWithCache(
-                  mapping.itemId,
-                  provider: mapping.providerInstance,
-                );
-                if (episodes.isNotEmpty) {
-                  _logger.log('🎙️ Loaded episodes via provider mapping');
-                  break;
-                }
-              } catch (e) {
-                _logger.log('🎙️ Provider mapping failed: $e');
+      // If that failed and we have provider mappings, try those
+      if (episodes.isEmpty && widget.podcast.providerMappings != null) {
+        for (final mapping in widget.podcast.providerMappings!) {
+          if (mapping.itemId.isNotEmpty && mapping.providerInstance.isNotEmpty) {
+            try {
+              _logger.log('🎙️ Trying provider mapping: ${mapping.providerInstance}');
+              episodes = await maProvider.getPodcastEpisodesWithCache(
+                mapping.itemId,
+                provider: mapping.providerInstance,
+              );
+              if (episodes.isNotEmpty) {
+                _logger.log('🎙️ Loaded episodes via provider mapping');
+                break;
               }
+            } catch (e) {
+              _logger.log('🎙️ Provider mapping failed: $e');
             }
           }
         }
+      }
 
-        if (mounted) {
+      if (mounted && episodes.isNotEmpty) {
+        final changed = _episodes.length != episodes.length;
+        if (changed || _episodes.isEmpty) {
           _logger.log('🎙️ Loaded ${episodes.length} episodes for ${widget.podcast.name}');
-          // Debug: Log first episode metadata to see available fields
-          if (episodes.isNotEmpty) {
-            final first = episodes.first;
-            _logger.log('🎙️ First episode metadata keys: ${first.metadata?.keys.toList()}');
-            _logger.log('🎙️ First episode metadata: ${first.metadata}');
-          }
           setState(() {
             _episodes = episodes;
             _sortEpisodes();
@@ -432,12 +452,12 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
       }
     } catch (e) {
       _logger.log('🎙️ Error loading episodes: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingEpisodes = false;
-        });
-      }
+    }
+
+    if (mounted && _isLoadingEpisodes) {
+      setState(() {
+        _isLoadingEpisodes = false;
+      });
     }
   }
 

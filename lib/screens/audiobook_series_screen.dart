@@ -53,15 +53,18 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
     // Use initial covers immediately for smooth Hero animation
     if (widget.initialCovers != null && widget.initialCovers!.isNotEmpty) {
       _coverUrls = List.from(widget.initialCovers!);
-      // Start color extraction from initial covers
-      _extractColorsFromUrls(widget.initialCovers!);
     }
     _loadViewPreferences();
-    // Defer loading until after first frame to ensure UI renders first
+    // Defer color extraction and loading until after hero animation completes
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _loadSeriesBooks();
-      }
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (mounted) {
+          if (_coverUrls.isNotEmpty) {
+            _extractColorsFromUrls(_coverUrls);
+          }
+          _loadSeriesBooks();
+        }
+      });
     });
   }
 
@@ -158,71 +161,79 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
 
   Future<void> _loadSeriesBooks() async {
     _logger.log('📚 SeriesScreen _loadSeriesBooks START');
-    try {
+    final maProvider = context.read<MusicAssistantProvider>();
+
+    // 1. Show cached data immediately (if available)
+    final cached = maProvider.getCachedSeriesAudiobooks(widget.series.id);
+    if (cached != null && cached.isNotEmpty && mounted) {
+      _logger.log('📚 Showing ${cached.length} cached series books');
+      _applyBooks(cached, maProvider);
+    } else {
       setState(() {
         _isLoading = true;
         _error = null;
       });
-      _logger.log('📚 SeriesScreen setState done, getting provider...');
+    }
 
-      final maProvider = context.read<MusicAssistantProvider>();
-      _logger.log('📚 SeriesScreen got provider, api=${maProvider.api != null}');
-
+    // 2. Fetch fresh data in background
+    try {
       if (maProvider.api == null) {
-        setState(() {
-          _error = S.of(context)!.notConnected;
-          _isLoading = false;
-        });
+        if (cached == null || cached.isEmpty) {
+          setState(() {
+            _error = S.of(context)!.notConnected;
+            _isLoading = false;
+          });
+        }
         return;
       }
 
-      _logger.log('📚 SeriesScreen calling getSeriesAudiobooks: path=${widget.series.id}');
-      final books = await maProvider.api!.getSeriesAudiobooks(widget.series.id);
+      final books = await maProvider.getSeriesAudiobooksWithCache(
+        widget.series.id,
+        forceRefresh: cached != null && cached.isNotEmpty,
+      );
       _logger.log('📚 SeriesScreen got ${books.length} books');
 
-      // Debug: Log sequence data for each book
-      for (final book in books) {
-        _logger.log('📚 Book: "${book.name}" | position=${book.position} | browseOrder=${book.browseOrder} | sortName=${book.sortName} | seq=${book.seriesSequence} | metadata.series=${book.metadata?['series']}');
-      }
-
-      if (mounted) {
-        // Update cover URLs from loaded books
-        final newCovers = <String>[];
-        for (final book in books.take(9)) {
-          final imageUrl = maProvider.getImageUrl(book);
-          if (imageUrl != null) {
-            newCovers.add(imageUrl);
-          }
+      if (mounted && books.isNotEmpty) {
+        final changed = _audiobooks.length != books.length;
+        if (changed || _audiobooks.isEmpty) {
+          _applyBooks(books, maProvider);
         }
-
-        setState(() {
-          _audiobooks = books;
-          _sortAudiobooks(); // Sort inside setState so UI updates
-          // Update covers if we got new ones (may have more than initial)
-          if (newCovers.isNotEmpty) {
-            _coverUrls = newCovers;
-          }
-          _isLoading = false;
-        });
-        // Debug: Log sorted order
-        _logger.log('📚 Sorted order ($_sortOrder):');
-        for (final book in _audiobooks) {
-          _logger.log('  - ${book.seriesSequence ?? "null"}: ${book.name}');
-        }
-
-        // Extract colors from book covers asynchronously
-        _extractCoverColors(maProvider);
       }
     } catch (e, stack) {
       _logger.log('📚 SeriesScreen error: $e');
       _logger.log('📚 SeriesScreen stack: $stack');
-      if (mounted) {
+      if (mounted && _audiobooks.isEmpty) {
         setState(() {
           _error = 'Failed to load books: $e';
           _isLoading = false;
         });
       }
     }
+
+    if (mounted && _isLoading) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _applyBooks(List<Audiobook> books, MusicAssistantProvider maProvider) {
+    final newCovers = <String>[];
+    for (final book in books.take(9)) {
+      final imageUrl = maProvider.getImageUrl(book);
+      if (imageUrl != null) {
+        newCovers.add(imageUrl);
+      }
+    }
+
+    setState(() {
+      _audiobooks = books;
+      _sortAudiobooks();
+      if (newCovers.isNotEmpty) {
+        _coverUrls = newCovers;
+      }
+      _isLoading = false;
+    });
+
+    _extractCoverColors(maProvider);
   }
 
   /// Extract colors from book covers for empty grid cells
@@ -689,6 +700,8 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: double.infinity,
+                              memCacheWidth: 256,
+                              memCacheHeight: 256,
                               fadeInDuration: Duration.zero,
                               fadeOutDuration: Duration.zero,
                               placeholder: (_, __) => Center(

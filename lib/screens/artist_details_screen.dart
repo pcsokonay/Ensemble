@@ -680,6 +680,19 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> with LibraryS
           _isLoading = false;
         });
       }
+    } else {
+      // No cache yet - show library albums from memory instantly (no API call)
+      final memoryAlbums = provider.getArtistAlbumsFromLibrary(widget.artist.name);
+      if (memoryAlbums.isNotEmpty && mounted) {
+        final libraryAlbums = memoryAlbums.where((a) => a.inLibrary).toList();
+        final providerOnlyAlbums = memoryAlbums.where((a) => !a.inLibrary).toList();
+        setState(() {
+          _albums = libraryAlbums;
+          _providerAlbums = providerOnlyAlbums;
+          _sortAlbums();
+          _isLoading = false;
+        });
+      }
     }
 
     // 2. Fetch fresh data in background (silent refresh)
@@ -690,13 +703,14 @@ class _ArtistDetailsScreenState extends State<ArtistDetailsScreen> with LibraryS
       );
 
       if (mounted && allAlbums.isNotEmpty) {
+        final libraryAlbums = allAlbums.where((a) => a.inLibrary).toList();
+        final providerOnlyAlbums = allAlbums.where((a) => !a.inLibrary).toList();
+
         // Check if data actually changed
-        final albumsChanged = _albums.length != allAlbums.where((a) => a.inLibrary).length;
+        final changed = _albums.length != libraryAlbums.length ||
+            _providerAlbums.length != providerOnlyAlbums.length;
 
-        if (albumsChanged || _albums.isEmpty) {
-          final libraryAlbums = allAlbums.where((a) => a.inLibrary).toList();
-          final providerOnlyAlbums = allAlbums.where((a) => !a.inLibrary).toList();
-
+        if (changed) {
           setState(() {
             _albums = libraryAlbums;
             _providerAlbums = providerOnlyAlbums;

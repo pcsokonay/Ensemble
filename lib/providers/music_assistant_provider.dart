@@ -60,6 +60,8 @@ class MusicAssistantProvider with ChangeNotifier {
   List<Album> _albums = [];
   List<Track> _tracks = [];
   List<Track> _cachedFavoriteTracks = []; // Cached for instant display before full library loads
+  List<Audiobook> _audiobooks = [];
+  final Map<String, List<Audiobook>> _seriesAudiobooksCache = {};
   List<MediaItem> _radioStations = [];
   List<MediaItem> _podcasts = [];
   bool _isLoading = false;
@@ -167,6 +169,7 @@ class MusicAssistantProvider with ChangeNotifier {
   List<Artist> get artists => filterByProvider(_artists);
   List<Album> get albums => filterByProvider(_albums);
   List<Track> get tracks => filterByProvider(_tracks);
+  List<Audiobook> get audiobooks => filterByProvider(_audiobooks);
   List<MediaItem> get radioStations => filterByProvider(_radioStations);
   List<MediaItem> get podcasts => filterByProvider(_podcasts);
 
@@ -309,7 +312,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Get providers that have audiobooks (with item counts)
   Map<String, int> getProvidersWithAudiobooks() {
-    return _getProvidersWithCounts(SyncService.instance.cachedAudiobooks);
+    return _getProvidersWithCounts(_audiobooks);
   }
 
   /// Get providers that have radio stations (with item counts)
@@ -1726,6 +1729,9 @@ class MusicAssistantProvider with ChangeNotifier {
           _cacheService.invalidateAllPlaylistTracksCaches();
         } else if (mediaType == 'artist') {
           _cacheService.invalidateHomeArtistCaches();
+        } else if (mediaType == 'audiobook') {
+          _cacheService.invalidateAudiobookCaches();
+          _cacheService.invalidateHomeCache();
         }
         return true;
       } catch (e) {
@@ -1764,6 +1770,9 @@ class MusicAssistantProvider with ChangeNotifier {
         _cacheService.invalidateAllPlaylistTracksCaches();
       } else if (mediaType == 'artist') {
         _cacheService.invalidateHomeArtistCaches();
+      } else if (mediaType == 'audiobook') {
+        _cacheService.invalidateAudiobookCaches();
+        _cacheService.invalidateHomeCache();
       }
 
       try {
@@ -1844,6 +1853,12 @@ class MusicAssistantProvider with ChangeNotifier {
         !matchesLibraryId(p.provider, p.itemId, p.providerMappings)
       ).toList();
       updated = _podcasts.length != before;
+    } else if (mediaType == 'audiobook') {
+      final before = _audiobooks.length;
+      _audiobooks = _audiobooks.where((a) =>
+        !matchesLibraryId(a.provider, a.itemId, a.providerMappings)
+      ).toList();
+      updated = _audiobooks.length != before;
     }
 
     if (updated) {
@@ -1873,6 +1888,9 @@ class MusicAssistantProvider with ChangeNotifier {
           _radioStations = await _api!.getRadioStations(limit: 100);
         } else if (mediaType == 'podcast') {
           _podcasts = await _api!.getPodcasts(limit: 100);
+        } else if (mediaType == 'audiobook') {
+          _audiobooks = await _api!.getAudiobooks(limit: LibraryConstants.maxLibraryItems);
+          _cacheService.invalidateAudiobookCaches();
         }
         _syncLibraryStatusToService();
         notifyListeners();
@@ -3748,10 +3766,8 @@ class MusicAssistantProvider with ChangeNotifier {
     try {
       _logger.log('🔄 Fetching albums for artist "$artistName"...');
 
-      // Fetch all library albums (with high limit to get full library)
-      final libraryAlbums = await _api!.getAlbums(limit: LibraryConstants.maxLibraryItems);
-      _logger.log('📚 Fetched ${libraryAlbums.length} total library albums');
-      final artistAlbums = libraryAlbums.where((album) {
+      // Use already-loaded library albums instead of re-fetching from API
+      final artistAlbums = _albums.where((album) {
         final albumArtists = album.artists;
         if (albumArtists == null || albumArtists.isEmpty) return false;
         return albumArtists.any((a) => a.name.toLowerCase() == artistName.toLowerCase());
@@ -3851,6 +3867,52 @@ class MusicAssistantProvider with ChangeNotifier {
   /// Get cached artist albums (for instant display before background refresh)
   List<Album>? getCachedArtistAlbums(String artistName) {
     return _cacheService.getCachedArtistAlbums(artistName.toLowerCase());
+  }
+
+  /// Get artist albums from in-memory library (synchronous, no API call)
+  List<Album> getArtistAlbumsFromLibrary(String artistName) {
+    final lowerName = artistName.toLowerCase();
+    return _albums.where((album) {
+      final albumArtists = album.artists;
+      if (albumArtists == null || albumArtists.isEmpty) return false;
+      return albumArtists.any((a) => a.name.toLowerCase() == lowerName);
+    }).toList();
+  }
+
+  /// Get cached audiobook detail from memory (synchronous, for instant display)
+  Audiobook? getCachedAudiobookDetail(String provider, String itemId) {
+    final cacheKey = '${provider}_$itemId';
+    final json = _cacheService.getCachedAudiobookDetail(cacheKey);
+    if (json == null) return null;
+    try {
+      return Audiobook.fromJson(jsonDecode(json) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Get cached podcast episodes from memory (synchronous, for instant display)
+  List<MediaItem>? getCachedPodcastEpisodes(String podcastId, {String? provider}) {
+    final cacheKey = '${provider ?? 'default'}_$podcastId';
+    return _cacheService.getCachedPodcastEpisodes(cacheKey);
+  }
+
+  /// Get cached series audiobooks (synchronous, for instant display)
+  List<Audiobook>? getCachedSeriesAudiobooks(String seriesPath) {
+    return _seriesAudiobooksCache[seriesPath];
+  }
+
+  /// Get series audiobooks with cache-first pattern
+  Future<List<Audiobook>> getSeriesAudiobooksWithCache(String seriesPath, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _seriesAudiobooksCache.containsKey(seriesPath)) {
+      return _seriesAudiobooksCache[seriesPath]!;
+    }
+
+    if (_api == null) return _seriesAudiobooksCache[seriesPath] ?? [];
+
+    final books = await _api!.getSeriesAudiobooks(seriesPath);
+    _seriesAudiobooksCache[seriesPath] = books;
+    return books;
   }
 
   // ============================================================================
@@ -5216,7 +5278,8 @@ class MusicAssistantProvider with ChangeNotifier {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
         _tracks = syncService.cachedTracks;
-        _logger.log('📦 Loaded ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks from cache');
+        _audiobooks = syncService.cachedAudiobooks;
+        _logger.log('📦 Loaded ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks, ${_audiobooks.length} audiobooks from cache');
         _syncLibraryStatusToService();
         notifyListeners();
       }
@@ -5249,10 +5312,11 @@ class MusicAssistantProvider with ChangeNotifier {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
         _tracks = syncService.cachedTracks;
+        _audiobooks = syncService.cachedAudiobooks;
         if (syncService.cachedPodcasts.isNotEmpty) {
           _podcasts = syncService.cachedPodcasts;
         }
-        _logger.log('🔄 Updated library from background sync: ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks, ${_podcasts.length} podcasts');
+        _logger.log('🔄 Updated library from background sync: ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks, ${_audiobooks.length} audiobooks, ${_podcasts.length} podcasts');
         _syncLibraryStatusToService();
         notifyListeners();
         _prefetchAlbumImages();
