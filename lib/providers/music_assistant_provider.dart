@@ -4734,6 +4734,9 @@ class MusicAssistantProvider with ChangeNotifier {
   Future<void> _updatePlayerState() async {
     if (_selectedPlayer == null || _api == null) return;
 
+    // Don't poll when not connected - avoids "Not authenticated" spam
+    if (_api!.currentConnectionState != MAConnectionState.authenticated) return;
+
     // Capture player ID at start to detect stale operations
     // If player changes during async operations, we should abort
     final operationPlayerId = _selectedPlayer!.playerId;
@@ -4870,10 +4873,17 @@ class MusicAssistantProvider with ChangeNotifier {
 
       if (!shouldShowTrack) {
         if (_currentTrack != null) {
-          _currentTrack = null;
+          // Player went idle - try to keep last-known track visible for resume
+          final lastKnown = _cacheService.getLastKnownTrack(_selectedPlayer!.playerId);
+          if (lastKnown != null && _selectedPlayer!.state == 'idle') {
+            _logger.log('🔄 Player idle-out: keeping last-known track "${lastKnown.name}" for resume');
+            _currentTrack = lastKnown;
+          } else {
+            _currentTrack = null;
+            // Persist cleared track state
+            _persistPlaybackState();
+          }
           stateChanged = true;
-          // Persist cleared track state
-          _persistPlaybackState();
         }
         // Clear audiobook context when playback stops
         if (_currentAudiobook != null) {
@@ -4986,6 +4996,9 @@ class MusicAssistantProvider with ChangeNotifier {
             }
           }
         }
+
+        // Save last-known track for resume after idle-out
+        _cacheService.setLastKnownTrack(_selectedPlayer!.playerId, _currentTrack!);
 
         // Update notification for ALL players
         final track = _currentTrack!;
@@ -5127,7 +5140,15 @@ class MusicAssistantProvider with ChangeNotifier {
       // For pause: Don't refresh - we already did optimistic UI update
       // The player_updated event from MA will handle final state sync
     } else {
-      await resumePlayer(_selectedPlayer!.playerId);
+      // If player is idle with no active queue but has a last-known track, re-queue it
+      final isIdle = _selectedPlayer!.state == 'idle';
+      final lastKnown = _cacheService.getLastKnownTrack(_selectedPlayer!.playerId);
+      if (isIdle && lastKnown != null) {
+        _logger.log('🔄 Player idle with last-known track - re-queuing "${lastKnown.name}"');
+        await playTrack(_selectedPlayer!.playerId, lastKnown);
+      } else {
+        await resumePlayer(_selectedPlayer!.playerId);
+      }
       // For resume: Refresh in background to get updated track info
       unawaited(refreshPlayers());
     }

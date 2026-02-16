@@ -55,6 +55,9 @@ class CacheService {
   final Map<String, Track?> _playerTrackCache = {};
   final Map<String, DateTime> _playerTrackCacheTime = {};
 
+  // Last-known track cache (survives idle-out, for resume after Chromecast idle)
+  final Map<String, Track> _lastKnownTrackCache = {};
+
   // ============================================================================
   // HOME SCREEN ROW CACHING
   // ============================================================================
@@ -484,6 +487,14 @@ class CacheService {
   void clearCachedTrackForPlayer(String playerId) {
     _playerTrackCache.remove(playerId);
     _playerTrackCacheTime.remove(playerId);
+  }
+
+  /// Get last-known track for a player (survives idle-out)
+  Track? getLastKnownTrack(String playerId) => _lastKnownTrackCache[playerId];
+
+  /// Save last-known track for a player (only called when a real track is playing/paused)
+  void setLastKnownTrack(String playerId, Track track) {
+    _lastKnownTrackCache[playerId] = track;
   }
 
   // ============================================================================
