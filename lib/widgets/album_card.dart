@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../services/image_prefetch_service.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
 import '../screens/album_details_screen.dart';
@@ -377,6 +378,7 @@ class _AlbumCardState extends State<AlbumCard> with LibraryStatusMixin {
                                 fit: BoxFit.cover,
                                 memCacheWidth: cacheSize,
                                 memCacheHeight: cacheSize,
+                                cacheManager: AlbumImageCacheManager(),
                                 fadeInDuration: Duration.zero,
                                 fadeOutDuration: Duration.zero,
                                 placeholder: (context, url) => const SizedBox(),

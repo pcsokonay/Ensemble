@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 /// A wrapper around CachedNetworkImage for consistent image caching throughout the app.
 ///
@@ -18,6 +19,7 @@ class CachedImage extends StatelessWidget {
   final int? cacheWidth;
   final int? cacheHeight;
   final BorderRadius? borderRadius;
+  final BaseCacheManager? cacheManager;
 
   const CachedImage({
     super.key,
@@ -30,6 +32,7 @@ class CachedImage extends StatelessWidget {
     this.cacheWidth,
     this.cacheHeight,
     this.borderRadius,
+    this.cacheManager,
   });
 
   @override
@@ -43,6 +46,7 @@ class CachedImage extends StatelessWidget {
       fit: fit,
       memCacheWidth: cacheWidth,
       memCacheHeight: cacheHeight,
+      cacheManager: cacheManager,
       fadeInDuration: const Duration(milliseconds: 150),
       fadeOutDuration: const Duration(milliseconds: 150),
       placeholder: (context, url) => placeholder ?? Container(

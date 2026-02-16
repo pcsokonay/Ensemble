@@ -26,6 +26,7 @@ import '../services/group_volume_manager.dart';
 import '../services/sendspin_service.dart';
 import '../services/pcm_audio_player.dart';
 import '../services/offline_action_queue.dart';
+import '../services/image_prefetch_service.dart';
 import '../constants/timings.dart';
 import '../services/database_service.dart';
 import '../services/library_status_service.dart';
@@ -47,6 +48,7 @@ class MusicAssistantProvider with ChangeNotifier {
   final DebugLogger _logger = DebugLogger();
   final CacheService _cacheService = CacheService();
   final PositionTracker _positionTracker = PositionTracker();
+  ImagePrefetchService? _imagePrefetchService;
   final GroupVolumeManager _groupVolumeManager = GroupVolumeManager();
 
   MAConnectionState _connectionState = MAConnectionState.disconnected;
@@ -942,8 +944,8 @@ class MusicAssistantProvider with ChangeNotifier {
       if (syncService.hasCache) {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
-        // Note: tracks are loaded separately via API, not cached in SyncService
-        _logger.log('📦 Pre-loaded library for favorites: ${_albums.length} albums, ${_artists.length} artists');
+        _tracks = syncService.cachedTracks;
+        _logger.log('📦 Pre-loaded library for favorites: ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks');
         _syncLibraryStatusToService();
         notifyListeners();
       }
@@ -1892,6 +1894,8 @@ class MusicAssistantProvider with ChangeNotifier {
     _mediaItemAddedEventSubscription?.cancel();
     _mediaItemDeletedEventSubscription?.cancel();
     _positionTracker.clear();
+    _imagePrefetchService?.cancel();
+    _imagePrefetchService = null;
     // Disconnect Sendspin and PCM player if connected
     if (_sendspinConnected) {
       await _pcmAudioPlayer?.disconnect();
@@ -3615,6 +3619,12 @@ class MusicAssistantProvider with ChangeNotifier {
       return _cacheService.getCachedAlbumTracks(cacheKey)!;
     }
 
+    // Try database fallback before hitting API
+    if (!forceRefresh) {
+      final dbTracks = await _cacheService.getAlbumTracksWithDbFallback(cacheKey);
+      if (dbTracks != null) return dbTracks;
+    }
+
     if (_api == null) return _cacheService.getCachedAlbumTracks(cacheKey) ?? [];
 
     try {
@@ -3636,6 +3646,12 @@ class MusicAssistantProvider with ChangeNotifier {
       return _cacheService.getCachedPlaylistTracks(cacheKey)!;
     }
 
+    // Try database fallback before hitting API
+    if (!forceRefresh) {
+      final dbTracks = await _cacheService.getPlaylistTracksWithDbFallback(cacheKey);
+      if (dbTracks != null) return dbTracks;
+    }
+
     if (_api == null) return _cacheService.getCachedPlaylistTracks(cacheKey) ?? [];
 
     try {
@@ -3646,6 +3662,76 @@ class MusicAssistantProvider with ChangeNotifier {
     } catch (e) {
       _logger.log('❌ Failed to fetch playlist tracks: $e');
       return _cacheService.getCachedPlaylistTracks(cacheKey) ?? [];
+    }
+  }
+
+  Future<Audiobook?> getAudiobookDetailsWithCache(String provider, String itemId, {bool forceRefresh = false}) async {
+    final cacheKey = '${provider}_$itemId';
+
+    if (_cacheService.isAudiobookDetailCacheValid(cacheKey, forceRefresh: forceRefresh)) {
+      _logger.log('📦 Using cached audiobook detail for $cacheKey');
+      final json = _cacheService.getCachedAudiobookDetail(cacheKey)!;
+      try {
+        return Audiobook.fromJson(jsonDecode(json) as Map<String, dynamic>);
+      } catch (_) {}
+    }
+
+    // Try database fallback before hitting API
+    if (!forceRefresh) {
+      final dbJson = await _cacheService.getAudiobookDetailWithDbFallback(cacheKey);
+      if (dbJson != null) {
+        try {
+          return Audiobook.fromJson(jsonDecode(dbJson) as Map<String, dynamic>);
+        } catch (_) {}
+      }
+    }
+
+    if (_api == null) return null;
+
+    try {
+      _logger.log('🔄 Fetching audiobook details for $cacheKey...');
+      final audiobook = await _api!.getAudiobookDetails(provider, itemId);
+      if (audiobook != null) {
+        _cacheService.setCachedAudiobookDetail(cacheKey, jsonEncode(audiobook.toJson()));
+      }
+      return audiobook;
+    } catch (e) {
+      _logger.log('❌ Failed to fetch audiobook details: $e');
+      // Try cached version on error
+      final cached = _cacheService.getCachedAudiobookDetail(cacheKey);
+      if (cached != null) {
+        try {
+          return Audiobook.fromJson(jsonDecode(cached) as Map<String, dynamic>);
+        } catch (_) {}
+      }
+      return null;
+    }
+  }
+
+  Future<List<MediaItem>> getPodcastEpisodesWithCache(String podcastId, {String? provider, bool forceRefresh = false}) async {
+    final cacheKey = '${provider ?? 'default'}_$podcastId';
+
+    if (_cacheService.isPodcastEpisodesCacheValid(cacheKey, forceRefresh: forceRefresh)) {
+      _logger.log('📦 Using cached podcast episodes for $cacheKey');
+      return _cacheService.getCachedPodcastEpisodes(cacheKey)!;
+    }
+
+    // Try database fallback before hitting API
+    if (!forceRefresh) {
+      final dbEpisodes = await _cacheService.getPodcastEpisodesWithDbFallback(cacheKey);
+      if (dbEpisodes != null) return dbEpisodes;
+    }
+
+    if (_api == null) return _cacheService.getCachedPodcastEpisodes(cacheKey) ?? [];
+
+    try {
+      _logger.log('🔄 Fetching podcast episodes for $cacheKey...');
+      final episodes = await _api!.getPodcastEpisodes(podcastId, provider: provider);
+      _cacheService.setCachedPodcastEpisodes(cacheKey, episodes);
+      return episodes;
+    } catch (e) {
+      _logger.log('❌ Failed to fetch podcast episodes: $e');
+      return _cacheService.getCachedPodcastEpisodes(cacheKey) ?? [];
     }
   }
 
@@ -5108,22 +5194,10 @@ class MusicAssistantProvider with ChangeNotifier {
       if (syncService.hasCache) {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
-        _logger.log('📦 Loaded ${_albums.length} albums, ${_artists.length} artists from cache');
+        _tracks = syncService.cachedTracks;
+        _logger.log('📦 Loaded ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks from cache');
         _syncLibraryStatusToService();
         notifyListeners();
-      }
-
-      // Fetch tracks from API (not cached - too many items)
-      if (_api != null) {
-        try {
-          _tracks = await _api!.getTracks(
-            limit: LibraryConstants.maxLibraryItems,
-            providerInstanceIds: providerIdsForApiCalls,
-          );
-          _logger.log('📥 Fetched ${_tracks.length} tracks from MA');
-        } catch (e) {
-          _logger.log('⚠️ Failed to fetch tracks: $e');
-        }
       }
 
       _isLoading = false;
@@ -5153,15 +5227,40 @@ class MusicAssistantProvider with ChangeNotifier {
       if (syncService.status == SyncStatus.completed) {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
-        _logger.log('🔄 Updated library from background sync: ${_albums.length} albums, ${_artists.length} artists');
+        _tracks = syncService.cachedTracks;
+        if (syncService.cachedPodcasts.isNotEmpty) {
+          _podcasts = syncService.cachedPodcasts;
+        }
+        _logger.log('🔄 Updated library from background sync: ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks, ${_podcasts.length} podcasts');
         _syncLibraryStatusToService();
         notifyListeners();
+        _prefetchAlbumImages();
       }
       syncService.removeListener(onSyncComplete);
     }
 
     syncService.addListener(onSyncComplete);
     await syncService.syncFromApi(_api!, providerInstanceIds: providerIdsForApiCalls);
+  }
+
+  /// Prefetch album and audiobook images in background after sync
+  void _prefetchAlbumImages() {
+    _imagePrefetchService?.cancel();
+    _imagePrefetchService = ImagePrefetchService();
+
+    final urls = <String>[];
+    for (final album in _albums) {
+      final url = _api?.getImageUrl(album, size: 256);
+      if (url != null) urls.add(url);
+    }
+    for (final audiobook in SyncService.instance.cachedAudiobooks) {
+      final url = _api?.getImageUrl(audiobook, size: 256);
+      if (url != null) urls.add(url);
+    }
+
+    if (urls.isEmpty) return;
+    _logger.log('🖼️ Starting image prefetch for ${urls.length} items');
+    _imagePrefetchService!.prefetchImages(urls);
   }
 
   /// Load radio stations from the library
@@ -5185,9 +5284,17 @@ class MusicAssistantProvider with ChangeNotifier {
   Future<void> loadPodcasts({String? orderBy}) async {
     if (!isConnected || _api == null) return;
 
+    // Load from cache first (instant)
+    final syncService = SyncService.instance;
+    if (syncService.cachedPodcasts.isNotEmpty && _podcasts.isEmpty) {
+      _podcasts = syncService.cachedPodcasts;
+      _logger.log('📦 Loaded ${_podcasts.length} podcasts from cache');
+      notifyListeners();
+    }
+
     try {
       _isLoadingPodcasts = true;
-      notifyListeners();
+      if (_podcasts.isEmpty) notifyListeners();
 
       _podcasts = await _api!.getPodcasts(limit: 100, orderBy: orderBy);
 

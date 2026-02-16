@@ -43,6 +43,8 @@ class SyncService with ChangeNotifier {
   List<Artist> _cachedArtists = [];
   List<Audiobook> _cachedAudiobooks = [];
   List<Playlist> _cachedPlaylists = [];
+  List<Track> _cachedTracks = [];
+  List<MediaItem> _cachedPodcasts = [];
 
   // Source provider tracking for client-side filtering
   // Maps itemId -> list of provider instance IDs that provided the item
@@ -50,6 +52,7 @@ class SyncService with ChangeNotifier {
   Map<String, List<String>> _artistSourceProviders = {};
   Map<String, List<String>> _audiobookSourceProviders = {};
   Map<String, List<String>> _playlistSourceProviders = {};
+  Map<String, List<String>> _trackSourceProviders = {};
 
   // Getters
   SyncStatus get status => _status;
@@ -60,14 +63,18 @@ class SyncService with ChangeNotifier {
   List<Artist> get cachedArtists => _cachedArtists;
   List<Audiobook> get cachedAudiobooks => _cachedAudiobooks;
   List<Playlist> get cachedPlaylists => _cachedPlaylists;
+  List<Track> get cachedTracks => _cachedTracks;
+  List<MediaItem> get cachedPodcasts => _cachedPodcasts;
   bool get hasCache => _cachedAlbums.isNotEmpty || _cachedArtists.isNotEmpty ||
-                       _cachedAudiobooks.isNotEmpty || _cachedPlaylists.isNotEmpty;
+                       _cachedAudiobooks.isNotEmpty || _cachedPlaylists.isNotEmpty ||
+                       _cachedTracks.isNotEmpty || _cachedPodcasts.isNotEmpty;
 
   // Source provider getters for client-side filtering
   Map<String, List<String>> get albumSourceProviders => _albumSourceProviders;
   Map<String, List<String>> get artistSourceProviders => _artistSourceProviders;
   Map<String, List<String>> get audiobookSourceProviders => _audiobookSourceProviders;
   Map<String, List<String>> get playlistSourceProviders => _playlistSourceProviders;
+  Map<String, List<String>> get trackSourceProviders => _trackSourceProviders;
 
   /// Load library data from database cache (instant)
   /// Call this on app startup for immediate data
@@ -145,9 +152,37 @@ class SyncService with ChangeNotifier {
         }
       }
 
+      // Load tracks from cache with source providers
+      final trackDataWithProviders = await _db.getCachedItemsWithProviders('track');
+      _cachedTracks = [];
+      _trackSourceProviders = {};
+      for (final (data, providers) in trackDataWithProviders) {
+        try {
+          final track = Track.fromJson(data);
+          _cachedTracks.add(track);
+          if (providers.isNotEmpty) {
+            _trackSourceProviders[track.itemId] = providers;
+          }
+        } catch (e) {
+          _logger.log('⚠️ Failed to parse cached track: $e');
+        }
+      }
+
+      // Load podcasts from cache (no source provider tracking - API doesn't support filtering)
+      final podcastData = await _db.getCachedItems('podcast');
+      _cachedPodcasts = [];
+      for (final data in podcastData) {
+        try {
+          _cachedPodcasts.add(MediaItem.fromJson(data));
+        } catch (e) {
+          _logger.log('⚠️ Failed to parse cached podcast: $e');
+        }
+      }
+
       _logger.log('📦 Loaded ${_cachedAlbums.length} albums, ${_cachedArtists.length} artists, '
-                  '${_cachedAudiobooks.length} audiobooks, ${_cachedPlaylists.length} playlists from cache');
-      _logger.log('📦 Source providers: ${_albumSourceProviders.length} albums, ${_artistSourceProviders.length} artists tracked');
+                  '${_cachedAudiobooks.length} audiobooks, ${_cachedPlaylists.length} playlists, '
+                  '${_cachedTracks.length} tracks, ${_cachedPodcasts.length} podcasts from cache');
+      _logger.log('📦 Source providers: ${_albumSourceProviders.length} albums, ${_artistSourceProviders.length} artists, ${_trackSourceProviders.length} tracks tracked');
       notifyListeners();
     } catch (e) {
       _logger.log('❌ Failed to load from cache: $e');
@@ -180,8 +215,10 @@ class SyncService with ChangeNotifier {
       final artistsNeedSync = await _db.needsSync('artists', maxAge: const Duration(minutes: 5));
       final audiobooksNeedSync = await _db.needsSync('audiobooks', maxAge: const Duration(minutes: 5));
       final playlistsNeedSync = await _db.needsSync('playlists', maxAge: const Duration(minutes: 5));
+      final tracksNeedSync = await _db.needsSync('tracks', maxAge: const Duration(minutes: 5));
+      final podcastsNeedSync = await _db.needsSync('podcasts', maxAge: const Duration(minutes: 5));
 
-      if (!albumsNeedSync && !artistsNeedSync && !audiobooksNeedSync && !playlistsNeedSync) {
+      if (!albumsNeedSync && !artistsNeedSync && !audiobooksNeedSync && !playlistsNeedSync && !tracksNeedSync && !podcastsNeedSync) {
         _logger.log('✅ Cache is fresh, skipping sync');
         return;
       }
@@ -207,6 +244,8 @@ class SyncService with ChangeNotifier {
         await _db.clearCacheForType('artist');
         await _db.clearCacheForType('audiobook');
         await _db.clearCacheForType('playlist');
+        await _db.clearCacheForType('track');
+        await _db.clearCacheForType('podcast');
       }
 
       // Build NEW source tracking maps - don't modify existing until sync is complete
@@ -216,6 +255,7 @@ class SyncService with ChangeNotifier {
       final newArtistSourceProviders = <String, List<String>>{};
       final newAudiobookSourceProviders = <String, List<String>>{};
       final newPlaylistSourceProviders = <String, List<String>>{};
+      final newTrackSourceProviders = <String, List<String>>{};
 
       // For partial syncs, copy tracking from non-syncing providers
       if (isPartialSync) {
@@ -235,6 +275,10 @@ class SyncService with ChangeNotifier {
           final preserved = entry.value.where((p) => !syncingProviders.contains(p)).toList();
           if (preserved.isNotEmpty) newPlaylistSourceProviders[entry.key] = preserved;
         }
+        for (final entry in _trackSourceProviders.entries) {
+          final preserved = entry.value.where((p) => !syncingProviders.contains(p)).toList();
+          if (preserved.isNotEmpty) newTrackSourceProviders[entry.key] = preserved;
+        }
       }
 
       // Collect all items (deduped by itemId, but tracking all source providers)
@@ -242,6 +286,7 @@ class SyncService with ChangeNotifier {
       final artistMap = <String, Artist>{};
       final audiobookMap = <String, Audiobook>{};
       final playlistMap = <String, Playlist>{};
+      final trackMap = <String, Track>{};
 
       // If specific providers are requested, sync each separately for accurate source tracking
       if (providerInstanceIds != null && providerInstanceIds.isNotEmpty) {
@@ -256,14 +301,16 @@ class SyncService with ChangeNotifier {
             api.getArtists(limit: 1000, albumArtistsOnly: showOnlyArtistsWithAlbums, providerInstanceIds: [providerId]),
             api.getAudiobooks(limit: 1000, providerInstanceIds: [providerId]),
             api.getPlaylists(limit: 1000, providerInstanceIds: [providerId]),
+            api.getTracks(limit: 5000, providerInstanceIds: [providerId]),
           ]);
 
           final albums = results[0] as List<Album>;
           final artists = results[1] as List<Artist>;
           final audiobooks = results[2] as List<Audiobook>;
           final playlists = results[3] as List<Playlist>;
+          final tracks = results[4] as List<Track>;
 
-          _logger.log('  📥 Got ${albums.length} albums, ${artists.length} artists, ${audiobooks.length} audiobooks from $providerId');
+          _logger.log('  📥 Got ${albums.length} albums, ${artists.length} artists, ${audiobooks.length} audiobooks, ${tracks.length} tracks from $providerId');
 
           // Add to maps and track source provider in NEW tracking maps
           for (final album in albums) {
@@ -294,6 +341,13 @@ class SyncService with ChangeNotifier {
               newPlaylistSourceProviders[playlist.itemId]!.add(providerId);
             }
           }
+          for (final track in tracks) {
+            trackMap[track.itemId] = track;
+            newTrackSourceProviders.putIfAbsent(track.itemId, () => []);
+            if (!newTrackSourceProviders[track.itemId]!.contains(providerId)) {
+              newTrackSourceProviders[track.itemId]!.add(providerId);
+            }
+          }
         }
       } else {
         // No provider filter - fetch all at once (faster, but no source tracking)
@@ -304,6 +358,7 @@ class SyncService with ChangeNotifier {
           api.getArtists(limit: 1000, albumArtistsOnly: showOnlyArtistsWithAlbums),
           api.getAudiobooks(limit: 1000),
           api.getPlaylists(limit: 1000),
+          api.getTracks(limit: 5000),
         ]);
 
         for (final album in results[0] as List<Album>) {
@@ -318,27 +373,44 @@ class SyncService with ChangeNotifier {
         for (final playlist in results[3] as List<Playlist>) {
           playlistMap[playlist.itemId] = playlist;
         }
+        for (final track in results[4] as List<Track>) {
+          trackMap[track.itemId] = track;
+        }
       }
 
       final albums = albumMap.values.toList();
       final artists = artistMap.values.toList();
       final audiobooks = audiobookMap.values.toList();
       final playlists = playlistMap.values.toList();
+      final tracks = trackMap.values.toList();
+
+      // Fetch podcasts separately (API doesn't support providerInstanceIds)
+      List<MediaItem> podcasts = [];
+      try {
+        podcasts = await api.getPodcasts(limit: 100);
+      } catch (e) {
+        _logger.log('⚠️ Failed to fetch podcasts: $e');
+      }
 
       _logger.log('📥 Total: ${albums.length} albums, ${artists.length} artists, '
-                  '${audiobooks.length} audiobooks, ${playlists.length} playlists');
+                  '${audiobooks.length} audiobooks, ${playlists.length} playlists, '
+                  '${tracks.length} tracks, ${podcasts.length} podcasts');
 
       // Save to database cache with source provider info (using NEW tracking maps)
       await _saveAlbumsToCache(albums, newAlbumSourceProviders);
       await _saveArtistsToCache(artists, newArtistSourceProviders);
       await _saveAudiobooksToCache(audiobooks, newAudiobookSourceProviders);
       await _savePlaylistsToCache(playlists, newPlaylistSourceProviders);
+      await _saveTracksToCache(tracks, newTrackSourceProviders);
+      await _savePodcastsToCache(podcasts);
 
       // Update sync metadata
       await _db.updateSyncMetadata('albums', albums.length);
       await _db.updateSyncMetadata('artists', artists.length);
       await _db.updateSyncMetadata('audiobooks', audiobooks.length);
       await _db.updateSyncMetadata('playlists', playlists.length);
+      await _db.updateSyncMetadata('tracks', tracks.length);
+      await _db.updateSyncMetadata('podcasts', podcasts.length);
 
       // Update in-memory cache
       if (isPartialSync) {
@@ -347,6 +419,7 @@ class SyncService with ChangeNotifier {
         final artistIds = artists.map((a) => a.itemId).toSet();
         final audiobookIds = audiobooks.map((a) => a.itemId).toSet();
         final playlistIds = playlists.map((p) => p.itemId).toSet();
+        final trackIds = tracks.map((t) => t.itemId).toSet();
 
         // Keep items not in current sync, add/update items from sync
         _cachedAlbums = [
@@ -365,25 +438,34 @@ class SyncService with ChangeNotifier {
           ..._cachedPlaylists.where((p) => !playlistIds.contains(p.itemId)),
           ...playlists,
         ];
+        _cachedTracks = [
+          ..._cachedTracks.where((t) => !trackIds.contains(t.itemId)),
+          ...tracks,
+        ];
       } else {
         // Full sync: replace entire cache
         _cachedAlbums = albums;
         _cachedArtists = artists;
         _cachedAudiobooks = audiobooks;
         _cachedPlaylists = playlists;
+        _cachedTracks = tracks;
       }
+      // Podcasts always full replace (no per-provider tracking)
+      _cachedPodcasts = podcasts;
+
       // Atomically swap in the new source tracking maps
       // This ensures filtering always sees complete data, never partial
       _albumSourceProviders = newAlbumSourceProviders;
       _artistSourceProviders = newArtistSourceProviders;
       _audiobookSourceProviders = newAudiobookSourceProviders;
       _playlistSourceProviders = newPlaylistSourceProviders;
+      _trackSourceProviders = newTrackSourceProviders;
 
       _lastSyncTime = DateTime.now();
       _status = SyncStatus.completed;
 
       _logger.log('✅ Library sync complete');
-      _logger.log('📊 Source tracking: ${_albumSourceProviders.length} albums, ${_artistSourceProviders.length} artists, ${_audiobookSourceProviders.length} audiobooks have provider info');
+      _logger.log('📊 Source tracking: ${_albumSourceProviders.length} albums, ${_artistSourceProviders.length} artists, ${_audiobookSourceProviders.length} audiobooks, ${_trackSourceProviders.length} tracks have provider info');
     } catch (e) {
       _logger.log('❌ Library sync failed: $e');
       _status = SyncStatus.error;
@@ -474,6 +556,44 @@ class SyncService with ChangeNotifier {
     }
   }
 
+  /// Save tracks to database cache with source provider tracking (batched)
+  Future<void> _saveTracksToCache(List<Track> tracks, Map<String, List<String>> sourceProviders) async {
+    final batchItems = <BatchCacheItem>[];
+    for (final track in tracks) {
+      final providers = sourceProviders[track.itemId] ?? <String>[];
+      batchItems.add(BatchCacheItem(
+        itemType: 'track',
+        itemId: track.itemId,
+        data: jsonEncode(track.toJson()),
+        sourceProviders: providers,
+      ));
+    }
+    try {
+      await _db.batchCacheItems(batchItems);
+      _logger.log('💾 Batch saved ${tracks.length} tracks to cache');
+    } catch (e) {
+      _logger.log('⚠️ Failed to batch cache tracks: $e');
+    }
+  }
+
+  /// Save podcasts to database cache (batched, no source provider tracking)
+  Future<void> _savePodcastsToCache(List<MediaItem> podcasts) async {
+    final batchItems = <BatchCacheItem>[];
+    for (final podcast in podcasts) {
+      batchItems.add(BatchCacheItem(
+        itemType: 'podcast',
+        itemId: podcast.itemId,
+        data: jsonEncode(podcast.toJson()),
+      ));
+    }
+    try {
+      await _db.batchCacheItems(batchItems);
+      _logger.log('💾 Batch saved ${podcasts.length} podcasts to cache');
+    } catch (e) {
+      _logger.log('⚠️ Failed to batch cache podcasts: $e');
+    }
+  }
+
   /// Force a fresh sync (for pull-to-refresh)
   /// [providerInstanceIds] - optional list of provider IDs to filter by (null = all providers)
   Future<void> forceSync(MusicAssistantAPI api, {List<String>? providerInstanceIds}) async {
@@ -489,10 +609,13 @@ class SyncService with ChangeNotifier {
     _cachedArtists = [];
     _cachedAudiobooks = [];
     _cachedPlaylists = [];
+    _cachedTracks = [];
+    _cachedPodcasts = [];
     _albumSourceProviders = {};
     _artistSourceProviders = {};
     _audiobookSourceProviders = {};
     _playlistSourceProviders = {};
+    _trackSourceProviders = {};
     _lastSyncTime = null;
     _status = SyncStatus.idle;
     notifyListeners();
@@ -555,12 +678,25 @@ class SyncService with ChangeNotifier {
     }).toList();
   }
 
+  /// Filter tracks by source provider (instant, no network)
+  List<Track> getTracksFilteredByProviders(Set<String> enabledProviderIds) {
+    if (enabledProviderIds.isEmpty) {
+      return _cachedTracks;
+    }
+    return _cachedTracks.where((track) {
+      final sources = _trackSourceProviders[track.itemId];
+      if (sources == null || sources.isEmpty) return false;
+      return sources.any((s) => enabledProviderIds.contains(s));
+    }).toList();
+  }
+
   /// Check if we have source provider tracking data
   bool get hasSourceTracking =>
       _albumSourceProviders.isNotEmpty ||
       _artistSourceProviders.isNotEmpty ||
       _audiobookSourceProviders.isNotEmpty ||
-      _playlistSourceProviders.isNotEmpty;
+      _playlistSourceProviders.isNotEmpty ||
+      _trackSourceProviders.isNotEmpty;
 
   /// Get albums (from cache or empty if not loaded)
   List<Album> getAlbums() => _cachedAlbums;
@@ -574,9 +710,16 @@ class SyncService with ChangeNotifier {
   /// Get playlists (from cache or empty if not loaded)
   List<Playlist> getPlaylists() => _cachedPlaylists;
 
+  /// Get tracks (from cache or empty if not loaded)
+  List<Track> getTracks() => _cachedTracks;
+
+  /// Get podcasts (from cache or empty if not loaded)
+  List<MediaItem> getPodcasts() => _cachedPodcasts;
+
   /// Check if we have data available (from cache or sync)
   bool get hasData => _cachedAlbums.isNotEmpty || _cachedArtists.isNotEmpty ||
-                      _cachedAudiobooks.isNotEmpty || _cachedPlaylists.isNotEmpty;
+                      _cachedAudiobooks.isNotEmpty || _cachedPlaylists.isNotEmpty ||
+                      _cachedTracks.isNotEmpty || _cachedPodcasts.isNotEmpty;
 
   /// Update cached albums with sorted data from provider
   /// Used when sort order changes - preserves source provider tracking
@@ -663,6 +806,17 @@ class SyncService with ChangeNotifier {
         if (updated) {
           _playlistSourceProviders.removeWhere((key, _) =>
             _cachedPlaylists.every((p) => p.itemId != key));
+        }
+        break;
+      case 'track':
+        final before = _cachedTracks.length;
+        _cachedTracks = _cachedTracks.where((t) =>
+          !matchesLibraryId(t.provider, t.itemId, t.providerMappings)
+        ).toList();
+        updated = _cachedTracks.length != before;
+        if (updated) {
+          _trackSourceProviders.removeWhere((key, _) =>
+            _cachedTracks.every((t) => t.itemId != key));
         }
         break;
     }

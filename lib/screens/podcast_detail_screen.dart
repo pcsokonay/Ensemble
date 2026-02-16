@@ -386,18 +386,14 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
 
     try {
       final maProvider = context.read<MusicAssistantProvider>();
-      if (maProvider.api != null) {
+      {
         List<MediaItem> episodes = [];
 
         // Try loading with the podcast's own ID and provider first
-        try {
-          episodes = await maProvider.api!.getPodcastEpisodes(
-            widget.podcast.itemId,
-            provider: widget.podcast.provider,
-          );
-        } catch (e) {
-          _logger.log('🎙️ Primary episode load failed: $e');
-        }
+        episodes = await maProvider.getPodcastEpisodesWithCache(
+          widget.podcast.itemId,
+          provider: widget.podcast.provider,
+        );
 
         // If that failed and we have provider mappings, try those
         if (episodes.isEmpty && widget.podcast.providerMappings != null) {
@@ -405,7 +401,7 @@ class _PodcastDetailScreenState extends State<PodcastDetailScreen> {
             if (mapping.itemId.isNotEmpty && mapping.providerInstance.isNotEmpty) {
               try {
                 _logger.log('🎙️ Trying provider mapping: ${mapping.providerInstance}');
-                episodes = await maProvider.api!.getPodcastEpisodes(
+                episodes = await maProvider.getPodcastEpisodesWithCache(
                   mapping.itemId,
                   provider: mapping.providerInstance,
                 );

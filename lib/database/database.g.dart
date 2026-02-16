@@ -2916,6 +2916,381 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
   }
 }
 
+class $DetailTrackCacheTable extends DetailTrackCache
+    with TableInfo<$DetailTrackCacheTable, DetailTrackCacheData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DetailTrackCacheTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _cacheKeyMeta =
+      const VerificationMeta('cacheKey');
+  @override
+  late final GeneratedColumn<String> cacheKey = GeneratedColumn<String>(
+      'cache_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _parentTypeMeta =
+      const VerificationMeta('parentType');
+  @override
+  late final GeneratedColumn<String> parentType = GeneratedColumn<String>(
+      'parent_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _parentKeyMeta =
+      const VerificationMeta('parentKey');
+  @override
+  late final GeneratedColumn<String> parentKey = GeneratedColumn<String>(
+      'parent_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _tracksJsonMeta =
+      const VerificationMeta('tracksJson');
+  @override
+  late final GeneratedColumn<String> tracksJson = GeneratedColumn<String>(
+      'tracks_json', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _lastFetchedMeta =
+      const VerificationMeta('lastFetched');
+  @override
+  late final GeneratedColumn<DateTime> lastFetched = GeneratedColumn<DateTime>(
+      'last_fetched', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _lastAccessedMeta =
+      const VerificationMeta('lastAccessed');
+  @override
+  late final GeneratedColumn<DateTime> lastAccessed = GeneratedColumn<DateTime>(
+      'last_accessed', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [cacheKey, parentType, parentKey, tracksJson, lastFetched, lastAccessed];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'detail_track_cache';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<DetailTrackCacheData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('cache_key')) {
+      context.handle(_cacheKeyMeta,
+          cacheKey.isAcceptableOrUnknown(data['cache_key']!, _cacheKeyMeta));
+    } else if (isInserting) {
+      context.missing(_cacheKeyMeta);
+    }
+    if (data.containsKey('parent_type')) {
+      context.handle(
+          _parentTypeMeta,
+          parentType.isAcceptableOrUnknown(
+              data['parent_type']!, _parentTypeMeta));
+    } else if (isInserting) {
+      context.missing(_parentTypeMeta);
+    }
+    if (data.containsKey('parent_key')) {
+      context.handle(_parentKeyMeta,
+          parentKey.isAcceptableOrUnknown(data['parent_key']!, _parentKeyMeta));
+    } else if (isInserting) {
+      context.missing(_parentKeyMeta);
+    }
+    if (data.containsKey('tracks_json')) {
+      context.handle(
+          _tracksJsonMeta,
+          tracksJson.isAcceptableOrUnknown(
+              data['tracks_json']!, _tracksJsonMeta));
+    } else if (isInserting) {
+      context.missing(_tracksJsonMeta);
+    }
+    if (data.containsKey('last_fetched')) {
+      context.handle(
+          _lastFetchedMeta,
+          lastFetched.isAcceptableOrUnknown(
+              data['last_fetched']!, _lastFetchedMeta));
+    } else if (isInserting) {
+      context.missing(_lastFetchedMeta);
+    }
+    if (data.containsKey('last_accessed')) {
+      context.handle(
+          _lastAccessedMeta,
+          lastAccessed.isAcceptableOrUnknown(
+              data['last_accessed']!, _lastAccessedMeta));
+    } else if (isInserting) {
+      context.missing(_lastAccessedMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {cacheKey};
+  @override
+  DetailTrackCacheData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DetailTrackCacheData(
+      cacheKey: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cache_key'])!,
+      parentType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parent_type'])!,
+      parentKey: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parent_key'])!,
+      tracksJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tracks_json'])!,
+      lastFetched: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}last_fetched'])!,
+      lastAccessed: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}last_accessed'])!,
+    );
+  }
+
+  @override
+  $DetailTrackCacheTable createAlias(String alias) {
+    return $DetailTrackCacheTable(attachedDatabase, alias);
+  }
+}
+
+class DetailTrackCacheData extends DataClass
+    implements Insertable<DetailTrackCacheData> {
+  /// Composite key: "{parentType}_{parentKey}"
+  final String cacheKey;
+
+  /// Type: 'album' or 'playlist'
+  final String parentType;
+
+  /// The parent item's cache key (e.g., "provider_itemId")
+  final String parentKey;
+
+  /// Serialized list of tracks as JSON array
+  final String tracksJson;
+
+  /// When this was fetched from API
+  final DateTime lastFetched;
+
+  /// When this was last accessed (for LRU eviction)
+  final DateTime lastAccessed;
+  const DetailTrackCacheData(
+      {required this.cacheKey,
+      required this.parentType,
+      required this.parentKey,
+      required this.tracksJson,
+      required this.lastFetched,
+      required this.lastAccessed});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['cache_key'] = Variable<String>(cacheKey);
+    map['parent_type'] = Variable<String>(parentType);
+    map['parent_key'] = Variable<String>(parentKey);
+    map['tracks_json'] = Variable<String>(tracksJson);
+    map['last_fetched'] = Variable<DateTime>(lastFetched);
+    map['last_accessed'] = Variable<DateTime>(lastAccessed);
+    return map;
+  }
+
+  DetailTrackCacheCompanion toCompanion(bool nullToAbsent) {
+    return DetailTrackCacheCompanion(
+      cacheKey: Value(cacheKey),
+      parentType: Value(parentType),
+      parentKey: Value(parentKey),
+      tracksJson: Value(tracksJson),
+      lastFetched: Value(lastFetched),
+      lastAccessed: Value(lastAccessed),
+    );
+  }
+
+  factory DetailTrackCacheData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DetailTrackCacheData(
+      cacheKey: serializer.fromJson<String>(json['cacheKey']),
+      parentType: serializer.fromJson<String>(json['parentType']),
+      parentKey: serializer.fromJson<String>(json['parentKey']),
+      tracksJson: serializer.fromJson<String>(json['tracksJson']),
+      lastFetched: serializer.fromJson<DateTime>(json['lastFetched']),
+      lastAccessed: serializer.fromJson<DateTime>(json['lastAccessed']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'cacheKey': serializer.toJson<String>(cacheKey),
+      'parentType': serializer.toJson<String>(parentType),
+      'parentKey': serializer.toJson<String>(parentKey),
+      'tracksJson': serializer.toJson<String>(tracksJson),
+      'lastFetched': serializer.toJson<DateTime>(lastFetched),
+      'lastAccessed': serializer.toJson<DateTime>(lastAccessed),
+    };
+  }
+
+  DetailTrackCacheData copyWith(
+          {String? cacheKey,
+          String? parentType,
+          String? parentKey,
+          String? tracksJson,
+          DateTime? lastFetched,
+          DateTime? lastAccessed}) =>
+      DetailTrackCacheData(
+        cacheKey: cacheKey ?? this.cacheKey,
+        parentType: parentType ?? this.parentType,
+        parentKey: parentKey ?? this.parentKey,
+        tracksJson: tracksJson ?? this.tracksJson,
+        lastFetched: lastFetched ?? this.lastFetched,
+        lastAccessed: lastAccessed ?? this.lastAccessed,
+      );
+  DetailTrackCacheData copyWithCompanion(DetailTrackCacheCompanion data) {
+    return DetailTrackCacheData(
+      cacheKey: data.cacheKey.present ? data.cacheKey.value : this.cacheKey,
+      parentType:
+          data.parentType.present ? data.parentType.value : this.parentType,
+      parentKey: data.parentKey.present ? data.parentKey.value : this.parentKey,
+      tracksJson:
+          data.tracksJson.present ? data.tracksJson.value : this.tracksJson,
+      lastFetched:
+          data.lastFetched.present ? data.lastFetched.value : this.lastFetched,
+      lastAccessed: data.lastAccessed.present
+          ? data.lastAccessed.value
+          : this.lastAccessed,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DetailTrackCacheData(')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('parentType: $parentType, ')
+          ..write('parentKey: $parentKey, ')
+          ..write('tracksJson: $tracksJson, ')
+          ..write('lastFetched: $lastFetched, ')
+          ..write('lastAccessed: $lastAccessed')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      cacheKey, parentType, parentKey, tracksJson, lastFetched, lastAccessed);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DetailTrackCacheData &&
+          other.cacheKey == this.cacheKey &&
+          other.parentType == this.parentType &&
+          other.parentKey == this.parentKey &&
+          other.tracksJson == this.tracksJson &&
+          other.lastFetched == this.lastFetched &&
+          other.lastAccessed == this.lastAccessed);
+}
+
+class DetailTrackCacheCompanion extends UpdateCompanion<DetailTrackCacheData> {
+  final Value<String> cacheKey;
+  final Value<String> parentType;
+  final Value<String> parentKey;
+  final Value<String> tracksJson;
+  final Value<DateTime> lastFetched;
+  final Value<DateTime> lastAccessed;
+  final Value<int> rowid;
+  const DetailTrackCacheCompanion({
+    this.cacheKey = const Value.absent(),
+    this.parentType = const Value.absent(),
+    this.parentKey = const Value.absent(),
+    this.tracksJson = const Value.absent(),
+    this.lastFetched = const Value.absent(),
+    this.lastAccessed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DetailTrackCacheCompanion.insert({
+    required String cacheKey,
+    required String parentType,
+    required String parentKey,
+    required String tracksJson,
+    required DateTime lastFetched,
+    required DateTime lastAccessed,
+    this.rowid = const Value.absent(),
+  })  : cacheKey = Value(cacheKey),
+        parentType = Value(parentType),
+        parentKey = Value(parentKey),
+        tracksJson = Value(tracksJson),
+        lastFetched = Value(lastFetched),
+        lastAccessed = Value(lastAccessed);
+  static Insertable<DetailTrackCacheData> custom({
+    Expression<String>? cacheKey,
+    Expression<String>? parentType,
+    Expression<String>? parentKey,
+    Expression<String>? tracksJson,
+    Expression<DateTime>? lastFetched,
+    Expression<DateTime>? lastAccessed,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (cacheKey != null) 'cache_key': cacheKey,
+      if (parentType != null) 'parent_type': parentType,
+      if (parentKey != null) 'parent_key': parentKey,
+      if (tracksJson != null) 'tracks_json': tracksJson,
+      if (lastFetched != null) 'last_fetched': lastFetched,
+      if (lastAccessed != null) 'last_accessed': lastAccessed,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DetailTrackCacheCompanion copyWith(
+      {Value<String>? cacheKey,
+      Value<String>? parentType,
+      Value<String>? parentKey,
+      Value<String>? tracksJson,
+      Value<DateTime>? lastFetched,
+      Value<DateTime>? lastAccessed,
+      Value<int>? rowid}) {
+    return DetailTrackCacheCompanion(
+      cacheKey: cacheKey ?? this.cacheKey,
+      parentType: parentType ?? this.parentType,
+      parentKey: parentKey ?? this.parentKey,
+      tracksJson: tracksJson ?? this.tracksJson,
+      lastFetched: lastFetched ?? this.lastFetched,
+      lastAccessed: lastAccessed ?? this.lastAccessed,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (cacheKey.present) {
+      map['cache_key'] = Variable<String>(cacheKey.value);
+    }
+    if (parentType.present) {
+      map['parent_type'] = Variable<String>(parentType.value);
+    }
+    if (parentKey.present) {
+      map['parent_key'] = Variable<String>(parentKey.value);
+    }
+    if (tracksJson.present) {
+      map['tracks_json'] = Variable<String>(tracksJson.value);
+    }
+    if (lastFetched.present) {
+      map['last_fetched'] = Variable<DateTime>(lastFetched.value);
+    }
+    if (lastAccessed.present) {
+      map['last_accessed'] = Variable<DateTime>(lastAccessed.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DetailTrackCacheCompanion(')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('parentType: $parentType, ')
+          ..write('parentKey: $parentKey, ')
+          ..write('tracksJson: $tracksJson, ')
+          ..write('lastFetched: $lastFetched, ')
+          ..write('lastAccessed: $lastAccessed, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2928,6 +3303,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CachedQueueTable cachedQueue = $CachedQueueTable(this);
   late final $HomeRowCacheTable homeRowCache = $HomeRowCacheTable(this);
   late final $SearchHistoryTable searchHistory = $SearchHistoryTable(this);
+  late final $DetailTrackCacheTable detailTrackCache =
+      $DetailTrackCacheTable(this);
   late final Index idxRecentlyPlayedProfile = Index(
       'idx_recently_played_profile',
       'CREATE INDEX idx_recently_played_profile ON recently_played (profile_username)');
@@ -2958,6 +3335,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         cachedQueue,
         homeRowCache,
         searchHistory,
+        detailTrackCache,
         idxRecentlyPlayedProfile,
         idxRecentlyPlayedProfilePlayed,
         idxLibraryCacheType,
@@ -4701,6 +5079,198 @@ typedef $$SearchHistoryTableProcessedTableManager = ProcessedTableManager<
     ),
     SearchHistoryData,
     PrefetchHooks Function()>;
+typedef $$DetailTrackCacheTableCreateCompanionBuilder
+    = DetailTrackCacheCompanion Function({
+  required String cacheKey,
+  required String parentType,
+  required String parentKey,
+  required String tracksJson,
+  required DateTime lastFetched,
+  required DateTime lastAccessed,
+  Value<int> rowid,
+});
+typedef $$DetailTrackCacheTableUpdateCompanionBuilder
+    = DetailTrackCacheCompanion Function({
+  Value<String> cacheKey,
+  Value<String> parentType,
+  Value<String> parentKey,
+  Value<String> tracksJson,
+  Value<DateTime> lastFetched,
+  Value<DateTime> lastAccessed,
+  Value<int> rowid,
+});
+
+class $$DetailTrackCacheTableFilterComposer
+    extends Composer<_$AppDatabase, $DetailTrackCacheTable> {
+  $$DetailTrackCacheTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get cacheKey => $composableBuilder(
+      column: $table.cacheKey, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parentType => $composableBuilder(
+      column: $table.parentType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parentKey => $composableBuilder(
+      column: $table.parentKey, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tracksJson => $composableBuilder(
+      column: $table.tracksJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastFetched => $composableBuilder(
+      column: $table.lastFetched, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastAccessed => $composableBuilder(
+      column: $table.lastAccessed, builder: (column) => ColumnFilters(column));
+}
+
+class $$DetailTrackCacheTableOrderingComposer
+    extends Composer<_$AppDatabase, $DetailTrackCacheTable> {
+  $$DetailTrackCacheTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get cacheKey => $composableBuilder(
+      column: $table.cacheKey, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parentType => $composableBuilder(
+      column: $table.parentType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parentKey => $composableBuilder(
+      column: $table.parentKey, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tracksJson => $composableBuilder(
+      column: $table.tracksJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastFetched => $composableBuilder(
+      column: $table.lastFetched, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastAccessed => $composableBuilder(
+      column: $table.lastAccessed,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$DetailTrackCacheTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DetailTrackCacheTable> {
+  $$DetailTrackCacheTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get cacheKey =>
+      $composableBuilder(column: $table.cacheKey, builder: (column) => column);
+
+  GeneratedColumn<String> get parentType => $composableBuilder(
+      column: $table.parentType, builder: (column) => column);
+
+  GeneratedColumn<String> get parentKey =>
+      $composableBuilder(column: $table.parentKey, builder: (column) => column);
+
+  GeneratedColumn<String> get tracksJson => $composableBuilder(
+      column: $table.tracksJson, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastFetched => $composableBuilder(
+      column: $table.lastFetched, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastAccessed => $composableBuilder(
+      column: $table.lastAccessed, builder: (column) => column);
+}
+
+class $$DetailTrackCacheTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $DetailTrackCacheTable,
+    DetailTrackCacheData,
+    $$DetailTrackCacheTableFilterComposer,
+    $$DetailTrackCacheTableOrderingComposer,
+    $$DetailTrackCacheTableAnnotationComposer,
+    $$DetailTrackCacheTableCreateCompanionBuilder,
+    $$DetailTrackCacheTableUpdateCompanionBuilder,
+    (
+      DetailTrackCacheData,
+      BaseReferences<_$AppDatabase, $DetailTrackCacheTable,
+          DetailTrackCacheData>
+    ),
+    DetailTrackCacheData,
+    PrefetchHooks Function()> {
+  $$DetailTrackCacheTableTableManager(
+      _$AppDatabase db, $DetailTrackCacheTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DetailTrackCacheTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DetailTrackCacheTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DetailTrackCacheTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> cacheKey = const Value.absent(),
+            Value<String> parentType = const Value.absent(),
+            Value<String> parentKey = const Value.absent(),
+            Value<String> tracksJson = const Value.absent(),
+            Value<DateTime> lastFetched = const Value.absent(),
+            Value<DateTime> lastAccessed = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              DetailTrackCacheCompanion(
+            cacheKey: cacheKey,
+            parentType: parentType,
+            parentKey: parentKey,
+            tracksJson: tracksJson,
+            lastFetched: lastFetched,
+            lastAccessed: lastAccessed,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String cacheKey,
+            required String parentType,
+            required String parentKey,
+            required String tracksJson,
+            required DateTime lastFetched,
+            required DateTime lastAccessed,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              DetailTrackCacheCompanion.insert(
+            cacheKey: cacheKey,
+            parentType: parentType,
+            parentKey: parentKey,
+            tracksJson: tracksJson,
+            lastFetched: lastFetched,
+            lastAccessed: lastAccessed,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$DetailTrackCacheTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $DetailTrackCacheTable,
+    DetailTrackCacheData,
+    $$DetailTrackCacheTableFilterComposer,
+    $$DetailTrackCacheTableOrderingComposer,
+    $$DetailTrackCacheTableAnnotationComposer,
+    $$DetailTrackCacheTableCreateCompanionBuilder,
+    $$DetailTrackCacheTableUpdateCompanionBuilder,
+    (
+      DetailTrackCacheData,
+      BaseReferences<_$AppDatabase, $DetailTrackCacheTable,
+          DetailTrackCacheData>
+    ),
+    DetailTrackCacheData,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4723,4 +5293,6 @@ class $AppDatabaseManager {
       $$HomeRowCacheTableTableManager(_db, _db.homeRowCache);
   $$SearchHistoryTableTableManager get searchHistory =>
       $$SearchHistoryTableTableManager(_db, _db.searchHistory);
+  $$DetailTrackCacheTableTableManager get detailTrackCache =>
+      $$DetailTrackCacheTableTableManager(_db, _db.detailTrackCache);
 }

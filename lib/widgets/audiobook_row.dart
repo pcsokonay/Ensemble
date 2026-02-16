@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import '../services/image_prefetch_service.dart';
 import '../l10n/app_localizations.dart';
 import '../models/media_item.dart';
 import '../providers/music_assistant_provider.dart';
@@ -95,7 +96,7 @@ class _AudiobookRowState extends State<AudiobookRow> with AutomaticKeepAliveClie
       final imageUrl = maProvider.api?.getImageUrl(audiobook, size: 256);
       if (imageUrl != null) {
         precacheImage(
-          CachedNetworkImageProvider(imageUrl),
+          CachedNetworkImageProvider(imageUrl, cacheManager: AlbumImageCacheManager()),
           context,
         ).catchError((_) {
           // Silently ignore precache errors
@@ -449,6 +450,7 @@ class _AudiobookCardState extends State<_AudiobookCard> with LibraryStatusMixin 
                           ? CachedNetworkImage(
                               imageUrl: imageUrl,
                               fit: BoxFit.cover,
+                              cacheManager: AlbumImageCacheManager(),
                               // PERF: Duration.zero for hero-wrapped images
                               fadeInDuration: Duration.zero,
                               fadeOutDuration: Duration.zero,

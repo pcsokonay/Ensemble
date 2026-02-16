@@ -83,8 +83,8 @@ class _AudiobookDetailScreenState extends State<AudiobookDetailScreen> {
     try {
       final maProvider = context.read<MusicAssistantProvider>();
 
-      if (maProvider.api != null) {
-        final fullBook = await maProvider.api!.getAudiobookDetails(
+      {
+        final fullBook = await maProvider.getAudiobookDetailsWithCache(
           widget.audiobook.provider,
           widget.audiobook.itemId,
         );

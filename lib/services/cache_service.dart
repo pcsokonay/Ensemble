@@ -319,6 +319,7 @@ class CacheService {
     _albumTracksCacheTime[cacheKey] = DateTime.now();
     _evictOldestEntries(_albumTracksCache, _albumTracksCacheTime, _maxDetailCacheSize);
     _logger.log('✅ Cached ${tracks.length} tracks for album $cacheKey');
+    _persistDetailTracks('album', cacheKey, tracks);
   }
 
   /// Invalidate album tracks cache for a specific album
@@ -353,6 +354,7 @@ class CacheService {
     _playlistTracksCacheTime[cacheKey] = DateTime.now();
     _evictOldestEntries(_playlistTracksCache, _playlistTracksCacheTime, _maxDetailCacheSize);
     _logger.log('✅ Cached ${tracks.length} tracks for playlist $cacheKey');
+    _persistDetailTracks('playlist', cacheKey, tracks);
   }
 
   /// Invalidate playlist tracks cache for a specific playlist
@@ -500,7 +502,21 @@ class CacheService {
     _searchCacheTime.clear();
     _playerTrackCache.clear();
     _playerTrackCacheTime.clear();
+    _audiobookDetailCache.clear();
+    _audiobookDetailCacheTime.clear();
+    _podcastEpisodesCache.clear();
+    _podcastEpisodesCacheTime.clear();
     _logger.log('🗑️ All detail caches cleared');
+    // Also clear DB detail cache
+    () async {
+      try {
+        if (DatabaseService.instance.isInitialized) {
+          await DatabaseService.instance.clearDetailTrackCache();
+        }
+      } catch (e) {
+        _logger.log('⚠️ Failed to clear detail track DB cache: $e');
+      }
+    }();
   }
 
   /// Clear all caches
@@ -642,6 +658,179 @@ class CacheService {
 
     if (keysToRemove.isNotEmpty) {
       _logger.log('🗑️ LRU evicted ${keysToRemove.length} cache entries');
+    }
+  }
+
+  // ============================================================================
+  // AUDIOBOOK DETAIL CACHING
+  // ============================================================================
+
+  final Map<String, String> _audiobookDetailCache = {};  // cacheKey -> JSON
+  final Map<String, DateTime> _audiobookDetailCacheTime = {};
+
+  bool isAudiobookDetailCacheValid(String cacheKey, {bool forceRefresh = false}) {
+    if (forceRefresh) return false;
+    final cacheTime = _audiobookDetailCacheTime[cacheKey];
+    return _audiobookDetailCache.containsKey(cacheKey) &&
+        cacheTime != null &&
+        DateTime.now().difference(cacheTime) < const Duration(minutes: 5);
+  }
+
+  String? getCachedAudiobookDetail(String cacheKey) => _audiobookDetailCache[cacheKey];
+
+  void setCachedAudiobookDetail(String cacheKey, String audiobookJson) {
+    _audiobookDetailCache[cacheKey] = audiobookJson;
+    _audiobookDetailCacheTime[cacheKey] = DateTime.now();
+    _evictOldestEntries(_audiobookDetailCache, _audiobookDetailCacheTime, _maxDetailCacheSize);
+    _logger.log('✅ Cached audiobook detail for $cacheKey');
+    _persistDetailData('audiobook', cacheKey, audiobookJson);
+  }
+
+  Future<String?> getAudiobookDetailWithDbFallback(String cacheKey) async {
+    final memCached = _audiobookDetailCache[cacheKey];
+    if (memCached != null) return memCached;
+
+    try {
+      if (!DatabaseService.instance.isInitialized) return null;
+      final dbResult = await DatabaseService.instance.getDetailTracks('audiobook', cacheKey);
+      if (dbResult == null) return null;
+
+      _audiobookDetailCache[cacheKey] = dbResult.tracksJson;
+      _audiobookDetailCacheTime[cacheKey] = dbResult.lastFetched;
+      _logger.log('📦 Loaded audiobook detail from database for $cacheKey');
+      return dbResult.tracksJson;
+    } catch (e) {
+      _logger.log('⚠️ Failed to load audiobook detail from database: $e');
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // PODCAST EPISODE CACHING
+  // ============================================================================
+
+  final Map<String, List<MediaItem>> _podcastEpisodesCache = {};
+  final Map<String, DateTime> _podcastEpisodesCacheTime = {};
+
+  bool isPodcastEpisodesCacheValid(String cacheKey, {bool forceRefresh = false}) {
+    if (forceRefresh) return false;
+    final cacheTime = _podcastEpisodesCacheTime[cacheKey];
+    return _podcastEpisodesCache.containsKey(cacheKey) &&
+        cacheTime != null &&
+        DateTime.now().difference(cacheTime) < const Duration(minutes: 5);
+  }
+
+  List<MediaItem>? getCachedPodcastEpisodes(String cacheKey) => _podcastEpisodesCache[cacheKey];
+
+  void setCachedPodcastEpisodes(String cacheKey, List<MediaItem> episodes) {
+    _podcastEpisodesCache[cacheKey] = episodes;
+    _podcastEpisodesCacheTime[cacheKey] = DateTime.now();
+    _evictOldestEntries(_podcastEpisodesCache, _podcastEpisodesCacheTime, _maxDetailCacheSize);
+    _logger.log('✅ Cached ${episodes.length} episodes for podcast $cacheKey');
+    _persistDetailMediaItems('podcast', cacheKey, episodes);
+  }
+
+  Future<List<MediaItem>?> getPodcastEpisodesWithDbFallback(String cacheKey) async {
+    final memCached = _podcastEpisodesCache[cacheKey];
+    if (memCached != null) return memCached;
+
+    try {
+      if (!DatabaseService.instance.isInitialized) return null;
+      final dbResult = await DatabaseService.instance.getDetailTracks('podcast', cacheKey);
+      if (dbResult == null) return null;
+
+      final episodes = (jsonDecode(dbResult.tracksJson) as List)
+          .map((json) => MediaItem.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      _podcastEpisodesCache[cacheKey] = episodes;
+      _podcastEpisodesCacheTime[cacheKey] = dbResult.lastFetched;
+      _logger.log('📦 Loaded ${episodes.length} podcast episodes from database for $cacheKey');
+      return episodes;
+    } catch (e) {
+      _logger.log('⚠️ Failed to load podcast episodes from database: $e');
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // DATABASE PERSISTENCE FOR DETAIL TRACKS
+  // ============================================================================
+
+  /// Persist detail tracks to database (fire-and-forget)
+  void _persistDetailTracks(String parentType, String cacheKey, List<Track> tracks) {
+    _persistDetailData(parentType, cacheKey, jsonEncode(tracks.map((t) => t.toJson()).toList()));
+  }
+
+  /// Persist detail media items to database (fire-and-forget)
+  void _persistDetailMediaItems(String parentType, String cacheKey, List<MediaItem> items) {
+    _persistDetailData(parentType, cacheKey, jsonEncode(items.map((i) => i.toJson()).toList()));
+  }
+
+  /// Persist raw JSON detail data to database (fire-and-forget)
+  void _persistDetailData(String parentType, String cacheKey, String dataJson) {
+    () async {
+      try {
+        if (!DatabaseService.instance.isInitialized) return;
+        await DatabaseService.instance.saveDetailTracks(parentType, cacheKey, dataJson);
+        _logger.log('💾 Persisted detail data ($parentType/$cacheKey) to database');
+      } catch (e) {
+        _logger.log('⚠️ Failed to persist detail data: $e');
+      }
+    }();
+  }
+
+  /// Get album tracks with database fallback (memory → DB → null)
+  Future<List<Track>?> getAlbumTracksWithDbFallback(String cacheKey) async {
+    // Check memory cache first
+    final memCached = _albumTracksCache[cacheKey];
+    if (memCached != null) return memCached;
+
+    // Try database
+    try {
+      if (!DatabaseService.instance.isInitialized) return null;
+      final dbResult = await DatabaseService.instance.getDetailTracks('album', cacheKey);
+      if (dbResult == null) return null;
+
+      final tracks = (jsonDecode(dbResult.tracksJson) as List)
+          .map((json) => Track.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      // Warm memory cache
+      _albumTracksCache[cacheKey] = tracks;
+      _albumTracksCacheTime[cacheKey] = dbResult.lastFetched;
+      _logger.log('📦 Loaded ${tracks.length} album tracks from database for $cacheKey');
+      return tracks;
+    } catch (e) {
+      _logger.log('⚠️ Failed to load album tracks from database: $e');
+      return null;
+    }
+  }
+
+  /// Get playlist tracks with database fallback (memory → DB → null)
+  Future<List<Track>?> getPlaylistTracksWithDbFallback(String cacheKey) async {
+    // Check memory cache first
+    final memCached = _playlistTracksCache[cacheKey];
+    if (memCached != null) return memCached;
+
+    // Try database
+    try {
+      if (!DatabaseService.instance.isInitialized) return null;
+      final dbResult = await DatabaseService.instance.getDetailTracks('playlist', cacheKey);
+      if (dbResult == null) return null;
+
+      final tracks = (jsonDecode(dbResult.tracksJson) as List)
+          .map((json) => Track.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      // Warm memory cache
+      _playlistTracksCache[cacheKey] = tracks;
+      _playlistTracksCacheTime[cacheKey] = dbResult.lastFetched;
+      _logger.log('📦 Loaded ${tracks.length} playlist tracks from database for $cacheKey');
+      return tracks;
+    } catch (e) {
+      _logger.log('⚠️ Failed to load playlist tracks from database: $e');
+      return null;
     }
   }
 }

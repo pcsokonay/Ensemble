@@ -190,12 +190,37 @@ class SearchHistory extends Table {
   DateTimeColumn get searchedAt => dateTime()();
 }
 
-@DriftDatabase(tables: [Profiles, RecentlyPlayed, LibraryCache, SyncMetadata, PlaybackState, CachedPlayers, CachedQueue, HomeRowCache, SearchHistory])
+/// Cached detail tracks for album/playlist detail screens
+/// Persists across app restarts so detail screens load instantly
+class DetailTrackCache extends Table {
+  /// Composite key: "{parentType}_{parentKey}"
+  TextColumn get cacheKey => text()();
+
+  /// Type: 'album' or 'playlist'
+  TextColumn get parentType => text()();
+
+  /// The parent item's cache key (e.g., "provider_itemId")
+  TextColumn get parentKey => text()();
+
+  /// Serialized list of tracks as JSON array
+  TextColumn get tracksJson => text()();
+
+  /// When this was fetched from API
+  DateTimeColumn get lastFetched => dateTime()();
+
+  /// When this was last accessed (for LRU eviction)
+  DateTimeColumn get lastAccessed => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {cacheKey};
+}
+
+@DriftDatabase(tables: [Profiles, RecentlyPlayed, LibraryCache, SyncMetadata, PlaybackState, CachedPlayers, CachedQueue, HomeRowCache, SearchHistory, DetailTrackCache])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -233,6 +258,10 @@ class AppDatabase extends _$AppDatabase {
         // Migration from v5 to v6: Add source_providers column for client-side filtering
         if (from < 6) {
           await customStatement("ALTER TABLE library_cache ADD COLUMN source_providers TEXT NOT NULL DEFAULT '[]'");
+        }
+        // Migration from v6 to v7: Add detail track cache table
+        if (from < 7) {
+          await m.createTable(detailTrackCache);
         }
       },
     );
@@ -694,6 +723,66 @@ class AppDatabase extends _$AppDatabase {
   /// Clear all search history
   Future<void> clearSearchHistory() async {
     await delete(searchHistory).go();
+  }
+
+  // ============================================
+  // Detail Track Cache Operations
+  // ============================================
+
+  /// Save detail tracks for an album or playlist
+  Future<void> saveDetailTracks(String parentType, String parentKey, String tracksJson) async {
+    final cacheKey = '${parentType}_$parentKey';
+    final now = DateTime.now();
+    await into(detailTrackCache).insertOnConflictUpdate(
+      DetailTrackCacheCompanion.insert(
+        cacheKey: cacheKey,
+        parentType: parentType,
+        parentKey: parentKey,
+        tracksJson: tracksJson,
+        lastFetched: now,
+        lastAccessed: now,
+      ),
+    );
+    // Evict old entries if cache grows too large
+    await _evictDetailTrackCache();
+  }
+
+  /// Get cached detail tracks for an album or playlist
+  /// Returns null if not cached, updates lastAccessed on hit
+  Future<DetailTrackCacheData?> getDetailTracks(String parentType, String parentKey) async {
+    final cacheKey = '${parentType}_$parentKey';
+    final result = await (select(detailTrackCache)
+      ..where((d) => d.cacheKey.equals(cacheKey)))
+      .getSingleOrNull();
+    if (result != null) {
+      // Update last accessed time
+      await (update(detailTrackCache)..where((d) => d.cacheKey.equals(cacheKey)))
+          .write(DetailTrackCacheCompanion(lastAccessed: Value(DateTime.now())));
+    }
+    return result;
+  }
+
+  /// Evict oldest detail track cache entries when over limit
+  Future<void> _evictDetailTrackCache() async {
+    const maxEntries = 100;
+    final count = await (selectOnly(detailTrackCache)..addColumns([countAll()]))
+        .map((row) => row.read(countAll())!)
+        .getSingle();
+    if (count <= maxEntries) return;
+
+    // Delete oldest by lastAccessed
+    final oldest = await (select(detailTrackCache)
+      ..orderBy([(d) => OrderingTerm.asc(d.lastAccessed)])
+      ..limit(count - maxEntries))
+      .get();
+    for (final entry in oldest) {
+      await (delete(detailTrackCache)..where((d) => d.cacheKey.equals(entry.cacheKey))).go();
+    }
+  }
+
+  /// Clear all detail track cache
+  Future<void> clearDetailTrackCache() async {
+    await delete(detailTrackCache).go();
   }
 
   // ============================================

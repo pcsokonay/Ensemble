@@ -324,6 +324,23 @@ class DatabaseService {
   Future<void> clearSearchHistory() => db.clearSearchHistory();
 
   // ============================================
+  // Detail Track Cache Convenience Methods
+  // ============================================
+
+  /// Save detail tracks for an album or playlist
+  Future<void> saveDetailTracks(String parentType, String parentKey, String tracksJson) {
+    return db.saveDetailTracks(parentType, parentKey, tracksJson);
+  }
+
+  /// Get cached detail tracks for an album or playlist
+  Future<DetailTrackCacheData?> getDetailTracks(String parentType, String parentKey) {
+    return db.getDetailTracks(parentType, parentKey);
+  }
+
+  /// Clear all detail track cache
+  Future<void> clearDetailTrackCache() => db.clearDetailTrackCache();
+
+  // ============================================
   // Cast-to-Sendspin Mapping Methods
   // ============================================
 
