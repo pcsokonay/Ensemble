@@ -44,8 +44,11 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   // Extracted colors from book covers
   List<Color> _extractedColors = [];
 
-  // Cover URLs - start with initial covers, update when books load
+  // Cover URLs - set once from initialCovers or first book load, then frozen
   List<String> _coverUrls = [];
+
+  // Cached cover widget - built once, never rebuilt
+  Widget? _cachedCoverWidget;
 
   @override
   void initState() {
@@ -216,24 +219,30 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
   }
 
   void _applyBooks(List<Audiobook> books, MusicAssistantProvider maProvider) {
-    final newCovers = <String>[];
-    for (final book in books.take(9)) {
-      final imageUrl = maProvider.getImageUrl(book);
-      if (imageUrl != null) {
-        newCovers.add(imageUrl);
-      }
-    }
+    // Only populate covers if we have none yet (initialCovers was empty)
+    final needsCovers = _coverUrls.isEmpty;
 
     setState(() {
       _audiobooks = books;
       _sortAudiobooks();
-      if (newCovers.isNotEmpty) {
-        _coverUrls = newCovers;
+      if (needsCovers) {
+        final newCovers = <String>[];
+        for (final book in books.take(9)) {
+          final imageUrl = maProvider.getImageUrl(book);
+          if (imageUrl != null) {
+            newCovers.add(imageUrl);
+          }
+        }
+        if (newCovers.isNotEmpty) {
+          _coverUrls = newCovers;
+        }
       }
       _isLoading = false;
     });
 
-    _extractCoverColors(maProvider);
+    if (needsCovers && _extractedColors.isEmpty) {
+      _extractCoverColors(maProvider);
+    }
   }
 
   /// Extract colors from book covers for empty grid cells
@@ -314,25 +323,31 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
                 children: [
                   const SizedBox(height: 60),
                   // Series cover collage - responsive size
-                  Hero(
-                    tag: widget.heroTag ?? 'series_cover_${widget.series.id}',
-                    child: Container(
-                      width: coverSize,
-                      height: coverSize,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                  // Shadow container outside Hero to avoid widget tree mismatch
+                  Container(
+                    width: coverSize,
+                    height: coverSize,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    // Hero child matches source: RepaintBoundary > AspectRatio > ClipRRect
+                    child: Hero(
+                      tag: widget.heroTag ?? 'series_cover_${widget.series.id}',
+                      child: RepaintBoundary(
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: _buildSeriesCover(colorScheme, maProvider),
                           ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: _buildSeriesCover(colorScheme, maProvider),
+                        ),
                       ),
                     ),
                   ),
@@ -526,6 +541,9 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
       );
     }
 
+    // Return cached cover widget if already built (prevents rebuilds from unrelated setState)
+    if (_cachedCoverWidget != null) return _cachedCoverWidget!;
+
     final covers = _coverUrls;
 
     // Dynamic grid size based on number of covers (matches library screen)
@@ -549,7 +567,8 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
     }
 
     // Build grid using Column/Row for proper sizing (no scrolling issues)
-    return Column(
+    // Cache the widget so it never rebuilds from unrelated setState calls
+    _cachedCoverWidget = Column(
       children: List.generate(gridSize, (row) {
         return Expanded(
           child: Row(
@@ -560,8 +579,11 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
               return Expanded(
                 child: coverUrl != null
                       ? CachedNetworkImage(
+                          key: ValueKey(coverUrl),
                           imageUrl: coverUrl,
                           fit: BoxFit.cover,
+                          memCacheWidth: 256,
+                          memCacheHeight: 256,
                           fadeInDuration: Duration.zero,
                           fadeOutDuration: Duration.zero,
                           placeholder: (_, __) => Container(
@@ -583,6 +605,7 @@ class _AudiobookSeriesScreenState extends State<AudiobookSeriesScreen> {
         );
       }),
     );
+    return _cachedCoverWidget!;
   }
 
   /// Builds an empty cell with either a solid color or a nested grid

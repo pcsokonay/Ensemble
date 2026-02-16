@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'debug_logger.dart';
 import 'settings_service.dart';
 import '../utils/lru_cache.dart';
@@ -259,8 +261,17 @@ class MetadataService {
   /// Cache for album images - includes null entries for failed lookups (200 entries)
   static final NullableLruCache<String, String> _albumImageCache = NullableLruCache(maxSize: 200);
 
-  /// Cache for author images (audiobooks) - includes null entries for failed lookups (100 entries)
-  static final NullableLruCache<String, String> _authorImageCache = NullableLruCache(maxSize: 100);
+  /// Cache for author images (audiobooks) - includes null entries for failed lookups (500 entries)
+  static final NullableLruCache<String, String> _authorImageCache = NullableLruCache(maxSize: 500);
+
+  /// In-flight author image requests for deduplication
+  static final Map<String, Completer<String?>> _authorImageInFlight = {};
+
+  /// SharedPreferences key for persisted author images
+  static const _authorImagePrefsKey = 'author_image_urls';
+
+  /// Whether persisted author images have been loaded into memory cache
+  static bool _authorImageCacheWarmed = false;
 
   /// Fetches album cover URL from Deezer (free, no API key required)
   /// Returns the image URL if found, null otherwise
@@ -649,33 +660,122 @@ class MetadataService {
     return null;
   }
 
-  /// Fetches author image URL from multiple sources with fuzzy name matching
-  /// Priority: 1. Audnexus, 2. Open Library, 3. Wikipedia
-  /// Tries name variations if exact match fails
+  /// Load persisted author image URLs into memory cache on first access
+  static Future<void> _warmAuthorImageCache() async {
+    if (_authorImageCacheWarmed) return;
+    _authorImageCacheWarmed = true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString(_authorImagePrefsKey);
+      if (jsonStr != null) {
+        final map = (json.decode(jsonStr) as Map<String, dynamic>).cast<String, String>();
+        for (final entry in map.entries) {
+          _authorImageCache[entry.key] = entry.value;
+        }
+        _logger.log('📸 Loaded ${map.length} persisted author images');
+      }
+    } catch (e) {
+      _logger.warning('Failed to load persisted author images: $e', context: 'Metadata');
+    }
+  }
+
+  /// Persist an author image URL to SharedPreferences
+  static Future<void> _persistAuthorImage(String cacheKey, String url) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString(_authorImagePrefsKey);
+      final map = jsonStr != null
+          ? (json.decode(jsonStr) as Map<String, dynamic>).cast<String, String>()
+          : <String, String>{};
+      map[cacheKey] = url;
+      // Cap at 500 entries to prevent unbounded growth
+      if (map.length > 500) {
+        final keys = map.keys.toList();
+        for (var i = 0; i < map.length - 500; i++) {
+          map.remove(keys[i]);
+        }
+      }
+      await prefs.setString(_authorImagePrefsKey, json.encode(map));
+    } catch (e) {
+      _logger.warning('Failed to persist author image: $e', context: 'Metadata');
+    }
+  }
+
+  /// Validate that an image URL actually returns an image
+  static Future<bool> _validateImageUrl(String url) async {
+    try {
+      final response = await http.head(Uri.parse(url)).timeout(const Duration(seconds: 3));
+      return response.statusCode == 200 || response.statusCode == 301 ||
+             response.statusCode == 302 || response.statusCode == 307 || response.statusCode == 308;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Try a single source with all name variations, return first validated result
+  static Future<String?> _trySourceWithVariations(
+    Future<String?> Function(String name) source,
+    List<String> variations, {
+    bool alreadyValidated = false,
+  }) async {
+    for (final name in variations) {
+      final url = await source(name);
+      if (url != null) {
+        if (alreadyValidated || await _validateImageUrl(url)) {
+          return url;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Fetches author image URL from multiple sources in parallel
+  /// Sources: 1. Audnexus, 2. Open Library, 3. Wikidata, 4. Wikipedia
+  /// All sources run in parallel; first validated result wins
   static Future<String?> getAuthorImageUrl(String authorName) async {
+    // Warm cache from persistence on first access
+    await _warmAuthorImageCache();
+
     // Check cache first
     final cacheKey = 'authorImage:$authorName';
     if (_authorImageCache.containsKey(cacheKey)) {
       return _authorImageCache[cacheKey];
     }
 
+    // Deduplicate concurrent requests for the same author
+    if (_authorImageInFlight.containsKey(cacheKey)) {
+      return _authorImageInFlight[cacheKey]!.future;
+    }
+
+    final completer = Completer<String?>();
+    _authorImageInFlight[cacheKey] = completer;
+
+    try {
+      final result = await _fetchAuthorImage(authorName, cacheKey);
+      completer.complete(result);
+      return result;
+    } catch (e) {
+      completer.complete(null);
+      return null;
+    } finally {
+      _authorImageInFlight.remove(cacheKey);
+    }
+  }
+
+  /// Internal fetch logic (called once per author, deduplicated)
+  static Future<String?> _fetchAuthorImage(String authorName, String cacheKey) async {
     // Handle comma-separated author names (e.g., "Neil Gaiman, Dirk Maggs")
-    // Try to get image for the first/primary author
     if (authorName.contains(',')) {
       final authors = authorName.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
 
-      // Skip if this looks like "Lastname, Firstname" format or has suffixes
-      // - Second part is initials (J.R.R., J.K., etc.)
-      // - Second part is a suffix (Jr., Sr., III, PhD, etc.)
       final suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'phd', 'ph.d.', 'md', 'm.d.'];
       if (authors.length == 2) {
         final secondPart = authors[1].toLowerCase();
-        // Check if second part is a suffix or looks like initials
         if (suffixes.contains(secondPart) ||
             RegExp(r'^[a-z]\.?\s*[a-z]?\.?\s*[a-z]?\.?$').hasMatch(secondPart)) {
-          // This is "Lastname, First" or "Name, Jr." - don't split
+          // "Lastname, First" or "Name, Jr." - don't split
         } else if (authors[0].split(' ').length > 1 && authors[1].split(' ').length > 1) {
-          // Both parts have multiple words - likely "Author1, Author2"
           for (final author in authors) {
             final result = await getAuthorImageUrl(author);
             if (result != null) {
@@ -683,10 +783,8 @@ class MetadataService {
               return result;
             }
           }
-          // Don't cache null here - fall through to try the full name
         }
       } else if (authors.length > 2) {
-        // Multiple commas = definitely multiple authors
         for (final author in authors) {
           final result = await getAuthorImageUrl(author);
           if (result != null) {
@@ -694,55 +792,28 @@ class MetadataService {
             return result;
           }
         }
-        // Don't cache null - fall through to try full name
       }
     }
 
     // Generate name variations for fuzzy matching
     final variations = _generateNameVariations(authorName);
 
-    // Try each source with all variations before moving to next source
-    // This prioritizes source quality over name variation
+    // Run all sources in parallel - first validated result wins
+    final results = await Future.wait([
+      _trySourceWithVariations(_tryAudnexus, variations),
+      _trySourceWithVariations(_tryOpenLibrary, variations, alreadyValidated: true),
+      _trySourceWithVariations(_tryWikidata, variations.take(2).toList()),
+      _trySourceWithVariations(_tryWikipedia, variations.take(3).toList()),
+    ]);
 
-    // 1. Try Audnexus (best for audiobook authors)
-    for (final name in variations) {
-      final result = await _tryAudnexus(name);
-      if (result != null) {
-        _authorImageCache[cacheKey] = result;
-        return result;
-      }
+    // Pick first non-null result (priority: Audnexus > OpenLibrary > Wikidata > Wikipedia)
+    final result = results[0] ?? results[1] ?? results[2] ?? results[3];
+
+    _authorImageCache[cacheKey] = result;
+    if (result != null) {
+      _persistAuthorImage(cacheKey, result);
     }
-
-    // 2. Try Open Library
-    for (final name in variations) {
-      final result = await _tryOpenLibrary(name);
-      if (result != null) {
-        _authorImageCache[cacheKey] = result;
-        return result;
-      }
-    }
-
-    // 3. Try Wikidata (structured data, good for finding exact person)
-    for (final name in variations.take(2)) {
-      final wikidataResult = await _tryWikidata(name);
-      if (wikidataResult != null) {
-        _authorImageCache[cacheKey] = wikidataResult;
-        return wikidataResult;
-      }
-    }
-
-    // 4. Try Wikipedia (search-based, good fallback)
-    for (final name in variations.take(3)) {
-      final wikiResult = await _tryWikipedia(name);
-      if (wikiResult != null) {
-        _authorImageCache[cacheKey] = wikiResult;
-        return wikiResult;
-      }
-    }
-
-    // Cache the null result to avoid repeated failed lookups
-    _authorImageCache[cacheKey] = null;
-    return null;
+    return result;
   }
 
   /// Cache for lyrics - uses bounded Map with manual size limiting (500 entries max)
