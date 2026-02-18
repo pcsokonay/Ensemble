@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:audio_service/audio_service.dart' as audio_service;
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import '../models/media_item.dart';
 import '../models/player.dart';
 import '../models/provider_instance.dart';
@@ -947,8 +946,7 @@ class MusicAssistantProvider with ChangeNotifier {
       if (syncService.hasCache) {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
-        _tracks = syncService.cachedTracks;
-        _logger.log('📦 Pre-loaded library for favorites: ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks');
+        _logger.log('📦 Pre-loaded library for favorites: ${_albums.length} albums, ${_artists.length} artists');
         _syncLibraryStatusToService();
         notifyListeners();
       }
@@ -2440,11 +2438,19 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   /// Handle Sendspin volume command
-  void _handleSendspinVolume(int volumeLevel) async {
+  void _handleSendspinVolume(int volumeLevel) {
     _logger.log('🔊 Sendspin: Set volume to $volumeLevel');
     _localPlayerVolume = volumeLevel;
-    await FlutterVolumeController.setVolume(volumeLevel / 100.0);
+    _pcmAudioPlayer?.setVolumeGain(volumeLevel / 100.0);
     _sendspinService?.reportState(volume: volumeLevel);
+  }
+
+  /// Called when the user changes the local player volume from within Ensemble.
+  /// Updates [_localPlayerVolume] so the periodic state report reflects the real
+  /// volume, and applies the same gain to the PCM stream.
+  void updateLocalPlayerVolume(int volumeLevel) {
+    _localPlayerVolume = volumeLevel.clamp(0, 100);
+    _pcmAudioPlayer?.setVolumeGain(_localPlayerVolume / 100.0);
   }
 
   /// Handle Sendspin stream start - server is about to send PCM audio data
@@ -2701,7 +2707,7 @@ class MusicAssistantProvider with ChangeNotifier {
           final volume = event['volume_level'] as int? ?? event['volume'] as int?;
           if (volume != null) {
             _localPlayerVolume = volume;
-            await FlutterVolumeController.setVolume(volume / 100.0);
+            _pcmAudioPlayer?.setVolumeGain(volume / 100.0);
           }
           break;
 
@@ -3629,7 +3635,7 @@ class MusicAssistantProvider with ChangeNotifier {
   // DETAIL SCREEN CACHING
   // ============================================================================
 
-  Future<List<Track>> getAlbumTracksWithCache(String provider, String itemId, {bool forceRefresh = false}) async {
+  Future<List<Track>> getAlbumTracksWithCache(String provider, String itemId, {bool forceRefresh = false, Album? album}) async {
     final cacheKey = '${provider}_$itemId';
 
     if (_cacheService.isAlbumTracksCacheValid(cacheKey, forceRefresh: forceRefresh)) {
@@ -3645,10 +3651,28 @@ class MusicAssistantProvider with ChangeNotifier {
 
     if (_api == null) return _cacheService.getCachedAlbumTracks(cacheKey) ?? [];
 
+    // Use actual provider mapping instead of "library" provider when available.
+    // The MA server caches tracks per provider, so using the actual Spotify/etc
+    // provider ID hits the server-side cache instead of re-resolving every time.
+    var fetchProvider = provider;
+    var fetchItemId = itemId;
+    if (album?.providerMappings != null) {
+      final nonLibrary = album!.providerMappings!
+          .where((m) => m.providerInstance != 'library' && m.available)
+          .toList();
+      if (nonLibrary.isNotEmpty) {
+        fetchProvider = nonLibrary.first.providerInstance;
+        fetchItemId = nonLibrary.first.itemId;
+        _logger.log('🔀 Using provider mapping: $fetchProvider/$fetchItemId instead of $provider/$itemId');
+      }
+    }
+
     try {
-      _logger.log('🔄 Fetching fresh album tracks for $cacheKey...');
-      final tracks = await _api!.getAlbumTracks(provider, itemId);
-      _cacheService.setCachedAlbumTracks(cacheKey, tracks);
+      _logger.log('🔄 Fetching fresh album tracks for $fetchProvider/$fetchItemId...');
+      final tracks = await _api!.getAlbumTracks(fetchProvider, fetchItemId);
+      if (tracks.isNotEmpty) {
+        _cacheService.setCachedAlbumTracks(cacheKey, tracks);
+      }
       return tracks;
     } catch (e) {
       _logger.log('❌ Failed to fetch album tracks: $e');
@@ -3675,7 +3699,9 @@ class MusicAssistantProvider with ChangeNotifier {
     try {
       _logger.log('🔄 Fetching fresh playlist tracks for $cacheKey...');
       final tracks = await _api!.getPlaylistTracks(provider, itemId);
-      _cacheService.setCachedPlaylistTracks(cacheKey, tracks);
+      if (tracks.isNotEmpty) {
+        _cacheService.setCachedPlaylistTracks(cacheKey, tracks);
+      }
       return tracks;
     } catch (e) {
       _logger.log('❌ Failed to fetch playlist tracks: $e');
@@ -5277,9 +5303,8 @@ class MusicAssistantProvider with ChangeNotifier {
       if (syncService.hasCache) {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
-        _tracks = syncService.cachedTracks;
         _audiobooks = syncService.cachedAudiobooks;
-        _logger.log('📦 Loaded ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks, ${_audiobooks.length} audiobooks from cache');
+        _logger.log('📦 Loaded ${_albums.length} albums, ${_artists.length} artists, ${_audiobooks.length} audiobooks from cache');
         _syncLibraryStatusToService();
         notifyListeners();
       }
@@ -5311,12 +5336,11 @@ class MusicAssistantProvider with ChangeNotifier {
       if (syncService.status == SyncStatus.completed) {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
-        _tracks = syncService.cachedTracks;
         _audiobooks = syncService.cachedAudiobooks;
         if (syncService.cachedPodcasts.isNotEmpty) {
           _podcasts = syncService.cachedPodcasts;
         }
-        _logger.log('🔄 Updated library from background sync: ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks, ${_audiobooks.length} audiobooks, ${_podcasts.length} podcasts');
+        _logger.log('🔄 Updated library from background sync: ${_albums.length} albums, ${_artists.length} artists, ${_audiobooks.length} audiobooks, ${_podcasts.length} podcasts');
         _syncLibraryStatusToService();
         notifyListeners();
         _prefetchAlbumImages();
@@ -6306,7 +6330,7 @@ class MusicAssistantProvider with ChangeNotifier {
       final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
       if (builtinPlayerId != null && playerId == builtinPlayerId) {
         _localPlayerVolume = volumeLevel;
-        await FlutterVolumeController.setVolume(volumeLevel / 100.0);
+        _pcmAudioPlayer?.setVolumeGain(volumeLevel / 100.0);
       }
       await _api?.setVolume(playerId, volumeLevel);
     } catch (e) {

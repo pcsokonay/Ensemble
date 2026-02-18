@@ -140,6 +140,7 @@ class _VolumeControlState extends State<VolumeControl> {
             _systemVolume = newVolume / 100.0;
           });
         }
+        maProvider.updateLocalPlayerVolume(newVolume);
       } catch (e) {
         _logger.log('Volume: Error setting system volume - $e');
       }
@@ -163,6 +164,7 @@ class _VolumeControlState extends State<VolumeControl> {
 
       if (_isLocalPlayer) {
         FlutterVolumeController.setVolume(volume);
+        maProvider.updateLocalPlayerVolume(volumeLevel);
       } else {
         maProvider.setVolume(playerId, volumeLevel);
       }
@@ -298,6 +300,7 @@ class _VolumeControlState extends State<VolumeControl> {
                         if (_isLocalPlayer) {
                           FlutterVolumeController.setVolume(finalVolume);
                           _systemVolume = finalVolume;
+                          context.read<MusicAssistantProvider>().updateLocalPlayerVolume(volumeLevel);
                         } else {
                           context.read<MusicAssistantProvider>().setVolume(player.playerId, volumeLevel);
                         }
