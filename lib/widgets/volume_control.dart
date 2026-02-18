@@ -72,6 +72,7 @@ class _VolumeControlState extends State<VolumeControl> {
         setState(() {
           _systemVolume = volume;
         });
+        context.read<MusicAssistantProvider>().updateLocalPlayerVolume((volume * 100).round());
       }
     });
   }
