@@ -2451,6 +2451,7 @@ class MusicAssistantProvider with ChangeNotifier {
   void updateLocalPlayerVolume(int volumeLevel) {
     _localPlayerVolume = volumeLevel.clamp(0, 100);
     _pcmAudioPlayer?.setVolumeGain(_localPlayerVolume / 100.0);
+    _sendspinService?.reportState(volume: _localPlayerVolume);
   }
 
   /// Handle Sendspin stream start - server is about to send PCM audio data
