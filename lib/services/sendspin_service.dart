@@ -248,7 +248,7 @@ class SendspinService {
           'client_id': _playerId,
           'name': _playerName,
           'version': 1,  // Protocol version (integer)
-          'supported_roles': ['player'],
+          'supported_roles': ['player@v1'],
           'player@v1_support': {
             'supported_formats': [
               {

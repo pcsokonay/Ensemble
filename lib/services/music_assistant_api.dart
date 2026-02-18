@@ -1621,36 +1621,28 @@ class MusicAssistantAPI {
   }
 
   Future<List<Track>> getAlbumTracks(String provider, String itemId) async {
-    return await RetryHelper.retryNetwork(
-      operation: () async {
-        try {
-          final response = await _sendCommand(
-            'music/albums/album_tracks',
-            args: {
-              'provider_instance_id_or_domain': provider,
-              'item_id': itemId,
-            },
-          );
+    try {
+      final response = await _sendCommand(
+        'music/albums/album_tracks',
+        args: {
+          'provider_instance_id_or_domain': provider,
+          'item_id': itemId,
+        },
+      );
 
-          final items = response['result'] as List<dynamic>?;
-          if (items == null) {
-            _logger.log('No result for album tracks');
-            return <Track>[];
-          }
+      final items = response['result'] as List<dynamic>?;
+      if (items == null) {
+        _logger.log('No result for album tracks');
+        return <Track>[];
+      }
 
-
-          return items
-              .map((item) => Track.fromJson(item as Map<String, dynamic>))
-              .toList();
-        } catch (e) {
-          _logger.log('Error getting album tracks: $e');
-          return <Track>[];
-        }
-      },
-    ).catchError((e) {
-      _logger.log('Error getting album tracks after retries: $e');
-      return <Track>[];
-    });
+      return items
+          .map((item) => Track.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      _logger.log('Error getting album tracks: $e');
+      rethrow;
+    }
   }
 
   /// Get playlists
@@ -1711,35 +1703,28 @@ class MusicAssistantAPI {
 
   /// Get playlist tracks
   Future<List<Track>> getPlaylistTracks(String provider, String itemId) async {
-    return await RetryHelper.retryNetwork(
-      operation: () async {
-        try {
-          final response = await _sendCommand(
-            'music/playlists/playlist_tracks',
-            args: {
-              'provider_instance_id_or_domain': provider,
-              'item_id': itemId,
-            },
-          );
+    try {
+      final response = await _sendCommand(
+        'music/playlists/playlist_tracks',
+        args: {
+          'provider_instance_id_or_domain': provider,
+          'item_id': itemId,
+        },
+      );
 
-          final items = response['result'] as List<dynamic>?;
-          if (items == null) {
-            _logger.log('No result for playlist tracks');
-            return <Track>[];
-          }
+      final items = response['result'] as List<dynamic>?;
+      if (items == null) {
+        _logger.log('No result for playlist tracks');
+        return <Track>[];
+      }
 
-          return items
-              .map((item) => Track.fromJson(item as Map<String, dynamic>))
-              .toList();
-        } catch (e) {
-          _logger.log('Error getting playlist tracks: $e');
-          return <Track>[];
-        }
-      },
-    ).catchError((e) {
-      _logger.log('Error getting playlist tracks after retries: $e');
-      return <Track>[];
-    });
+      return items
+          .map((item) => Track.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      _logger.log('Error getting playlist tracks: $e');
+      rethrow;
+    }
   }
 
   // Favorites

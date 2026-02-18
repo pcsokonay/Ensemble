@@ -573,6 +573,7 @@ class _AlbumDetailsScreenState extends State<AlbumDetailsScreen> with SingleTick
         widget.album.provider,
         widget.album.itemId,
         forceRefresh: cachedTracks != null, // Force refresh if we had cache
+        album: widget.album,
       );
 
       // 3. Update if we got different data

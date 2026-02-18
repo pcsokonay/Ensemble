@@ -174,8 +174,9 @@ class _VolumeControlState extends State<VolumeControl> {
 
   @override
   Widget build(BuildContext context) {
-    // Use select to only rebuild when selectedPlayer changes (not on every provider update)
+    // Use select to only rebuild when selectedPlayer or localPlayerVolume changes
     final player = context.select<MusicAssistantProvider, dynamic>((p) => p.selectedPlayer);
+    final maLocalVolume = context.select<MusicAssistantProvider, int>((p) => p.localPlayerVolume);
 
     if (player == null) {
       return const SizedBox.shrink();
@@ -185,9 +186,9 @@ class _VolumeControlState extends State<VolumeControl> {
 
     // Use pending volume during drag or button tap to prevent stale state issues
     final currentVolume = (_isDragging || _showButtonIndicator)
-        ? (_pendingVolume ?? (_isLocalPlayer ? (_systemVolume ?? 0.5) : player.volume.toDouble() / 100.0))
+        ? (_pendingVolume ?? (_isLocalPlayer ? maLocalVolume / 100.0 : player.volume.toDouble() / 100.0))
         : _isLocalPlayer
-            ? (_systemVolume ?? 0.5)
+            ? maLocalVolume / 100.0
             : player.volume.toDouble() / 100.0;
 
     // Use accent color if provided, otherwise fall back to theme primary

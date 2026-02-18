@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:audio_service/audio_service.dart' as audio_service;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import '../models/media_item.dart';
 import '../models/player.dart';
 import '../models/provider_instance.dart';
@@ -599,6 +600,9 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Home refresh counter - increments when home rows should refresh their data
   int get homeRefreshCounter => _homeRefreshCounter;
+
+  /// Current local (Sendspin) player volume as tracked by MA (0-100).
+  int get localPlayerVolume => _localPlayerVolume;
 
   /// Currently playing audiobook context (with chapters) - set when playing an audiobook
   Audiobook? get currentAudiobook => _currentAudiobook;
@@ -2441,8 +2445,9 @@ class MusicAssistantProvider with ChangeNotifier {
   void _handleSendspinVolume(int volumeLevel) {
     _logger.log('🔊 Sendspin: Set volume to $volumeLevel');
     _localPlayerVolume = volumeLevel;
-    _pcmAudioPlayer?.setVolumeGain(volumeLevel / 100.0);
+    FlutterVolumeController.setVolume(volumeLevel / 100.0);
     _sendspinService?.reportState(volume: volumeLevel);
+    notifyListeners();
   }
 
   /// Called when the user changes the local player volume from within Ensemble.
@@ -2450,8 +2455,8 @@ class MusicAssistantProvider with ChangeNotifier {
   /// volume, and applies the same gain to the PCM stream.
   void updateLocalPlayerVolume(int volumeLevel) {
     _localPlayerVolume = volumeLevel.clamp(0, 100);
-    _pcmAudioPlayer?.setVolumeGain(_localPlayerVolume / 100.0);
     _sendspinService?.reportState(volume: _localPlayerVolume);
+    notifyListeners();
   }
 
   /// Handle Sendspin stream start - server is about to send PCM audio data
@@ -2708,7 +2713,8 @@ class MusicAssistantProvider with ChangeNotifier {
           final volume = event['volume_level'] as int? ?? event['volume'] as int?;
           if (volume != null) {
             _localPlayerVolume = volume;
-            _pcmAudioPlayer?.setVolumeGain(volume / 100.0);
+            FlutterVolumeController.setVolume(volume / 100.0);
+            notifyListeners();
           }
           break;
 
@@ -2814,6 +2820,14 @@ class MusicAssistantProvider with ChangeNotifier {
         if (idx != -1 && _availablePlayers[idx].volumeLevel != eventVolume) {
           _availablePlayers[idx] =
               _availablePlayers[idx].copyWith(volumeLevel: eventVolume);
+        }
+        // If this is the local Sendspin player, sync the tracked volume and slider.
+        // Do NOT call FlutterVolumeController here — _handleSendspinVolume already
+        // sets system volume from the server/command message; calling it again from
+        // player_updated would create a feedback loop via the volume listener.
+        if (playerId == _sendspinService?.playerId && eventVolume != _localPlayerVolume) {
+          _localPlayerVolume = eventVolume;
+          notifyListeners();
         }
       }
 
@@ -6331,7 +6345,7 @@ class MusicAssistantProvider with ChangeNotifier {
       final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
       if (builtinPlayerId != null && playerId == builtinPlayerId) {
         _localPlayerVolume = volumeLevel;
-        _pcmAudioPlayer?.setVolumeGain(volumeLevel / 100.0);
+        FlutterVolumeController.setVolume(volumeLevel / 100.0);
       }
       await _api?.setVolume(playerId, volumeLevel);
     } catch (e) {
