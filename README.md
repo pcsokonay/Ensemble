@@ -158,10 +158,6 @@ A huge thank you to my sponsors! 💖
 
 <a href="https://github.com/pcsokonay"><img src="https://github.com/pcsokonay.png" width="60px" alt="pcsokonay" /></a>
 
-## Contributors
-
-<a href="https://github.com/antoinevandenhurk"><img src="https://github.com/antoinevandenhurk.png" width="60px" alt="antoinevandenhurk" /></a>
-
 ## License
 
 MIT License
