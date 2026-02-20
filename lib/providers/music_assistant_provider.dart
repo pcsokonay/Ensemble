@@ -3473,7 +3473,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Get favorite tracks from the library
   Future<List<Track>> getFavoriteTracks() async {
-    // If full tracks list is loaded, filter from it
+    // Tier 1: filter from in-memory tracks list
     if (_tracks.isNotEmpty) {
       final favTracks = _tracks.where((t) => t.favorite == true).toList();
       // Update cache if we have new data
@@ -3483,8 +3483,24 @@ class MusicAssistantProvider with ChangeNotifier {
       }
       return favTracks;
     }
-    // Otherwise return cached favorites (for instant display before full library loads)
-    return _cachedFavoriteTracks;
+    // Tier 2: return persisted cache
+    if (_cachedFavoriteTracks.isNotEmpty) {
+      return _cachedFavoriteTracks;
+    }
+    // Tier 3: fetch from API directly (e.g. Android Auto before library loads)
+    if (_api != null) {
+      try {
+        final apiFavs = await _api!.getTracks(favoriteOnly: true);
+        if (apiFavs.isNotEmpty) {
+          _cachedFavoriteTracks = apiFavs;
+          _persistFavoriteTracks(apiFavs);
+        }
+        return apiFavs;
+      } catch (e) {
+        _logger.log('❌ Failed to fetch favorite tracks from API: $e');
+      }
+    }
+    return [];
   }
 
   /// Get favorite playlists from the library
