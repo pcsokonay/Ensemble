@@ -150,11 +150,14 @@ If you run Music Assistant as a Home Assistant add-on:
 
 ### Android Auto
 
-1. Connect your phone to your car via USB or wirelessly
-2. Ensemble will appear automatically in Android Auto's app list
-3. Browse your library and play music directly from your car's display
+Since Ensemble is not installed from the Play Store, you need to enable unknown sources in Android Auto:
 
-No additional configuration is needed — Android Auto support works out of the box.
+1. Open **Android Auto** settings on your phone
+2. Tap the **Version** number at the bottom 10 times to enable developer mode
+3. Tap the three-dot menu and open **Developer settings**
+4. Enable **Unknown sources**
+5. Connect your phone to your car via USB or wirelessly
+6. Ensemble will appear in Android Auto's app list
 
 ### Remote Access
 
