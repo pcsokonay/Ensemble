@@ -86,6 +86,13 @@ This application was built with AI-assisted development using **Claude Code** an
 - **Skip Controls** - Skip forward/backward during playback
 - **High-Resolution Artwork** - Fetched via iTunes for best quality
 
+### Android Auto
+- **Media Browsing** - Browse your library from your car's display with categories for Home, Music, Audiobooks, Podcasts, and Radio
+- **Voice Search** - Find and play tracks using voice commands
+- **Full Playback Controls** - Play, pause, and skip from your car's head unit
+- **Album Art & Metadata** - Track info and artwork displayed on your car's screen
+- **Smart Queueing** - Tap any track in an album or playlist to play from that point with the full queue
+
 ### Smart Features
 - **Instant App Restore** - App loads instantly with cached library data while syncing in background
 - **Auto-Reconnect** - Automatically reconnects when connection is lost
@@ -140,6 +147,14 @@ To find the correct URL:
 If you run Music Assistant as a Home Assistant add-on:
 - Use the IP address of your Home Assistant server
 - Do **not** use your Home Assistant URL or ingress URL
+
+### Android Auto
+
+1. Connect your phone to your car via USB or wirelessly
+2. Ensemble will appear automatically in Android Auto's app list
+3. Browse your library and play music directly from your car's display
+
+No additional configuration is needed — Android Auto support works out of the box.
 
 ### Remote Access
 
