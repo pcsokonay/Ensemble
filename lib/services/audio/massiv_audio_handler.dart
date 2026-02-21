@@ -12,7 +12,7 @@ import '../../models/media_item.dart' as ma;
 
 /// Custom AudioHandler for Ensemble that provides full control over
 /// notification actions and metadata updates.
-class MassivAudioHandler extends BaseAudioHandler with SeekHandler {
+class MassivAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   final AudioPlayer _player = AudioPlayer();
   final AuthManager authManager;
   final _logger = DebugLogger();
