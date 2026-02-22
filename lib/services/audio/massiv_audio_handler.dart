@@ -335,6 +335,7 @@ class MassivAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler
   /// Called from _MusicAssistantAppState.initState().
   void setProvider(MusicAssistantProvider provider) {
     _autoProvider = provider;
+    _logger.log('AndroidAuto: provider set');
   }
 
   // Media ID constants — root categories
@@ -377,7 +378,10 @@ class MassivAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler
   Future<List<MediaItem>> getChildren(String parentMediaId,
       [Map<String, dynamic>? options]) async {
     final provider = _autoProvider;
-    if (provider == null) return [];
+    if (provider == null) {
+      _logger.log('AndroidAuto: getChildren("$parentMediaId") — provider not set yet');
+      return [];
+    }
 
     // Ensure provider is connected — AA may browse before app is fully ready
     if (!provider.isConnected) {
