@@ -19,6 +19,9 @@ class MainActivity: AudioServiceActivity() {
     private val CHANNEL = "com.collotsspot.ensemble/volume_buttons"
     private var methodChannel: MethodChannel? = null
     private var isListening = false
+    // Set to true when MA is actively playing (sent from Flutter).
+    // Used by the volume observer to suppress volume mirroring when MA is not streaming.
+    private var isMAPlaying = false
 
     // Volume observer for lockscreen volume changes
     // Watches system STREAM_MUSIC volume and mirrors changes to the MA player
@@ -66,6 +69,14 @@ class MainActivity: AudioServiceActivity() {
                     // Sync system volume to match MA player volume (0-100)
                     val volume = call.argument<Int>("volume") ?: 0
                     syncSystemVolume(volume)
+                    result.success(null)
+                }
+                "setMAPlayingState" -> {
+                    // Flutter notifies us whether MA is actively playing.
+                    // The volume observer uses this to suppress mirroring when
+                    // MA is paused, idle, or stopped.
+                    isMAPlaying = call.argument<Boolean>("isPlaying") ?: false
+                    Log.d(TAG, "MA playing state updated: isMAPlaying=$isMAPlaying")
                     result.success(null)
                 }
                 else -> {
@@ -123,31 +134,62 @@ class MainActivity: AudioServiceActivity() {
         ignoringVolumeChange = true
         am.setStreamVolume(AudioManager.STREAM_MUSIC, systemVolume, 0)
         lastKnownVolume = systemVolume
-        ignoringVolumeChange = false
+        // Clear the guard after a short delay so the ContentObserver's echo
+        // (dispatched asynchronously via Handler) is still suppressed.
+        // 100ms is plenty — the echo arrives within one main-thread frame (~16ms).
+        Handler(Looper.getMainLooper()).postDelayed({ ignoringVolumeChange = false }, 100)
         Log.d(TAG, "Synced system volume: MA $maVolume% -> system $systemVolume/$maxSystemVolume")
     }
 
     /// ContentObserver that watches for system volume changes.
     /// When volume changes (e.g., from lockscreen hardware buttons),
-    /// maps the change to a 0-100 value and sends to Flutter.
+    /// maps the change to a 0-100 value and sends to Flutter along with
+    /// the button direction (+1 up, -1 down).
     inner class VolumeContentObserver(handler: Handler) : ContentObserver(handler) {
         override fun onChange(selfChange: Boolean) {
             super.onChange(selfChange)
 
-            if (ignoringVolumeChange) return
-
             val am = audioManager ?: return
             val currentVolume = am.getStreamVolume(AudioManager.STREAM_MUSIC)
 
-            if (currentVolume != lastKnownVolume) {
+            // Always track the real system volume BEFORE checking guards.
+            // This ensures direction detection is accurate even after periods
+            // where events were suppressed (e.g., MA was paused, or during
+            // the ignoringVolumeChange window after syncSystemVolume).
+            val previousVolume = lastKnownVolume
+            lastKnownVolume = currentVolume
+
+            // Guards: suppress the event but volume tracking above stays accurate.
+            if (ignoringVolumeChange) return
+            if (!isMAPlaying) return
+            if (am.isMusicActive) return
+            if (am.mode != AudioManager.MODE_NORMAL) return
+
+            if (currentVolume != previousVolume) {
                 val maxVolume = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                 val maVolume = if (maxVolume > 0) (currentVolume * 100 / maxVolume) else 0
+                val prevMaVolume = if (maxVolume > 0) (previousVolume * 100 / maxVolume) else 0
+                val direction = if (currentVolume > previousVolume) 1 else -1
+                // Per-step delta mapped to 0-100 scale so Flutter can match
+                // the system volume rate of change exactly.
+                val delta = Math.abs(maVolume - prevMaVolume)
 
-                Log.d(TAG, "Volume observer: system $lastKnownVolume -> $currentVolume (MA: $maVolume%)")
-                lastKnownVolume = currentVolume
+                Log.d(TAG, "Volume observer: system $previousVolume -> $currentVolume (MA: $maVolume%, delta: $delta, dir: $direction)")
 
-                // Send the absolute volume (0-100) to Flutter
-                methodChannel?.invokeMethod("absoluteVolumeChange", maVolume)
+                // Send volume + direction + delta to Flutter
+                methodChannel?.invokeMethod("absoluteVolumeChange", mapOf("volume" to maVolume, "direction" to direction, "delta" to delta))
+
+                // Reset system volume to the midpoint of its range so the
+                // ContentObserver always has room to detect the next press
+                // in either direction.  Without this, holding a button drives
+                // the system to 0 or max and further presses are invisible.
+                val midpoint = maxVolume / 2
+                if (currentVolume != midpoint) {
+                    ignoringVolumeChange = true
+                    am.setStreamVolume(AudioManager.STREAM_MUSIC, midpoint, 0)
+                    lastKnownVolume = midpoint
+                    Handler(Looper.getMainLooper()).postDelayed({ ignoringVolumeChange = false }, 100)
+                }
             }
         }
     }
@@ -197,17 +239,17 @@ class MainActivity: AudioServiceActivity() {
         }
     }
 
-    // Pause volume interception when app goes to background so hardware buttons
-    // only control the system volume (e.g., YouTube, phone ringer) as expected.
+    // Pause foreground key interception (dispatchKeyEvent) when the app goes to background
+    // so hardware volume buttons don't intercept YouTube, ringer, etc.
+    // The volume observer is intentionally kept alive across pause/resume — it is the
+    // mechanism that routes lockscreen hardware-button presses to the MA player, and
+    // it already guards against unwanted mirroring via isMAPlaying / isMusicActive / mode.
     private var wasListeningBeforePause = false
-    private var wasObservingBeforePause = false
 
     override fun onPause() {
         wasListeningBeforePause = isListening
-        wasObservingBeforePause = isObservingVolume
         isListening = false
-        stopVolumeObserver()
-        Log.d(TAG, "onPause: suspended volume interception (wasListening=$wasListeningBeforePause, wasObserving=$wasObservingBeforePause)")
+        Log.d(TAG, "onPause: suspended key interception (wasListening=$wasListeningBeforePause), volume observer remains active")
         super.onPause()
     }
 
@@ -216,10 +258,7 @@ class MainActivity: AudioServiceActivity() {
         if (wasListeningBeforePause) {
             isListening = true
         }
-        if (wasObservingBeforePause) {
-            startVolumeObserver(null)
-        }
-        Log.d(TAG, "onResume: restored volume interception (listening=$isListening, observing=$isObservingVolume)")
+        Log.d(TAG, "onResume: restored key interception (listening=$isListening)")
     }
 
     override fun onDestroy() {
