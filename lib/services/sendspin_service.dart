@@ -249,7 +249,7 @@ class SendspinService {
           'name': _playerName,
           'version': 1,  // Protocol version (integer)
           'supported_roles': ['player@v1'],
-          'player_support': {
+          'player@v1_support': {
             'supported_formats': [
               {
                 'codec': 'pcm',
@@ -427,7 +427,25 @@ class SendspinService {
           }
           break;
 
+        case 'server/command':
+          final cmdPayload = data['payload'] as Map<String, dynamic>?;
+          final playerCmd = cmdPayload?['player'] as Map<String, dynamic>?;
+          final command = playerCmd?['command'] as String?;
+          if (command == 'volume') {
+            final level = playerCmd?['volume'] as int?;
+            if (level != null) {
+              _volume = level;
+              onVolume?.call(level);
+            }
+          } else if (command == 'mute') {
+            final muted = playerCmd?['mute'] as bool? ?? false;
+            _isMuted = muted;
+            onVolume?.call(muted ? 0 : _volume);
+          }
+          break;
+
         case 'volume':
+          // Legacy protocol - kept for compatibility
           final level = data['level'] as int?;
           if (level != null) {
             _volume = level;
@@ -523,7 +541,7 @@ class SendspinService {
 
     try {
       final json = jsonEncode(message);
-      _logger.log('Sendspin: Sending message: ${message['type']}');
+      _logger.debug('Sendspin: Sending message: ${message['type']}');
       _channel!.sink.add(json);
     } catch (e) {
       _logger.log('Sendspin: Error sending message: $e');

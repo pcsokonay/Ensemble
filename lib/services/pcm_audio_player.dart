@@ -88,6 +88,9 @@ class PcmAudioPlayer {
   // Each chunk is ~4KB, so max ~500 chunks
   static const int _maxBufferChunks = 500;
 
+  // Software volume gain (0.0 = silent, 1.0 = full volume)
+  double _volumeGain = 1.0;
+
   // Stats
   int _framesPlayed = 0;
   int _bytesPlayed = 0;
@@ -112,6 +115,11 @@ class PcmAudioPlayer {
   bool get isTransitioning => _state == PcmPlayerState.pausing ||
                                _state == PcmPlayerState.resuming ||
                                _state == PcmPlayerState.stopping;
+
+  /// Set software volume gain (0.0 = silent, 1.0 = full). Applied to PCM samples at feed time.
+  void setVolumeGain(double gain) {
+    _volumeGain = gain.clamp(0.0, 1.0);
+  }
 
   /// Check if feeding should be blocked
   bool get _shouldBlockFeeding => isTransitioning || _state == PcmPlayerState.paused;
@@ -360,7 +368,10 @@ class PcmAudioPlayer {
 
         // Convert Uint8List (raw bytes) to Int16 samples
         // Sendspin sends 16-bit little-endian PCM
-        final samples = _bytesToInt16List(chunk);
+        final rawSamples = _bytesToInt16List(chunk);
+        final samples = _volumeGain == 1.0
+            ? rawSamples
+            : rawSamples.map((s) => (s * _volumeGain).round().clamp(-32768, 32767)).toList();
 
         // Check state again before the async feed call
         if (samples.isNotEmpty && !_shouldBlockFeeding) {

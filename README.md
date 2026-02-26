@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/images/ensemble_logo.png" alt="Ensemble Logo" height="200">
 
-  [![GitHub release](https://img.shields.io/badge/Release-v3.0.3-blue?style=for-the-badge&logo=github)](https://github.com/CollotsSpot/Ensemble/releases)
+  [![GitHub release](https://img.shields.io/badge/Release-v3.0.4-blue?style=for-the-badge&logo=github)](https://github.com/CollotsSpot/Ensemble/releases)
   [![GitHub Downloads](https://img.shields.io/github/downloads/CollotsSpot/Ensemble/latest/total?style=for-the-badge&logo=android&label=APK%20Downloads&color=green)](https://github.com/CollotsSpot/Ensemble/releases/latest)
   [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
   [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?style=for-the-badge&logo=GitHub%20Sponsors&logoColor=white)](https://github.com/sponsors/CollotsSpot)
@@ -86,6 +86,13 @@ This application was built with AI-assisted development using **Claude Code** an
 - **Skip Controls** - Skip forward/backward during playback
 - **High-Resolution Artwork** - Fetched via iTunes for best quality
 
+### Android Auto
+- **Media Browsing** - Browse your library from your car's display with categories for Home, Music, Audiobooks, Podcasts, and Radio
+- **Voice Search** - Find and play tracks using voice commands
+- **Full Playback Controls** - Play, pause, and skip from your car's head unit
+- **Album Art & Metadata** - Track info and artwork displayed on your car's screen
+- **Smart Queueing** - Tap any track in an album or playlist to play from that point with the full queue
+
 ### Smart Features
 - **Instant App Restore** - App loads instantly with cached library data while syncing in background
 - **Auto-Reconnect** - Automatically reconnects when connection is lost
@@ -141,6 +148,17 @@ If you run Music Assistant as a Home Assistant add-on:
 - Use the IP address of your Home Assistant server
 - Do **not** use your Home Assistant URL or ingress URL
 
+### Android Auto
+
+Since Ensemble is not installed from the Play Store, you need to enable unknown sources in Android Auto:
+
+1. Open **Android Auto** settings on your phone
+2. Tap the **Version** number at the bottom 10 times to enable developer mode
+3. Tap the three-dot menu and open **Developer settings**
+4. Enable **Unknown sources**
+5. Connect your phone to your car via USB or wirelessly
+6. Ensemble will appear in Android Auto's app list
+
 ### Remote Access
 
 For access outside your home network, you'll need to expose Music Assistant through a reverse proxy (e.g., Traefik, Nginx Proxy Manager, Cloudflare Tunnel).
@@ -157,6 +175,7 @@ For access outside your home network, you'll need to expose Music Assistant thro
 A huge thank you to my sponsors! 💖
 
 <a href="https://github.com/pcsokonay"><img src="https://github.com/pcsokonay.png" width="60px" alt="pcsokonay" /></a>
+<a href="https://github.com/githubchb"><img src="https://github.com/githubchb.png" width="60px" alt="githubchb" /></a>
 
 ## License
 

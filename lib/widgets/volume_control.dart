@@ -72,6 +72,7 @@ class _VolumeControlState extends State<VolumeControl> {
         setState(() {
           _systemVolume = volume;
         });
+        context.read<MusicAssistantProvider>().updateLocalPlayerVolume((volume * 100).round());
       }
     });
   }
@@ -140,6 +141,7 @@ class _VolumeControlState extends State<VolumeControl> {
             _systemVolume = newVolume / 100.0;
           });
         }
+        maProvider.updateLocalPlayerVolume(newVolume);
       } catch (e) {
         _logger.log('Volume: Error setting system volume - $e');
       }
@@ -163,6 +165,7 @@ class _VolumeControlState extends State<VolumeControl> {
 
       if (_isLocalPlayer) {
         FlutterVolumeController.setVolume(volume);
+        maProvider.updateLocalPlayerVolume(volumeLevel);
       } else {
         maProvider.setVolume(playerId, volumeLevel);
       }
@@ -171,8 +174,9 @@ class _VolumeControlState extends State<VolumeControl> {
 
   @override
   Widget build(BuildContext context) {
-    // Use select to only rebuild when selectedPlayer changes (not on every provider update)
+    // Use select to only rebuild when selectedPlayer or localPlayerVolume changes
     final player = context.select<MusicAssistantProvider, dynamic>((p) => p.selectedPlayer);
+    final maLocalVolume = context.select<MusicAssistantProvider, int>((p) => p.localPlayerVolume);
 
     if (player == null) {
       return const SizedBox.shrink();
@@ -182,9 +186,9 @@ class _VolumeControlState extends State<VolumeControl> {
 
     // Use pending volume during drag or button tap to prevent stale state issues
     final currentVolume = (_isDragging || _showButtonIndicator)
-        ? (_pendingVolume ?? (_isLocalPlayer ? (_systemVolume ?? 0.5) : player.volume.toDouble() / 100.0))
+        ? (_pendingVolume ?? (_isLocalPlayer ? maLocalVolume / 100.0 : player.volume.toDouble() / 100.0))
         : _isLocalPlayer
-            ? (_systemVolume ?? 0.5)
+            ? maLocalVolume / 100.0
             : player.volume.toDouble() / 100.0;
 
     // Use accent color if provided, otherwise fall back to theme primary
@@ -298,6 +302,7 @@ class _VolumeControlState extends State<VolumeControl> {
                         if (_isLocalPlayer) {
                           FlutterVolumeController.setVolume(finalVolume);
                           _systemVolume = finalVolume;
+                          context.read<MusicAssistantProvider>().updateLocalPlayerVolume(volumeLevel);
                         } else {
                           context.read<MusicAssistantProvider>().setVolume(player.playerId, volumeLevel);
                         }

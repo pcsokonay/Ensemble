@@ -154,6 +154,7 @@ class _MusicAssistantAppState extends State<MusicAssistantApp> with WidgetsBindi
     _musicProvider = MusicAssistantProvider();
     _themeProvider = ThemeProvider();
     _localeProvider = LocaleProvider();
+    audioHandler.setProvider(_musicProvider);
     WidgetsBinding.instance.addObserver(this);
     _initHardwareVolumeControl();
     // Listen to player selection changes to toggle volume interception

@@ -601,6 +601,9 @@ class MusicAssistantProvider with ChangeNotifier {
   /// Home refresh counter - increments when home rows should refresh their data
   int get homeRefreshCounter => _homeRefreshCounter;
 
+  /// Current local (Sendspin) player volume as tracked by MA (0-100).
+  int get localPlayerVolume => _localPlayerVolume;
+
   /// Currently playing audiobook context (with chapters) - set when playing an audiobook
   Audiobook? get currentAudiobook => _currentAudiobook;
 
@@ -947,8 +950,7 @@ class MusicAssistantProvider with ChangeNotifier {
       if (syncService.hasCache) {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
-        _tracks = syncService.cachedTracks;
-        _logger.log('📦 Pre-loaded library for favorites: ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks');
+        _logger.log('📦 Pre-loaded library for favorites: ${_albums.length} albums, ${_artists.length} artists');
         _syncLibraryStatusToService();
         notifyListeners();
       }
@@ -2440,11 +2442,21 @@ class MusicAssistantProvider with ChangeNotifier {
   }
 
   /// Handle Sendspin volume command
-  void _handleSendspinVolume(int volumeLevel) async {
+  void _handleSendspinVolume(int volumeLevel) {
     _logger.log('🔊 Sendspin: Set volume to $volumeLevel');
     _localPlayerVolume = volumeLevel;
-    await FlutterVolumeController.setVolume(volumeLevel / 100.0);
+    FlutterVolumeController.setVolume(volumeLevel / 100.0);
     _sendspinService?.reportState(volume: volumeLevel);
+    notifyListeners();
+  }
+
+  /// Called when the user changes the local player volume from within Ensemble.
+  /// Updates [_localPlayerVolume] so the periodic state report reflects the real
+  /// volume, and applies the same gain to the PCM stream.
+  void updateLocalPlayerVolume(int volumeLevel) {
+    _localPlayerVolume = volumeLevel.clamp(0, 100);
+    _sendspinService?.reportState(volume: _localPlayerVolume);
+    notifyListeners();
   }
 
   /// Handle Sendspin stream start - server is about to send PCM audio data
@@ -2701,7 +2713,8 @@ class MusicAssistantProvider with ChangeNotifier {
           final volume = event['volume_level'] as int? ?? event['volume'] as int?;
           if (volume != null) {
             _localPlayerVolume = volume;
-            await FlutterVolumeController.setVolume(volume / 100.0);
+            FlutterVolumeController.setVolume(volume / 100.0);
+            notifyListeners();
           }
           break;
 
@@ -2807,6 +2820,14 @@ class MusicAssistantProvider with ChangeNotifier {
         if (idx != -1 && _availablePlayers[idx].volumeLevel != eventVolume) {
           _availablePlayers[idx] =
               _availablePlayers[idx].copyWith(volumeLevel: eventVolume);
+        }
+        // If this is the local Sendspin player, sync the tracked volume and slider.
+        // Do NOT call FlutterVolumeController here — _handleSendspinVolume already
+        // sets system volume from the server/command message; calling it again from
+        // player_updated would create a feedback loop via the volume listener.
+        if (playerId == _sendspinService?.playerId && eventVolume != _localPlayerVolume) {
+          _localPlayerVolume = eventVolume;
+          notifyListeners();
         }
       }
 
@@ -3042,7 +3063,7 @@ class MusicAssistantProvider with ChangeNotifier {
             _cacheService.setCachedTrackForPlayer(playerId, mergedTrack);
             _logger.log('📋 Merged album info into existing track for $playerName: ${albumName}');
           } else {
-            _logger.log('📋 Skipped caching for $playerName - already have better data (artist: $existingHasProperArtist, image: $existingHasImage)');
+            _logger.debug('📋 Skipped caching for $playerName - already have better data (artist: $existingHasProperArtist, image: $existingHasImage)');
           }
 
           // For selected player, _updatePlayerState() is already called above which fetches queue data
@@ -3452,7 +3473,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
   /// Get favorite tracks from the library
   Future<List<Track>> getFavoriteTracks() async {
-    // If full tracks list is loaded, filter from it
+    // Tier 1: filter from in-memory tracks list
     if (_tracks.isNotEmpty) {
       final favTracks = _tracks.where((t) => t.favorite == true).toList();
       // Update cache if we have new data
@@ -3462,8 +3483,24 @@ class MusicAssistantProvider with ChangeNotifier {
       }
       return favTracks;
     }
-    // Otherwise return cached favorites (for instant display before full library loads)
-    return _cachedFavoriteTracks;
+    // Tier 2: return persisted cache
+    if (_cachedFavoriteTracks.isNotEmpty) {
+      return _cachedFavoriteTracks;
+    }
+    // Tier 3: fetch from API directly (e.g. Android Auto before library loads)
+    if (_api != null) {
+      try {
+        final apiFavs = await _api!.getTracks(favoriteOnly: true);
+        if (apiFavs.isNotEmpty) {
+          _cachedFavoriteTracks = apiFavs;
+          _persistFavoriteTracks(apiFavs);
+        }
+        return apiFavs;
+      } catch (e) {
+        _logger.log('❌ Failed to fetch favorite tracks from API: $e');
+      }
+    }
+    return [];
   }
 
   /// Get favorite playlists from the library
@@ -3629,7 +3666,7 @@ class MusicAssistantProvider with ChangeNotifier {
   // DETAIL SCREEN CACHING
   // ============================================================================
 
-  Future<List<Track>> getAlbumTracksWithCache(String provider, String itemId, {bool forceRefresh = false}) async {
+  Future<List<Track>> getAlbumTracksWithCache(String provider, String itemId, {bool forceRefresh = false, Album? album}) async {
     final cacheKey = '${provider}_$itemId';
 
     if (_cacheService.isAlbumTracksCacheValid(cacheKey, forceRefresh: forceRefresh)) {
@@ -3645,10 +3682,28 @@ class MusicAssistantProvider with ChangeNotifier {
 
     if (_api == null) return _cacheService.getCachedAlbumTracks(cacheKey) ?? [];
 
+    // Use actual provider mapping instead of "library" provider when available.
+    // The MA server caches tracks per provider, so using the actual Spotify/etc
+    // provider ID hits the server-side cache instead of re-resolving every time.
+    var fetchProvider = provider;
+    var fetchItemId = itemId;
+    if (album?.providerMappings != null) {
+      final nonLibrary = album!.providerMappings!
+          .where((m) => m.providerInstance != 'library' && m.available)
+          .toList();
+      if (nonLibrary.isNotEmpty) {
+        fetchProvider = nonLibrary.first.providerInstance;
+        fetchItemId = nonLibrary.first.itemId;
+        _logger.log('🔀 Using provider mapping: $fetchProvider/$fetchItemId instead of $provider/$itemId');
+      }
+    }
+
     try {
-      _logger.log('🔄 Fetching fresh album tracks for $cacheKey...');
-      final tracks = await _api!.getAlbumTracks(provider, itemId);
-      _cacheService.setCachedAlbumTracks(cacheKey, tracks);
+      _logger.log('🔄 Fetching fresh album tracks for $fetchProvider/$fetchItemId...');
+      final tracks = await _api!.getAlbumTracks(fetchProvider, fetchItemId);
+      if (tracks.isNotEmpty) {
+        _cacheService.setCachedAlbumTracks(cacheKey, tracks);
+      }
       return tracks;
     } catch (e) {
       _logger.log('❌ Failed to fetch album tracks: $e');
@@ -3675,7 +3730,9 @@ class MusicAssistantProvider with ChangeNotifier {
     try {
       _logger.log('🔄 Fetching fresh playlist tracks for $cacheKey...');
       final tracks = await _api!.getPlaylistTracks(provider, itemId);
-      _cacheService.setCachedPlaylistTracks(cacheKey, tracks);
+      if (tracks.isNotEmpty) {
+        _cacheService.setCachedPlaylistTracks(cacheKey, tracks);
+      }
       return tracks;
     } catch (e) {
       _logger.log('❌ Failed to fetch playlist tracks: $e');
@@ -4499,7 +4556,7 @@ class MusicAssistantProvider with ChangeNotifier {
         return;
       }
       // Sendspin PCM player - continue to start timer
-      _logger.log('🔔 Starting notification timer for Sendspin PCM player');
+      _logger.debug('🔔 Starting notification timer for Sendspin PCM player');
     }
 
     // Only run timer if player is playing
@@ -4743,7 +4800,7 @@ class MusicAssistantProvider with ChangeNotifier {
   /// Called when playback stops (player state becomes idle)
   void _startIdleServiceTimer() {
     _idleServiceTimer?.cancel();
-    _logger.log('⏱️ Starting idle service timer (${_idleServiceTimeout.inMinutes} min)');
+    _logger.debug('⏱️ Starting idle service timer (${_idleServiceTimeout.inMinutes} min)');
     _idleServiceTimer = Timer(_idleServiceTimeout, () {
       _logger.log('⏱️ Idle service timeout reached - stopping foreground service');
       audioHandler.stopService();
@@ -5277,9 +5334,8 @@ class MusicAssistantProvider with ChangeNotifier {
       if (syncService.hasCache) {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
-        _tracks = syncService.cachedTracks;
         _audiobooks = syncService.cachedAudiobooks;
-        _logger.log('📦 Loaded ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks, ${_audiobooks.length} audiobooks from cache');
+        _logger.log('📦 Loaded ${_albums.length} albums, ${_artists.length} artists, ${_audiobooks.length} audiobooks from cache');
         _syncLibraryStatusToService();
         notifyListeners();
       }
@@ -5311,12 +5367,11 @@ class MusicAssistantProvider with ChangeNotifier {
       if (syncService.status == SyncStatus.completed) {
         _albums = syncService.cachedAlbums;
         _artists = syncService.cachedArtists;
-        _tracks = syncService.cachedTracks;
         _audiobooks = syncService.cachedAudiobooks;
         if (syncService.cachedPodcasts.isNotEmpty) {
           _podcasts = syncService.cachedPodcasts;
         }
-        _logger.log('🔄 Updated library from background sync: ${_albums.length} albums, ${_artists.length} artists, ${_tracks.length} tracks, ${_audiobooks.length} audiobooks, ${_podcasts.length} podcasts');
+        _logger.log('🔄 Updated library from background sync: ${_albums.length} albums, ${_artists.length} artists, ${_audiobooks.length} audiobooks, ${_podcasts.length} podcasts');
         _syncLibraryStatusToService();
         notifyListeners();
         _prefetchAlbumImages();
@@ -5675,7 +5730,7 @@ class MusicAssistantProvider with ChangeNotifier {
 
         final itemJsonList = queue.items.map((item) => jsonEncode(item.toJson())).toList();
         await DatabaseService.instance.saveQueue(playerId, itemJsonList);
-        _logger.log('💾 Persisted ${queue.items.length} queue items to database');
+        _logger.debug('💾 Persisted ${queue.items.length} queue items to database');
       } catch (e) {
         _logger.log('⚠️ Error persisting queue to database: $e');
       }
@@ -6306,7 +6361,7 @@ class MusicAssistantProvider with ChangeNotifier {
       final builtinPlayerId = await SettingsService.getBuiltinPlayerId();
       if (builtinPlayerId != null && playerId == builtinPlayerId) {
         _localPlayerVolume = volumeLevel;
-        await FlutterVolumeController.setVolume(volumeLevel / 100.0);
+        FlutterVolumeController.setVolume(volumeLevel / 100.0);
       }
       await _api?.setVolume(playerId, volumeLevel);
     } catch (e) {
