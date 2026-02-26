@@ -32,6 +32,10 @@ class MainActivity: AudioServiceActivity() {
     private var lastKnownVolume: Int = -1
     // Guard flag to ignore volume changes triggered by our own setStreamVolume calls
     private var ignoringVolumeChange = false
+    // Tracks the estimated MA volume locally so the system slider can shadow
+    // the MA position without a Flutter round-trip.  Updated in lockstep with
+    // every observer event and reset by syncSystemVolume / startVolumeObserver.
+    private var estimatedMAVolume = 50
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -97,6 +101,7 @@ class MainActivity: AudioServiceActivity() {
 
         // Optionally set system volume to match the MA player's current volume
         if (initialVolume != null) {
+            estimatedMAVolume = initialVolume
             syncSystemVolume(initialVolume)
         }
 
@@ -130,6 +135,8 @@ class MainActivity: AudioServiceActivity() {
         val am = audioManager ?: return
         val maxSystemVolume = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val systemVolume = (maVolume * maxSystemVolume / 100).coerceIn(0, maxSystemVolume)
+
+        estimatedMAVolume = maVolume
 
         ignoringVolumeChange = true
         am.setStreamVolume(AudioManager.STREAM_MUSIC, systemVolume, 0)
@@ -176,18 +183,22 @@ class MainActivity: AudioServiceActivity() {
 
                 Log.d(TAG, "Volume observer: system $previousVolume -> $currentVolume (MA: $maVolume%, delta: $delta, dir: $direction)")
 
+                // Update local MA estimate so the system slider can shadow it.
+                estimatedMAVolume = (estimatedMAVolume + direction * delta).coerceIn(0, 100)
+
                 // Send volume + direction + delta to Flutter
                 methodChannel?.invokeMethod("absoluteVolumeChange", mapOf("volume" to maVolume, "direction" to direction, "delta" to delta))
 
-                // Reset system volume to the midpoint of its range so the
-                // ContentObserver always has room to detect the next press
-                // in either direction.  Without this, holding a button drives
-                // the system to 0 or max and further presses are invisible.
-                val midpoint = maxVolume / 2
-                if (currentVolume != midpoint) {
+                // Reset system volume to the position matching our estimated MA
+                // volume, clamped to [1, max-1] so the ContentObserver always
+                // has room to detect the next press in either direction.
+                // This makes the system slider visually shadow the MA volume
+                // instead of snapping to midpoint.
+                val targetSystemVol = (estimatedMAVolume * maxVolume / 100).coerceIn(1, maxVolume - 1)
+                if (currentVolume != targetSystemVol) {
                     ignoringVolumeChange = true
-                    am.setStreamVolume(AudioManager.STREAM_MUSIC, midpoint, 0)
-                    lastKnownVolume = midpoint
+                    am.setStreamVolume(AudioManager.STREAM_MUSIC, targetSystemVol, 0)
+                    lastKnownVolume = targetSystemVol
                     Handler(Looper.getMainLooper()).postDelayed({ ignoringVolumeChange = false }, 100)
                 }
             }
